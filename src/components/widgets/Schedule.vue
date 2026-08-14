@@ -453,6 +453,12 @@
                 v-show="!hideRoot"
               >
                 <div
+                  class="cut-gap-catcher"
+                  :style="cutGapCatcherStyle()"
+                  @click="onBarCutClick(rootElement, $event)"
+                  v-if="cutMode && rootElement.editable"
+                ></div>
+                <div
                   class="timebar-wrapper"
                   :class="{
                     thinner: multiline
@@ -636,6 +642,13 @@
                     v-if="withGhosts && childElement.nextElement"
                   ></div>
 
+                  <div
+                    class="cut-gap-catcher"
+                    :style="cutGapCatcherStyle()"
+                    @click="onBarCutClick(childElement, $event)"
+                    v-if="cutMode && withEstimations"
+                  ></div>
+
                   <template v-if="withEstimations">
                     <div
                       class="timebar"
@@ -746,6 +759,12 @@
                         <briefcase-icon class="day-off-icon" :size="14" />
                       </div>
                       <template :key="index" v-for="(task, index) in subchild">
+                        <div
+                          class="cut-gap-catcher"
+                          :style="cutGapCatcherStyle(5 + 38 * task.line, 34)"
+                          @click="onBarCutClick(task, $event)"
+                          v-if="cutMode"
+                        ></div>
                         <div
                           class="timebar"
                           :class="{
@@ -2337,6 +2356,21 @@ const getBars = timeElement => {
 
 const isCut = timeElement => timeElement?.segments?.length > 0
 
+// A cut bar only paints a `.timebar` where a segment actually sits, so the
+// gap between two pieces has no element to click on. This sits behind the
+// segments (earlier in the DOM, so a segment always wins the hit test on
+// its own area) and fills the row so a click anywhere in the gap still
+// resolves to a day and can heal it.
+const cutGapCatcherStyle = (top = '0', height = '100%') => ({
+  position: 'absolute',
+  top: typeof top === 'number' ? `${top}px` : top,
+  left: 0,
+  right: 0,
+  width: '100%',
+  height: typeof height === 'number' ? `${height}px` : height,
+  cursor: cutCursor
+})
+
 // The cut lands on the day under the cursor and the page decides what it
 // means for that bar: opening a gap, widening one, or closing it again.
 const onBarCutClick = (timeElement, event) => {
@@ -3541,6 +3575,13 @@ const setItemPositions = (items, unitOfTime = 'days') => {
     height: 14px;
     top: 14px;
   }
+}
+
+// Sits behind the actual bars (earlier in the DOM, so a bar always wins the
+// hit test over its own area) and only exists while cutting, so it never
+// changes normal appearance or interaction.
+.cut-gap-catcher {
+  z-index: 0;
 }
 
 .day-off {
