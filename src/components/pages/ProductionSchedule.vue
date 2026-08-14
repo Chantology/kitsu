@@ -1549,6 +1549,32 @@ export default {
       }
     },
 
+    // A parent bar grows to keep its children inside it, and is never
+    // shrunk back onto them: a department drafted three months long has to
+    // stay three months long when a shorter sequence moves inside it,
+    // otherwise the rough plan collapses onto whatever is scheduled so far.
+    // Propagation stops as soon as a bar already contains its child, since
+    // the ones above it then cannot need widening either.
+    expandParentsToContain(item) {
+      let child = item
+      let parent = child.parentElement
+      while (parent) {
+        let widened = false
+        if (child.startDate.isBefore(parent.startDate)) {
+          parent.startDate = child.startDate.clone()
+          widened = true
+        }
+        if (child.endDate.isAfter(parent.endDate)) {
+          parent.endDate = child.endDate.clone()
+          widened = true
+        }
+        if (!widened) return
+        this.updateScheduleItem(parent)
+        child = parent
+        parent = parent.parentElement
+      }
+    },
+
     async onScheduleItemChanged(item) {
       if (item.type === 'Task') {
         // The window the user drew is kept as-is: the bar spans the period the
@@ -1556,18 +1582,13 @@ export default {
         // inside it. Deriving the end date from the estimation here made every
         // bar exactly as long as its estimation, which prevented rough drafts
         // and could not express an artist splitting time across several tasks.
-        // Parent bars are likewise left alone so a department timeline can be
-        // drafted independently of the tasks beneath it.
+        this.expandParentsToContain(item)
         await this.saveTaskChanged(item)
         return
       }
 
       if (item.startDate && item.endDate && item.parentElement) {
-        item.parentElement.startDate = this.getMinDate(item.parentElement)
-        item.parentElement.endDate = this.getMaxDate(item.parentElement)
-        if (!this.isVersioned) {
-          this.saveScheduleItem(item.parentElement)
-        }
+        this.expandParentsToContain(item)
       } else if (!item.parentElement) {
         if (!Array.isArray(item.children)) {
           await this.updateScheduleItem(item)
@@ -1632,26 +1653,6 @@ export default {
       })
       this.pendingParentChange = null
       this.modals.confirmChildMove = false
-    },
-
-    getMinDate(parentElement) {
-      let minDate = this.endDate.clone()
-      parentElement.children.forEach(item => {
-        if (item.startDate && item.startDate.isBefore(minDate)) {
-          minDate = item.startDate
-        }
-      })
-      return minDate.clone()
-    },
-
-    getMaxDate(parentElement) {
-      let maxDate = this.startDate.clone()
-      parentElement.children.forEach(item => {
-        if (item.endDate && item.endDate.isAfter(maxDate)) {
-          maxDate = item.endDate
-        }
-      })
-      return maxDate.clone()
     },
 
     isInDepartment(taskType) {
