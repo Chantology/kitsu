@@ -2196,6 +2196,19 @@ const entityLineStyle = (
   return style
 }
 
+// Mirrors the toolbar's lucide Scissors icon, with a white halo so the
+// blades stay visible over both light and dark bar colors. Encoded as a
+// literal (not base64) so the markup stays diffable.
+const cutCursor = `url('data:image/svg+xml,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24">' +
+    '<g fill="none" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">' +
+    '<circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/>' +
+    '<circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></g>' +
+    '<g fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+    '<circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/>' +
+    '<circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></g></svg>'
+)}') 2 2, pointer`
+
 const timebarStyle = (
   timeElement,
   root = false,
@@ -2204,11 +2217,13 @@ const timebarStyle = (
   const style = {
     left: `${getTimebarLeft(timeElement)}px`,
     width: `${getTimebarWidth(timeElement)}px`,
-    cursor: ownerElement.editable
-      ? !root && props.reassignable
-        ? 'all-scroll'
-        : 'ew-resize'
-      : 'default'
+    cursor: props.cutMode
+      ? cutCursor
+      : ownerElement.editable
+        ? !root && props.reassignable
+          ? 'all-scroll'
+          : 'ew-resize'
+        : 'default'
   }
   if (root) {
     style['background-color'] = timeElement.color || ownerElement.color
@@ -2248,11 +2263,13 @@ const timebarChildStyle = (
   return {
     left: !multiline && `${getTimebarLeft(timeElement)}px`,
     width: `${getTimebarWidth(timeElement)}px`,
-    cursor: ownerElement.editable
-      ? props.reassignable
-        ? 'all-scroll'
-        : 'ew-resize'
-      : 'default',
+    cursor: props.cutMode
+      ? cutCursor
+      : ownerElement.editable
+        ? props.reassignable
+          ? 'all-scroll'
+          : 'ew-resize'
+        : 'default',
     background: opacityPercentage
       ? `color-mix(in srgb, ${elementColor}, ${opacityColor} ${opacityPercentage}%)` // lighter color
       : elementColor
@@ -2282,11 +2299,13 @@ const timebarSubchildStyle = (bar, rootElement, timeElement = bar) => {
   return {
     left: `${getTimebarLeft(bar)}px`,
     width: `${getTimebarWidth(bar)}px`,
-    cursor: timeElement.editable
-      ? props.reassignable
-        ? 'all-scroll'
-        : 'ew-resize'
-      : 'default',
+    cursor: props.cutMode
+      ? cutCursor
+      : timeElement.editable
+        ? props.reassignable
+          ? 'all-scroll'
+          : 'ew-resize'
+        : 'default',
     top: `${5 + 38 * timeElement.line}px`,
     background: `color-mix(in srgb, ${color} ${selected ? 80 : 40}%, transparent)`,
     'box-shadow': `inset 0 0 1px 2px ${selected ? 'var(--background-selected)' : color}`

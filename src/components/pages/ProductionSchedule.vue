@@ -1726,6 +1726,11 @@ export default {
         // to click on to bring it back
         if (!desired.length) return
 
+        // One click, one cut: switch the tool back off so a coordinator
+        // doesn't have to remember to turn it off, and can't accidentally
+        // keep cutting other bars while moving the mouse across the chart.
+        this.cutMode = false
+
         // Rows are replaced rather than edited in place: the intermediate
         // states of a partial rewrite would trip the overlap check.
         await Promise.all(
