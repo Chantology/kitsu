@@ -1721,15 +1721,22 @@ export default {
             }))
           : [wholeBar]
 
+        // Closing a gap wider than a day takes one click per day in it, so
+        // only a cut or a heal that fully rejoins the bar counts as "done".
+        // A heal that still leaves more than one piece needs another click
+        // right after, so the tool has to stay armed for it.
+        const wasCut = current.some(
+          range => range.start_date <= day && day <= range.end_date
+        )
+
         const desired = this.toggleCutDay(current, day)
         // refuse to cut a bar out of existence, there would be nothing left
         // to click on to bring it back
         if (!desired.length) return
 
-        // One click, one cut: switch the tool back off so a coordinator
-        // doesn't have to remember to turn it off, and can't accidentally
-        // keep cutting other bars while moving the mouse across the chart.
-        this.cutMode = false
+        if (wasCut || desired.length === 1) {
+          this.cutMode = false
+        }
 
         // Rows are replaced rather than edited in place: the intermediate
         // states of a partial rewrite would trip the overlap check.
