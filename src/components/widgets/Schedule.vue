@@ -754,7 +754,7 @@
                           }"
                           :key="barIndex"
                           :style="timebarSubchildStyle(bar, rootElement, task)"
-                          :title="timebarSubchildTitle(task)"
+                          :title="timebarSubchildTitle(task, bar)"
                           v-for="(bar, barIndex) in getBars(task)"
                         >
                           <div
@@ -2293,10 +2293,13 @@ const timebarSubchildStyle = (bar, rootElement, timeElement = bar) => {
   }
 }
 
-const timebarSubchildTitle = task => {
+// `bar` is the piece under the cursor and can be one of several once the
+// task is cut, so the title shows its own dates rather than the task's
+// full span - otherwise every piece would claim the same whole-task range.
+const timebarSubchildTitle = (task, bar = task) => {
   const name = task.entity.name
-  const startDate = task.startDate.format('YYYY-MM-DD')
-  const endDate = task.endDate.format('YYYY-MM-DD')
+  const startDate = bar.startDate.format('YYYY-MM-DD')
+  const endDate = bar.endDate.format('YYYY-MM-DD')
   const duration = isRealSchedule.value
     ? formatDuration(task.duration)
     : formatDuration(task.estimation)
@@ -3123,6 +3126,14 @@ const setItemPositions = (items, unitOfTime = 'days') => {
           font-size: 12px;
           padding: 0 5px;
           white-space: nowrap;
+
+          // A cut bar is drawn as one piece per segment, and a piece can be
+          // a single day wide. The 5px padding above is sized for a normal
+          // multi-day bar's label; on a single-day piece it eats most of the
+          // width, leaving next to nothing to grab with the mouse.
+          &.timebar-cut {
+            padding: 0 1px;
+          }
         }
 
         // A cut bar is drawn as one piece per segment. Squaring the inner
