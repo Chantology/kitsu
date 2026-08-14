@@ -457,15 +457,24 @@
                   :class="{
                     thinner: multiline
                   }"
-                  :title="`${rootElement.name} (${displayDate(rootElement.startDate)} - ${displayDate(rootElement.endDate)})`"
-                  :style="timebarStyle(rootElement, true)"
+                  :title="`${rootElement.name} (${displayDate(bar.startDate)} - ${displayDate(bar.endDate)})`"
+                  :style="timebarStyle(bar, true, rootElement)"
+                  :key="`root-bar-${barIndex}`"
+                  v-for="(bar, barIndex) in getBars(rootElement)"
                 >
                   <div
                     class="timebar"
-                    v-show="isVisible(rootElement)"
+                    :class="{
+                      'timebar-cut': isCut(rootElement)
+                    }"
+                    v-show="isVisible(bar)"
                     role="button"
                     tabindex="0"
-                    @click="$emit('root-element-selected', rootElement)"
+                    @click="
+                      cutMode
+                        ? onBarCutClick(rootElement, $event)
+                        : $emit('root-element-selected', rootElement)
+                    "
                     @keydown.enter.prevent="
                       $emit('root-element-selected', rootElement)
                     "
@@ -473,18 +482,18 @@
                   >
                     <div
                       class="timebar-left-hand"
-                      @mousedown="moveTimebarLeftSide(rootElement, $event)"
-                      @touchstart="moveTimebarLeftSide(rootElement, $event)"
+                      @mousedown="moveTimebarLeftSide(bar, $event)"
+                      @touchstart="moveTimebarLeftSide(bar, $event)"
                     ></div>
                     <div
                       class="timebar-center"
-                      @mousedown="moveTimebar(rootElement, $event)"
-                      @touchstart="moveTimebar(rootElement, $event)"
+                      @mousedown="moveTimebar(bar, $event)"
+                      @touchstart="moveTimebar(bar, $event)"
                     ></div>
                     <div
                       class="timebar-right-hand"
-                      @mousedown="moveTimebarRightSide(rootElement, $event)"
-                      @touchstart="moveTimebarRightSide(rootElement, $event)"
+                      @mousedown="moveTimebarRightSide(bar, $event)"
+                      @touchstart="moveTimebarRightSide(bar, $event)"
                     ></div>
                   </div>
                 </div>
@@ -645,7 +654,8 @@
                           rootElement,
                           multiline,
                           withTimesheets && 25,
-                          isDarkTheme ? 'black' : 'white'
+                          isDarkTheme ? 'black' : 'white',
+                          childElement
                         )
                       "
                       v-show="subchildren || isVisible(childElement)"
@@ -2186,18 +2196,22 @@ const entityLineStyle = (
   return style
 }
 
-const timebarStyle = (timeElement, root = false) => {
+const timebarStyle = (
+  timeElement,
+  root = false,
+  ownerElement = timeElement
+) => {
   const style = {
     left: `${getTimebarLeft(timeElement)}px`,
     width: `${getTimebarWidth(timeElement)}px`,
-    cursor: timeElement.editable
+    cursor: ownerElement.editable
       ? !root && props.reassignable
         ? 'all-scroll'
         : 'ew-resize'
       : 'default'
   }
   if (root) {
-    style['background-color'] = timeElement.color
+    style['background-color'] = timeElement.color || ownerElement.color
   }
   return style
 }
@@ -2227,13 +2241,14 @@ const timebarChildStyle = (
   rootElement,
   multiline = false,
   opacityPercentage = 0,
-  opacityColor = 'transparent'
+  opacityColor = 'transparent',
+  ownerElement = timeElement
 ) => {
   const elementColor = timeElement.color || rootElement.color
   return {
     left: !multiline && `${getTimebarLeft(timeElement)}px`,
     width: `${getTimebarWidth(timeElement)}px`,
-    cursor: timeElement.editable
+    cursor: ownerElement.editable
       ? props.reassignable
         ? 'all-scroll'
         : 'ew-resize'
