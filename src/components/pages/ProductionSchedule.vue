@@ -647,6 +647,9 @@ export default {
       },
       availableTaskTypes: [],
       cutMode: false,
+      // a fast double-click fires two click events; without this, both read
+      // the same pre-cut segment rows and race to create duplicate ones
+      cuttingOwnerIds: new Set(),
       daysOffByPerson: {},
       daysOffRangeKey: null,
       segmentsByOwner: {},
@@ -1606,18 +1609,18 @@ export default {
           const last = parent.segments[parent.segments.length - 1]
           if (grewStart) {
             first.startDate = parent.startDate.clone()
+            first.start_date = first.startDate.format('YYYY-MM-DD')
             this.updateScheduleSegment({
               ...first,
-              start_date: first.startDate.format('YYYY-MM-DD'),
               end_date: first.endDate.format('YYYY-MM-DD')
             })
           }
           if (grewEnd) {
             last.endDate = parent.endDate.clone()
+            last.end_date = last.endDate.format('YYYY-MM-DD')
             this.updateScheduleSegment({
               ...last,
-              start_date: last.startDate.format('YYYY-MM-DD'),
-              end_date: last.endDate.format('YYYY-MM-DD')
+              start_date: last.startDate.format('YYYY-MM-DD')
             })
           }
         } else {
@@ -1696,51 +1699,60 @@ export default {
     },
 
     async onBarCut(owner, day) {
-      const ownerKey =
-        owner.type === 'Task'
-          ? { task_id: owner.id }
-          : { schedule_item_id: owner.id }
-      const wholeBar = {
-        start_date: owner.startDate.format('YYYY-MM-DD'),
-        end_date: owner.endDate.format('YYYY-MM-DD')
-      }
-      const existing = owner.segments || []
-      const current = existing.length
-        ? existing.map(segment => ({
-            start_date: segment.start_date,
-            end_date: segment.end_date
-          }))
-        : [wholeBar]
+      // a fast double-click delivers two click events before the first
+      // cut has saved; both would read the same pre-cut rows and race to
+      // create duplicate segments, so the second one is dropped
+      if (this.cuttingOwnerIds.has(owner.id)) return
+      this.cuttingOwnerIds.add(owner.id)
+      try {
+        const ownerKey =
+          owner.type === 'Task'
+            ? { task_id: owner.id }
+            : { schedule_item_id: owner.id }
+        const wholeBar = {
+          start_date: owner.startDate.format('YYYY-MM-DD'),
+          end_date: owner.endDate.format('YYYY-MM-DD')
+        }
+        const existing = owner.segments || []
+        const current = existing.length
+          ? existing.map(segment => ({
+              start_date: segment.start_date,
+              end_date: segment.end_date
+            }))
+          : [wholeBar]
 
-      const desired = this.toggleCutDay(current, day)
-      // refuse to cut a bar out of existence, there would be nothing left
-      // to click on to bring it back
-      if (!desired.length) return
+        const desired = this.toggleCutDay(current, day)
+        // refuse to cut a bar out of existence, there would be nothing left
+        // to click on to bring it back
+        if (!desired.length) return
 
-      // Rows are replaced rather than edited in place: the intermediate
-      // states of a partial rewrite would trip the overlap check.
-      await Promise.all(
-        existing.map(segment => this.deleteScheduleSegment(segment))
-      )
-
-      const backToWhole =
-        desired.length === 1 &&
-        desired[0].start_date === wholeBar.start_date &&
-        desired[0].end_date === wholeBar.end_date
-      if (backToWhole) {
-        this.segmentsByOwner[owner.id] = []
-        owner.segments = []
-        return
-      }
-
-      const created = []
-      for (const range of desired) {
-        created.push(
-          await this.createScheduleSegment({ ...range, ...ownerKey })
+        // Rows are replaced rather than edited in place: the intermediate
+        // states of a partial rewrite would trip the overlap check.
+        await Promise.all(
+          existing.map(segment => this.deleteScheduleSegment(segment))
         )
+
+        const backToWhole =
+          desired.length === 1 &&
+          desired[0].start_date === wholeBar.start_date &&
+          desired[0].end_date === wholeBar.end_date
+        if (backToWhole) {
+          this.segmentsByOwner[owner.id] = []
+          owner.segments = []
+          return
+        }
+
+        const created = []
+        for (const range of desired) {
+          created.push(
+            await this.createScheduleSegment({ ...range, ...ownerKey })
+          )
+        }
+        this.segmentsByOwner[owner.id] = created
+        owner.segments = this.buildSegments(owner)
+      } finally {
+        this.cuttingOwnerIds.delete(owner.id)
       }
-      this.segmentsByOwner[owner.id] = created
-      owner.segments = this.buildSegments(owner)
     },
 
     // A dragged segment carries its own dates. The bar it belongs to then
