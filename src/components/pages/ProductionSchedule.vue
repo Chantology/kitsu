@@ -1772,18 +1772,40 @@ export default {
     // per task or schedule item.
     async saveSegmentChanged(segment) {
       const owner = segment.owner
-      await this.updateScheduleSegment({
-        ...segment,
-        start_date: segment.startDate.format('YYYY-MM-DD'),
-        end_date: segment.endDate.format('YYYY-MM-DD')
-      })
-      segment.start_date = segment.startDate.format('YYYY-MM-DD')
-      segment.end_date = segment.endDate.format('YYYY-MM-DD')
 
-      const starts = owner.segments.map(item => item.startDate)
-      const ends = owner.segments.map(item => item.endDate)
-      owner.startDate = moment.min(starts).clone()
-      owner.endDate = moment.max(ends).clone()
+      // Dragging a piece onto or against a sibling piece is really
+      // rejoining them: two rows for the same day is what the backend
+      // rejects outright, and even a touching pair is one piece with no
+      // gap left between them.
+      const overlapping = owner.segments.filter(
+        other =>
+          other !== segment &&
+          segment.startDate.isSameOrBefore(
+            other.endDate.clone().add(1, 'days')
+          ) &&
+          segment.endDate.isSameOrAfter(
+            other.startDate.clone().subtract(1, 'days')
+          )
+      )
+
+      if (overlapping.length) {
+        await this.mergeDraggedSegment(owner, segment, overlapping)
+      } else {
+        await this.updateScheduleSegment({
+          ...segment,
+          start_date: segment.startDate.format('YYYY-MM-DD'),
+          end_date: segment.endDate.format('YYYY-MM-DD')
+        })
+        segment.start_date = segment.startDate.format('YYYY-MM-DD')
+        segment.end_date = segment.endDate.format('YYYY-MM-DD')
+      }
+
+      if (owner.segments.length) {
+        const starts = owner.segments.map(item => item.startDate)
+        const ends = owner.segments.map(item => item.endDate)
+        owner.startDate = moment.min(starts).clone()
+        owner.endDate = moment.max(ends).clone()
+      }
       this.expandParentsToContain(owner)
 
       if (owner.type === 'Task') {
@@ -1791,6 +1813,55 @@ export default {
       } else {
         await this.updateScheduleItem(owner)
       }
+    },
+
+    // Rows are replaced rather than edited in place, same as a cut-tool
+    // heal: the intermediate states of a partial rewrite would trip the
+    // overlap check. If the merge swallows every other piece, the bar goes
+    // back to whole rather than sitting at one segment with cut styling
+    // and no gap left to click.
+    async mergeDraggedSegment(owner, segment, overlapping) {
+      const group = [segment, ...overlapping]
+      const mergedStart = moment.min(group.map(item => item.startDate))
+      const mergedEnd = moment.max(group.map(item => item.endDate))
+      const untouched = owner.segments
+        .filter(item => !group.includes(item))
+        .map(item => ({
+          start_date: item.start_date,
+          end_date: item.end_date
+        }))
+      const desired = [
+        ...untouched,
+        {
+          start_date: mergedStart.format('YYYY-MM-DD'),
+          end_date: mergedEnd.format('YYYY-MM-DD')
+        }
+      ]
+
+      await Promise.all(
+        owner.segments.map(item => this.deleteScheduleSegment(item))
+      )
+
+      if (desired.length === 1) {
+        this.segmentsByOwner[owner.id] = []
+        owner.segments = []
+        owner.startDate = mergedStart.clone()
+        owner.endDate = mergedEnd.clone()
+        return
+      }
+
+      const ownerKey =
+        owner.type === 'Task'
+          ? { task_id: owner.id }
+          : { schedule_item_id: owner.id }
+      const created = []
+      for (const range of desired) {
+        created.push(
+          await this.createScheduleSegment({ ...range, ...ownerKey })
+        )
+      }
+      this.segmentsByOwner[owner.id] = created
+      owner.segments = this.buildSegments(owner)
     },
 
     async onScheduleItemChanged(item) {
