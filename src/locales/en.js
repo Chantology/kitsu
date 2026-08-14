@@ -1827,6 +1827,9 @@ export default {
     md: 'md',
     hours: 'h',
     today: 'Today',
+    cut_tool: 'Cut',
+    cut_tool_description:
+      'Click a bar to cut it in two, click a gap to close it again',
     zoom_level: 'Zoom level',
     milestone: {
       add_milestone: 'Add milestone for',

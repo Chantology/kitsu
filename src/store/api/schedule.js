@@ -37,6 +37,34 @@ export default {
     )
   },
 
+  getScheduleSegments(production, taskTypeId) {
+    let path = `/api/data/projects/${production.id}/schedule-segments`
+    if (taskTypeId) path += `?task_type_id=${taskTypeId}`
+    return client.pget(path)
+  },
+
+  createScheduleSegment(segment) {
+    return client.ppost('/api/data/schedule-segments', {
+      start_date: segment.start_date,
+      end_date: segment.end_date,
+      description: segment.description,
+      task_id: segment.task_id,
+      schedule_item_id: segment.schedule_item_id
+    })
+  },
+
+  updateScheduleSegment(segment) {
+    return client.pput(`/api/data/schedule-segments/${segment.id}`, {
+      start_date: segment.start_date,
+      end_date: segment.end_date,
+      description: segment.description
+    })
+  },
+
+  deleteScheduleSegment(segment) {
+    return client.pdel(`/api/data/schedule-segments/${segment.id}`)
+  },
+
   getAllScheduleItems(production) {
     return client.pget(`/api/data/projects/${production.id}/schedule-items/`)
   },

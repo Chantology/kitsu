@@ -98,6 +98,16 @@
             @click="scrollScheduleToToday"
           />
           <button-simple
+            :active="cutMode"
+            class="flexrow-item"
+            :disabled="isLockedSchedule"
+            icon="scissors"
+            :text="$t('schedule.cut_tool')"
+            :title="$t('schedule.cut_tool_description')"
+            @click="cutMode = !cutMode"
+            v-if="!isAllEpisodes"
+          />
+          <button-simple
             :active="isSidePanelOpen && assignments.type !== 'task'"
             class="flexrow-item"
             :disabled="isLockedSchedule"
@@ -118,6 +128,7 @@
         :is-loading="loading.schedule"
         :is-error="errors.schedule"
         clip-children
+        :cut-mode="cutMode"
         hide-man-days
         :multiline="isAllEpisodes"
         :reassignable="!isLockedSchedule && !isAllEpisodes"
@@ -130,6 +141,7 @@
         @item-drop="onScheduleItemDropped"
         @item-selected="selectTaskTypeElement"
         @item-unassign="onScheduleItemUnassigned"
+        @bar-cut="onBarCut"
         @root-element-expanded="expandTaskTypeElement"
         @root-element-selected="selectParentElement"
         @task-selected="selectTaskElement"
@@ -634,8 +646,10 @@ export default {
         unassign: false
       },
       availableTaskTypes: [],
+      cutMode: false,
       daysOffByPerson: {},
       daysOffRangeKey: null,
+      segmentsByOwner: {},
       draggedEntities: [],
       endDate: moment().add(6, 'months').endOf('day'),
       entityType: null,
@@ -884,6 +898,10 @@ export default {
       'loadSequences',
       'loadSequenceScheduleItems',
       'loadShots',
+      'loadScheduleSegments',
+      'createScheduleSegment',
+      'deleteScheduleSegment',
+      'updateScheduleSegment',
       'loadTasks',
       'loadTasksFromScheduleVersion',
       'saveScheduleItem',
@@ -971,7 +989,8 @@ export default {
             expanded: false,
             loading: false,
             route: path,
-            children: []
+            children: [],
+            segments: []
           }
         })
         this.scheduleItems = sortTaskTypeScheduleItems(
@@ -979,6 +998,12 @@ export default {
           this.currentProduction,
           this.taskTypeMap
         )
+        // Segments arrive for the whole production in one request, before
+        // any drill-down: every level reads them while building its bars.
+        await this.reloadSegments()
+        this.scheduleItems.forEach(item => {
+          item.segments = this.buildSegments(item)
+        })
 
         this.availableTaskTypes = this.scopedScheduleItems.map(item => ({
           ...this.taskTypeMap.get(item.task_type_id),
@@ -1083,6 +1108,7 @@ export default {
           children: [],
           parentElement: taskTypeElement
         }
+        scheduleItem.segments = this.buildSegments(scheduleItem)
         return scheduleItem
       })
     },
@@ -1415,6 +1441,7 @@ export default {
               }
 
               task.editable = !this.isLockedSchedule
+              task.segments = this.buildSegments(task)
               task.unresizable = false
               task.parentElement = entityTypeItem
 
@@ -1559,23 +1586,195 @@ export default {
       let child = item
       let parent = child.parentElement
       while (parent) {
-        let widened = false
+        let grewStart = false
+        let grewEnd = false
         if (child.startDate.isBefore(parent.startDate)) {
           parent.startDate = child.startDate.clone()
-          widened = true
+          grewStart = true
         }
         if (child.endDate.isAfter(parent.endDate)) {
           parent.endDate = child.endDate.clone()
-          widened = true
+          grewEnd = true
         }
-        if (!widened) return
-        this.updateScheduleItem(parent)
+        if (!grewStart && !grewEnd) return
+
+        // a cut parent is drawn from its segments, not its own start/end
+        // date, so the growth has to land on whichever piece sits at the
+        // edge being pushed out
+        if (parent.segments?.length) {
+          const first = parent.segments[0]
+          const last = parent.segments[parent.segments.length - 1]
+          if (grewStart) {
+            first.startDate = parent.startDate.clone()
+            this.updateScheduleSegment({
+              ...first,
+              start_date: first.startDate.format('YYYY-MM-DD'),
+              end_date: first.endDate.format('YYYY-MM-DD')
+            })
+          }
+          if (grewEnd) {
+            last.endDate = parent.endDate.clone()
+            this.updateScheduleSegment({
+              ...last,
+              start_date: last.startDate.format('YYYY-MM-DD'),
+              end_date: last.endDate.format('YYYY-MM-DD')
+            })
+          }
+        } else {
+          this.updateScheduleItem(parent)
+        }
         child = parent
         parent = parent.parentElement
       }
     },
 
+    async reloadSegments() {
+      const segments = await this.loadScheduleSegments({
+        production: this.currentProduction
+      }).catch(() => [])
+      this.segmentsByOwner = segments.reduce((acc, segment) => {
+        const ownerId = segment.task_id || segment.schedule_item_id
+        acc[ownerId] = acc[ownerId] || []
+        acc[ownerId].push(segment)
+        return acc
+      }, {})
+    },
+
+    // Segments are drawn and dragged like any other bar, so they are given
+    // moments and a back reference to the bar they cut up.
+    buildSegments(owner) {
+      const raw = this.segmentsByOwner[owner.id] || []
+      return raw
+        .map(segment => ({
+          ...segment,
+          startDate: parseSimpleDate(segment.start_date),
+          endDate: parseSimpleDate(segment.end_date),
+          editable: owner.editable,
+          owner
+        }))
+        .sort((a, b) => a.startDate - b.startDate)
+    },
+
+    // Cutting a day that is covered opens a gap there, cutting a day that
+    // already sits in a gap fills it back in. One gesture, both directions.
+    toggleCutDay(ranges, day) {
+      const before = moment(day).subtract(1, 'days').format('YYYY-MM-DD')
+      const after = moment(day).add(1, 'days').format('YYYY-MM-DD')
+      const covering = ranges.find(
+        range => range.start_date <= day && day <= range.end_date
+      )
+
+      if (covering) {
+        return ranges
+          .flatMap(range =>
+            range === covering
+              ? [
+                  { start_date: range.start_date, end_date: before },
+                  { start_date: after, end_date: range.end_date }
+                ]
+              : [range]
+          )
+          .filter(range => range.start_date <= range.end_date)
+      }
+
+      const filled = [...ranges, { start_date: day, end_date: day }].sort(
+        (a, b) => a.start_date.localeCompare(b.start_date)
+      )
+      return filled.reduce((merged, range) => {
+        const last = merged[merged.length - 1]
+        const joins =
+          last &&
+          moment(last.end_date).add(1, 'days').format('YYYY-MM-DD') >=
+            range.start_date
+        if (joins) {
+          last.end_date =
+            last.end_date > range.end_date ? last.end_date : range.end_date
+          return merged
+        }
+        return [...merged, { ...range }]
+      }, [])
+    },
+
+    async onBarCut(owner, day) {
+      const ownerKey =
+        owner.type === 'Task'
+          ? { task_id: owner.id }
+          : { schedule_item_id: owner.id }
+      const wholeBar = {
+        start_date: owner.startDate.format('YYYY-MM-DD'),
+        end_date: owner.endDate.format('YYYY-MM-DD')
+      }
+      const existing = owner.segments || []
+      const current = existing.length
+        ? existing.map(segment => ({
+            start_date: segment.start_date,
+            end_date: segment.end_date
+          }))
+        : [wholeBar]
+
+      const desired = this.toggleCutDay(current, day)
+      // refuse to cut a bar out of existence, there would be nothing left
+      // to click on to bring it back
+      if (!desired.length) return
+
+      // Rows are replaced rather than edited in place: the intermediate
+      // states of a partial rewrite would trip the overlap check.
+      await Promise.all(
+        existing.map(segment => this.deleteScheduleSegment(segment))
+      )
+
+      const backToWhole =
+        desired.length === 1 &&
+        desired[0].start_date === wholeBar.start_date &&
+        desired[0].end_date === wholeBar.end_date
+      if (backToWhole) {
+        this.segmentsByOwner[owner.id] = []
+        owner.segments = []
+        return
+      }
+
+      const created = []
+      for (const range of desired) {
+        created.push(
+          await this.createScheduleSegment({ ...range, ...ownerKey })
+        )
+      }
+      this.segmentsByOwner[owner.id] = created
+      owner.segments = this.buildSegments(owner)
+    },
+
+    // A dragged segment carries its own dates. The bar it belongs to then
+    // spans its pieces, so the rest of the schedule keeps seeing one range
+    // per task or schedule item.
+    async saveSegmentChanged(segment) {
+      const owner = segment.owner
+      await this.updateScheduleSegment({
+        ...segment,
+        start_date: segment.startDate.format('YYYY-MM-DD'),
+        end_date: segment.endDate.format('YYYY-MM-DD')
+      })
+      segment.start_date = segment.startDate.format('YYYY-MM-DD')
+      segment.end_date = segment.endDate.format('YYYY-MM-DD')
+
+      const starts = owner.segments.map(item => item.startDate)
+      const ends = owner.segments.map(item => item.endDate)
+      owner.startDate = moment.min(starts).clone()
+      owner.endDate = moment.max(ends).clone()
+      this.expandParentsToContain(owner)
+
+      if (owner.type === 'Task') {
+        await this.saveTaskChanged(owner)
+      } else {
+        await this.updateScheduleItem(owner)
+      }
+    },
+
     async onScheduleItemChanged(item) {
+      if (item.owner) {
+        await this.saveSegmentChanged(item)
+        return
+      }
+
       if (item.type === 'Task') {
         // The window the user drew is kept as-is: the bar spans the period the
         // task is planned over, while the estimation stays the amount of work

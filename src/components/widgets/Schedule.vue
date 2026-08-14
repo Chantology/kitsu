@@ -627,75 +627,87 @@
                     v-if="withGhosts && childElement.nextElement"
                   ></div>
 
-                  <div
-                    class="timebar"
-                    :class="{
-                      selected: isSelected(childElement),
-                      'timebar-subchildren': subchildren,
-                      'with-timesheets': withTimesheets,
-                      invalid: isOverlapping(childElement)
-                    }"
-                    :title="`${multiline && childElement.project_name ? `${childElement.project_name} - ` : ''}${childElement.name} (${displayDate(childElement.startDate)} - ${displayDate(childElement.endDate)})`"
-                    :style="
-                      timebarChildStyle(
-                        childElement,
-                        rootElement,
-                        multiline,
-                        withTimesheets && 25,
-                        isDarkTheme ? 'black' : 'white'
-                      )
-                    "
-                    v-show="subchildren || isVisible(childElement)"
-                    role="button"
-                    tabindex="0"
-                    @click="$emit('item-selected', rootElement, childElement)"
-                    @keydown.enter.prevent="
-                      $emit('item-selected', rootElement, childElement)
-                    "
-                    v-if="withEstimations"
-                  >
+                  <template v-if="withEstimations">
                     <div
-                      class="timebar-left-hand"
-                      @mousedown="moveTimebarLeftSide(childElement, $event)"
-                      @touchstart="moveTimebarLeftSide(childElement, $event)"
-                      v-if="
-                        !isChangeDates &&
-                        selection.length === 1 &&
-                        isSelected(childElement) &&
-                        childElement.editable &&
-                        !childElement.unresizable
-                      "
-                    ></div>
-                    <div
-                      class="timebar-center"
+                      class="timebar"
                       :class="{
-                        ellipsis: multiline || subchildren,
-                        'has-text-centered': subchildren
+                        selected: isSelected(bar),
+                        'timebar-subchildren': subchildren,
+                        'with-timesheets': withTimesheets,
+                        invalid: isOverlapping(childElement),
+                        'timebar-cut': isCut(childElement)
                       }"
-                      @mousedown="moveTimebar(childElement, $event)"
-                      @touchstart="moveTimebar(childElement, $event)"
-                    >
-                      <template v-if="multiline && childElement.project_name">
-                        <b>{{ childElement.project_name }}</b>
-                        <br />
-                      </template>
-                      <template v-if="multiline || subchildren">
-                        {{ childElement.name }}
-                      </template>
-                    </div>
-                    <div
-                      class="timebar-right-hand"
-                      @mousedown="moveTimebarRightSide(childElement, $event)"
-                      @touchstart="moveTimebarRightSide(childElement, $event)"
-                      v-if="
-                        !isChangeDates &&
-                        selection.length === 1 &&
-                        isSelected(childElement) &&
-                        childElement.editable &&
-                        !childElement.unresizable
+                      :key="`child-bar-${barIndex}`"
+                      :title="`${multiline && childElement.project_name ? `${childElement.project_name} - ` : ''}${childElement.name} (${displayDate(bar.startDate)} - ${displayDate(bar.endDate)})`"
+                      :style="
+                        timebarChildStyle(
+                          bar,
+                          rootElement,
+                          multiline,
+                          withTimesheets && 25,
+                          isDarkTheme ? 'black' : 'white'
+                        )
                       "
-                    ></div>
-                  </div>
+                      v-show="subchildren || isVisible(childElement)"
+                      role="button"
+                      tabindex="0"
+                      @click="
+                        cutMode
+                          ? onBarCutClick(childElement, $event)
+                          : $emit('item-selected', rootElement, childElement)
+                      "
+                      @keydown.enter.prevent="
+                        $emit('item-selected', rootElement, childElement)
+                      "
+                      v-for="(bar, barIndex) in getBars(childElement)"
+                    >
+                      <div
+                        class="timebar-left-hand"
+                        @mousedown="moveTimebarLeftSide(bar, $event)"
+                        @touchstart="moveTimebarLeftSide(bar, $event)"
+                        v-if="
+                          !isChangeDates &&
+                          selection.length === 1 &&
+                          isSelected(bar) &&
+                          childElement.editable &&
+                          !childElement.unresizable
+                        "
+                      ></div>
+                      <div
+                        class="timebar-center"
+                        :class="{
+                          ellipsis: multiline || subchildren,
+                          'has-text-centered': subchildren
+                        }"
+                        @mousedown="moveTimebar(bar, $event)"
+                        @touchstart="moveTimebar(bar, $event)"
+                      >
+                        <template v-if="barIndex === 0">
+                          <template
+                            v-if="multiline && childElement.project_name"
+                          >
+                            <b>{{ childElement.project_name }}</b>
+                            <br />
+                          </template>
+                          <template v-if="multiline || subchildren">
+                            {{ childElement.name }}
+                          </template>
+                        </template>
+                      </div>
+                      <div
+                        class="timebar-right-hand"
+                        @mousedown="moveTimebarRightSide(bar, $event)"
+                        @touchstart="moveTimebarRightSide(bar, $event)"
+                        v-if="
+                          !isChangeDates &&
+                          selection.length === 1 &&
+                          isSelected(bar) &&
+                          childElement.editable &&
+                          !childElement.unresizable
+                        "
+                      ></div>
+                    </div>
+                  </template>
 
                   <div
                     v-if="subchildren && childElement.children.size"
@@ -723,66 +735,73 @@
                       >
                         <briefcase-icon class="day-off-icon" :size="14" />
                       </div>
-                      <div
-                        class="timebar"
-                        :class="{ selected: isSelected(task) }"
-                        :key="index"
-                        :style="timebarSubchildStyle(task, rootElement)"
-                        :title="timebarSubchildTitle(task)"
-                        v-for="(task, index) in subchild"
-                      >
+                      <template :key="index" v-for="(task, index) in subchild">
                         <div
-                          class="timebar-left-hand"
-                          @mousedown="moveTimebarLeftSide(task, $event)"
-                          @touchstart="moveTimebarLeftSide(task, $event)"
-                          v-if="
-                            !isChangeDates &&
-                            selection.length === 1 &&
-                            isSelected(task) &&
-                            task.editable &&
-                            !task.unresizable
-                          "
-                        ></div>
-                        <div
-                          class="timebar-center ellipsis"
-                          role="button"
-                          tabindex="0"
-                          @mousedown="moveTimebar(task, $event)"
-                          @touchstart="moveTimebar(task, $event)"
-                          @click="
-                            $emit(
-                              'task-selected',
-                              rootElement,
-                              childElement,
-                              task,
-                              selection
-                            )
-                          "
-                          @keydown.enter.prevent="
-                            $emit(
-                              'task-selected',
-                              rootElement,
-                              childElement,
-                              task,
-                              selection
-                            )
-                          "
+                          class="timebar"
+                          :class="{
+                            selected: isSelected(bar),
+                            'timebar-cut': isCut(task)
+                          }"
+                          :key="barIndex"
+                          :style="timebarSubchildStyle(bar, rootElement, task)"
+                          :title="timebarSubchildTitle(task)"
+                          v-for="(bar, barIndex) in getBars(task)"
                         >
-                          {{ task.entity.name }}
+                          <div
+                            class="timebar-left-hand"
+                            @mousedown="moveTimebarLeftSide(bar, $event)"
+                            @touchstart="moveTimebarLeftSide(bar, $event)"
+                            v-if="
+                              !isChangeDates &&
+                              selection.length === 1 &&
+                              isSelected(bar) &&
+                              task.editable &&
+                              !task.unresizable
+                            "
+                          ></div>
+                          <div
+                            class="timebar-center ellipsis"
+                            role="button"
+                            tabindex="0"
+                            @mousedown="moveTimebar(bar, $event)"
+                            @touchstart="moveTimebar(bar, $event)"
+                            @click="
+                              cutMode
+                                ? onBarCutClick(task, $event)
+                                : $emit(
+                                    'task-selected',
+                                    rootElement,
+                                    childElement,
+                                    task,
+                                    selection
+                                  )
+                            "
+                            @keydown.enter.prevent="
+                              $emit(
+                                'task-selected',
+                                rootElement,
+                                childElement,
+                                task,
+                                selection
+                              )
+                            "
+                          >
+                            {{ barIndex === 0 ? task.entity.name : '' }}
+                          </div>
+                          <div
+                            class="timebar-right-hand"
+                            @mousedown="moveTimebarRightSide(bar, $event)"
+                            @touchstart="moveTimebarRightSide(bar, $event)"
+                            v-if="
+                              !isChangeDates &&
+                              selection.length === 1 &&
+                              isSelected(bar) &&
+                              task.editable &&
+                              !task.unresizable
+                            "
+                          ></div>
                         </div>
-                        <div
-                          class="timebar-right-hand"
-                          @mousedown="moveTimebarRightSide(task, $event)"
-                          @touchstart="moveTimebarRightSide(task, $event)"
-                          v-if="
-                            !isChangeDates &&
-                            selection.length === 1 &&
-                            isSelected(task) &&
-                            task.editable &&
-                            !task.unresizable
-                          "
-                        ></div>
-                      </div>
+                      </template>
                     </div>
                   </div>
                 </div>
@@ -934,6 +953,10 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  cutMode: {
+    type: Boolean,
+    default: false
+  },
   hideRoot: {
     type: Boolean,
     default: false
@@ -970,6 +993,7 @@ const emit = defineEmits([
   'item-unassign',
   'root-element-expanded',
   'root-element-selected',
+  'bar-cut',
   'scroll',
   'task-selected',
   'task-unselected'
@@ -1845,6 +1869,8 @@ const resetSelection = value => {
 
 const moveTimebar = (timeElement, event) => {
   event.preventDefault() // avoid scroll of schedule on touch
+  // the cut tool turns a press into a cut, dragging would fight it
+  if (props.cutMode) return
   if (
     !isChangeStartDate.value &&
     !isChangeEndDate.value &&
@@ -2232,12 +2258,15 @@ const timesheetStyle = (
   }
 }
 
-const timebarSubchildStyle = (timeElement, rootElement) => {
+// `bar` is the piece being drawn and `timeElement` the task it belongs to:
+// they are the same object until the task is cut. The line comes from the
+// task so every piece of it stays on one row.
+const timebarSubchildStyle = (bar, rootElement, timeElement = bar) => {
   const color = timeElement.color || rootElement.color
-  const selected = isSelected(timeElement)
+  const selected = isSelected(bar)
   return {
-    left: `${getTimebarLeft(timeElement)}px`,
-    width: `${getTimebarWidth(timeElement)}px`,
+    left: `${getTimebarLeft(bar)}px`,
+    width: `${getTimebarWidth(bar)}px`,
     cursor: timeElement.editable
       ? props.reassignable
         ? 'all-scroll'
@@ -2257,6 +2286,31 @@ const timebarSubchildTitle = task => {
     ? formatDuration(task.duration)
     : formatDuration(task.estimation)
   return `${name} (${startDate} - ${endDate}) ${duration} ${durationUnit.value}`
+}
+
+// A bar carrying no segment spans its own dates, which is the uncut case
+// and by far the common one. Once it has been cut, each segment is drawn
+// and dragged on its own, so the pieces move independently while still
+// belonging to the same task or schedule item. Everything downstream keeps
+// working because a segment carries startDate and endDate like any other
+// time element.
+const getBars = timeElement => {
+  return timeElement?.segments?.length ? timeElement.segments : [timeElement]
+}
+
+const isCut = timeElement => timeElement?.segments?.length > 0
+
+// The cut lands on the day under the cursor and the page decides what it
+// means for that bar: opening a gap, widening one, or closing it again.
+const onBarCutClick = (timeElement, event) => {
+  if (!timelineContentWrapperRef.value) return
+  const rect = timelineContentWrapperRef.value.getBoundingClientRect()
+  const cursorX = getClientX(event) - rect.left
+  const index = Math.floor(
+    (timelineContentWrapperRef.value.scrollLeft + cursorX) / cellWidth.value
+  )
+  const day = displayedDays.value[index]
+  if (day) emit('bar-cut', timeElement, day.format('YYYY-MM-DD'))
 }
 
 const getTimebarLeft = timeElement => {
@@ -3054,6 +3108,13 @@ const setItemPositions = (items, unitOfTime = 'days') => {
           font-size: 12px;
           padding: 0 5px;
           white-space: nowrap;
+        }
+
+        // A cut bar is drawn as one piece per segment. Squaring the inner
+        // edges keeps the pieces reading as parts of one interrupted bar
+        // rather than as separate tasks sitting on the same row.
+        .timebar.timebar-cut {
+          border-radius: 2px;
         }
 
         .timebar-wrapper {

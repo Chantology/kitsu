@@ -37,6 +37,22 @@ const actions = {
     commit(SET_CURRENT_SCHEDULE_ITEMS, scheduleItems)
   },
 
+  loadScheduleSegments({}, { production, taskTypeId = null }) {
+    return scheduleApi.getScheduleSegments(production, taskTypeId)
+  },
+
+  createScheduleSegment({}, segment) {
+    return scheduleApi.createScheduleSegment(segment)
+  },
+
+  updateScheduleSegment({}, segment) {
+    return scheduleApi.updateScheduleSegment(segment)
+  },
+
+  deleteScheduleSegment({}, segment) {
+    return scheduleApi.deleteScheduleSegment(segment)
+  },
+
   loadAssetTypeScheduleItems({}, { production, taskType, episodeId = null }) {
     return scheduleApi.getAssetTypeScheduleItems(
       production,

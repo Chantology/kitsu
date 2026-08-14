@@ -50,6 +50,7 @@
     <codepen-icon class="icon" v-else-if="icon === 'codepen'" />
     <link-icon class="icon" v-else-if="icon === 'link'" />
     <clock-icon class="icon" v-else-if="icon === 'clock'" />
+    <scissors-icon class="icon" v-else-if="icon === 'scissors'" />
     <rotate-ccw-icon class="icon" v-else-if="icon === 'refresh'" />
     <file-down-icon
       class="icon"
@@ -125,6 +126,7 @@ import {
   PlusIcon,
   RotateCcwIcon,
   SaveIcon,
+  ScissorsIcon,
   SendIcon,
   ShapesIcon,
   SkipBackIcon,
