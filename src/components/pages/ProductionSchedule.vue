@@ -118,7 +118,6 @@
         :is-loading="loading.schedule"
         :is-error="errors.schedule"
         clip-children
-        is-estimation-linked
         hide-man-days
         :multiline="isAllEpisodes"
         :reassignable="!isLockedSchedule && !isAllEpisodes"
@@ -415,7 +414,6 @@
               <div class="flexrow-item">
                 <date-field
                   :can-delete="false"
-                  disabled
                   :label="$t('main.end_date')"
                   utc
                   :with-margin="false"
@@ -1553,43 +1551,13 @@ export default {
 
     async onScheduleItemChanged(item) {
       if (item.type === 'Task') {
-        // update dates with weekends and days off
-        const daysOff = item.assignees
-          .flatMap(assigneeId => this.daysOffByPerson[assigneeId])
-          .filter(Boolean)
-        item.startDate = addBusinessDays(item.startDate, 0, daysOff)
-        item.endDate = addBusinessDays(
-          item.startDate,
-          Math.ceil(minutesToDays(this.organisation, item.estimation)) - 1,
-          daysOff
-        )
-        // update parents
-        if (item.startDate.isBefore(item.parentElement.startDate)) {
-          item.parentElement.startDate = item.startDate.clone()
-          this.updateScheduleItem(item.parentElement)
-          if (
-            item.parentElement.startDate.isBefore(
-              item.parentElement.parentElement.startDate
-            )
-          ) {
-            item.parentElement.parentElement.startDate =
-              item.parentElement.startDate.clone()
-            this.updateScheduleItem(item.parentElement.parentElement)
-          }
-        }
-        if (item.endDate.isAfter(item.parentElement.endDate)) {
-          item.parentElement.endDate = item.endDate.clone()
-          this.updateScheduleItem(item.parentElement)
-          if (
-            item.parentElement.endDate.isAfter(
-              item.parentElement.parentElement.endDate
-            )
-          ) {
-            item.parentElement.parentElement.endDate =
-              item.parentElement.endDate.clone()
-            this.updateScheduleItem(item.parentElement.parentElement)
-          }
-        }
+        // The window the user drew is kept as-is: the bar spans the period the
+        // task is planned over, while the estimation stays the amount of work
+        // inside it. Deriving the end date from the estimation here made every
+        // bar exactly as long as its estimation, which prevented rough drafts
+        // and could not express an artist splitting time across several tasks.
+        // Parent bars are likewise left alone so a department timeline can be
+        // drafted independently of the tasks beneath it.
         await this.saveTaskChanged(item)
         return
       }
