@@ -454,7 +454,7 @@
               >
                 <div
                   class="cut-gap-catcher"
-                  :style="cutGapCatcherStyle()"
+                  :style="cutGapCatcherStyle(rootElement)"
                   @click="onBarCutClick(rootElement, $event)"
                   v-if="cutMode && rootElement.editable"
                 ></div>
@@ -644,7 +644,7 @@
 
                   <div
                     class="cut-gap-catcher"
-                    :style="cutGapCatcherStyle()"
+                    :style="cutGapCatcherStyle(childElement)"
                     @click="onBarCutClick(childElement, $event)"
                     v-if="cutMode && withEstimations"
                   ></div>
@@ -761,7 +761,9 @@
                       <template :key="index" v-for="(task, index) in subchild">
                         <div
                           class="cut-gap-catcher"
-                          :style="cutGapCatcherStyle(5 + 38 * task.line, 34)"
+                          :style="
+                            cutGapCatcherStyle(task, 5 + 38 * task.line, 34)
+                          "
                           @click="onBarCutClick(task, $event)"
                           v-if="cutMode"
                         ></div>
@@ -2359,14 +2361,18 @@ const isCut = timeElement => timeElement?.segments?.length > 0
 // A cut bar only paints a `.timebar` where a segment actually sits, so the
 // gap between two pieces has no element to click on. This sits behind the
 // segments (earlier in the DOM, so a segment always wins the hit test on
-// its own area) and fills the row so a click anywhere in the gap still
-// resolves to a day and can heal it.
-const cutGapCatcherStyle = (top = '0', height = '100%') => ({
+// its own area) and spans the owner's own overall dates so a click anywhere
+// in one of its gaps still resolves to a day and can heal it.
+//
+// Bounded to the owner's own left/width rather than the full row: on a
+// person's row, several non-overlapping tasks can share the same visual
+// line, and a full-width catcher for a later task would sit in front of an
+// earlier task's own bars for the entire row, stealing its clicks too.
+const cutGapCatcherStyle = (timeElement, top = 0, height = '100%') => ({
   position: 'absolute',
   top: typeof top === 'number' ? `${top}px` : top,
-  left: 0,
-  right: 0,
-  width: '100%',
+  left: `${getTimebarLeft(timeElement)}px`,
+  width: `${getTimebarWidth(timeElement)}px`,
   height: typeof height === 'number' ? `${height}px` : height,
   cursor: cutCursor
 })
