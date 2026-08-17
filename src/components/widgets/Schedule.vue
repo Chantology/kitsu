@@ -1365,6 +1365,11 @@ const refreshAllItemPositions = () => {
 // enough for live feedback; the drop (stopBrowsing) still runs the exact
 // relayout on every moved item.
 let lastDragRelayoutAt = 0
+// A dragged bar is either a time element or one piece of a cut one. The row
+// it sits on, and the man-day total of that row, belong to the element that
+// owns the piece: a piece itself has no place in the hierarchy.
+const layoutOwnerOf = item => item.owner ?? item
+
 const refreshItemPositionsDuringDrag = rootElements => {
   const now = performance.now()
   if (now - lastDragRelayoutAt < 100) return
@@ -1550,7 +1555,12 @@ const changeDates = event => {
   const change = getClientX(event) - initialClientX - cellWidth.value / 2
   const dayChange = Math.ceil(change / cellWidth.value)
 
-  if (props.reassignable) {
+  // A piece of a cut bar only ever moves in time: reassigning half a task to
+  // another person means nothing, and the checks below read `assignees` and
+  // `entity_type_id`, which a piece does not carry. Reading them off a piece
+  // makes the entity-type comparison fail against undefined, which aborted
+  // every drag whose cursor sat over a person row - that is, all of them.
+  if (props.reassignable && !currentElement.value.owner) {
     let target = event.target
     while (target && !target.classList?.contains('drop-item-target')) {
       target = target.parentNode
@@ -1677,7 +1687,9 @@ const changeDates = event => {
         })
         if (props.multiline || props.subchildren) {
           const parentElements = [
-            ...new Set(selection.value.map(item => item.parentElement))
+            ...new Set(
+              selection.value.map(item => layoutOwnerOf(item).parentElement)
+            )
           ]
           refreshItemPositionsDuringDrag(parentElements)
         }
@@ -1733,7 +1745,9 @@ const changeStartDate = event => {
     currentElement.value.startDate = newStartDate.clone()
     updateItemEstimation(currentElement.value)
     propagateClipToChildren(currentElement.value)
-    refreshItemPositionsDuringDrag([currentElement.value.parentElement])
+    refreshItemPositionsDuringDrag([
+      layoutOwnerOf(currentElement.value).parentElement
+    ])
     resetSelection([currentElement.value])
   }
 }
@@ -1788,7 +1802,9 @@ const changeEndDate = event => {
     currentElement.value.endDate = newEndDate.clone()
     updateItemEstimation(currentElement.value)
     propagateClipToChildren(currentElement.value)
-    refreshItemPositionsDuringDrag([currentElement.value.parentElement])
+    refreshItemPositionsDuringDrag([
+      layoutOwnerOf(currentElement.value).parentElement
+    ])
     resetSelection([currentElement.value])
   }
 }
@@ -2072,8 +2088,9 @@ const stopBrowsing = event => {
       // on moving or resizing selected items
       selection.value.forEach(item => {
         emit('item-changed', item)
-        refreshItemPositions(item.parentElement)
-        refreshManDays(item.parentElement)
+        const rowElement = layoutOwnerOf(item).parentElement
+        refreshItemPositions(rowElement)
+        refreshManDays(rowElement)
       })
       // clear selection after moving a single item
       if (isChangeDates.value && selection.value.length === 1) {
