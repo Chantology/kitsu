@@ -2769,6 +2769,18 @@ defineExpose({
  * @param {Array<Object>} items - The list of items to position.
  * @param {Moment.unitOfTime} unitOfTime - A unit of time (eg. 'days', 'weeks', 'months', ...).
  */
+// A cut item occupies its pieces, not the whole stretch between the first and
+// the last one: the gaps are exactly where something else may sit. Measuring it
+// by one aggregate range pushed anything that fits inside a gap down onto a
+// second line, where it read as a bar stranded below its own row's label.
+const itemRanges = (item, unitOfTime, minDate) => {
+  const bars = item.segments?.length ? item.segments : [item]
+  return bars.map(bar => [
+    bar.startDate.clone().startOf(unitOfTime).diff(minDate, unitOfTime),
+    bar.endDate.clone().endOf(unitOfTime).diff(minDate, unitOfTime)
+  ])
+}
+
 const setItemPositions = (items, unitOfTime = 'days') => {
   if (!items?.length) {
     return
@@ -2781,19 +2793,19 @@ const setItemPositions = (items, unitOfTime = 'days') => {
   // one entry per line: the [start, end] ranges already placed on it
   const lines = []
   items.forEach(item => {
-    const start = item.startDate
-      .clone()
-      .startOf(unitOfTime)
-      .diff(minDate, unitOfTime)
-    const end = item.endDate.clone().endOf(unitOfTime).diff(minDate, unitOfTime)
+    const ranges = itemRanges(item, unitOfTime, minDate)
     let line = 0
-    while (lines[line]?.some(([s, e]) => start <= e && end >= s)) {
+    while (
+      lines[line]?.some(([s, e]) =>
+        ranges.some(([start, end]) => start <= e && end >= s)
+      )
+    ) {
       line++
     }
     if (!lines[line]) {
       lines[line] = []
     }
-    lines[line].push([start, end])
+    lines[line].push(...ranges)
     item.line = line
   })
 }
