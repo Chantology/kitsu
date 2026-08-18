@@ -1828,6 +1828,8 @@ export default {
     hours: 'h',
     today: 'Today',
     zoom_level: 'Zoom level',
+    task_types_filter: 'Filter Tasks',
+    task_types_filter_select: 'Select Tasks',
     milestone: {
       add_milestone: 'Add milestone for',
       delete_milestone: 'Delete milestone',
