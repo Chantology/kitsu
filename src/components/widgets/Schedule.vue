@@ -649,7 +649,7 @@
                     v-if="cutMode && withEstimations"
                   ></div>
 
-                  <template v-if="withEstimations">
+                  <div class="child-bars" v-if="withEstimations">
                     <div
                       class="timebar"
                       :class="{
@@ -730,7 +730,7 @@
                         "
                       ></div>
                     </div>
-                  </template>
+                  </div>
 
                   <div
                     v-if="subchildren && childElement.children.size"
@@ -3239,6 +3239,20 @@ const setItemPositions = (items, unitOfTime = 'days') => {
         }
         &.child-line {
           padding: 0;
+
+          // A child bar is drawn as one piece per segment once it is cut, and
+          // the pieces below are in the flow, so each extra one would claim
+          // another line of its own and shove the person rows underneath out
+          // of line with their names. This holds the one line they share, no
+          // matter how many pieces there are.
+          .child-bars {
+            position: relative;
+            height: 20px;
+
+            .timebar {
+              position: absolute;
+            }
+          }
 
           &.multiline .timebar {
             top: 0;
