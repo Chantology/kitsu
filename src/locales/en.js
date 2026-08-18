@@ -1831,6 +1831,8 @@ export default {
     cut_tool_description:
       'Click a bar to cut it in two, click a gap to close it again',
     zoom_level: 'Zoom level',
+    task_types_filter: 'Filter Tasks',
+    task_types_filter_select: 'Select Tasks',
     milestone: {
       add_milestone: 'Add milestone for',
       delete_milestone: 'Delete milestone',
