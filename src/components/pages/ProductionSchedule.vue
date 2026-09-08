@@ -1579,52 +1579,218 @@ export default {
       }
     },
 
-    // A parent bar grows to keep its children inside it, and is never
-    // shrunk back onto them: a department drafted three months long has to
-    // stay three months long when a shorter sequence moves inside it,
-    // otherwise the rough plan collapses onto whatever is scheduled so far.
-    // Propagation stops as soon as a bar already contains its child, since
-    // the ones above it then cannot need widening either.
-    expandParentsToContain(item) {
+    // Child rows are either an array (a task type's entity types) or a map of
+    // assignee to tasks (an entity type's own row), so a parent has to be
+    // asked for its children rather than read directly.
+    childElementsOf(element) {
+      const children = element.children
+      if (Array.isArray(children)) return children
+      if (children instanceof Map) return [...children.values()].flat()
+      return []
+    },
+
+    // Every dated bar at the bottom of the tree. A cut bar is fitted to the
+    // work inside one of its pieces, and the rows in between span all of
+    // their tasks at once, so the tasks have to be read from the leaves
+    // rather than from the immediate children.
+    leafElementsOf(element) {
+      const children = this.childElementsOf(element)
+      return children.flatMap(child => {
+        const leaves = this.leafElementsOf(child)
+        return leaves.length ? leaves : [child]
+      })
+    },
+
+    // The blocks of work under a bar, one per piece rather than one per task.
+    // A cut task's envelope spans its own break, so measuring it whole would
+    // credit a piece of the parent with work that happens weeks away from it.
+    leafRangesOf(element) {
+      return this.leafElementsOf(element).flatMap(leaf => {
+        if (!leaf.startDate || !leaf.endDate) return []
+        const pieces = leaf.segments?.length ? leaf.segments : [leaf]
+        return pieces.map(piece => ({
+          start: piece.startDate,
+          end: piece.endDate
+        }))
+      })
+    },
+
+    // Where the bar that moved sat before, and where it sits now. For a cut
+    // bar this is the piece that was dragged, not the task it belongs to:
+    // reading the task's envelope instead makes any move that keeps the
+    // envelope the same - dragging an inner piece about - look like no move at
+    // all, and nothing above it then follows.
+    movedRangeOf(item) {
+      return {
+        wasStart: item._dragOrigStartDate || item.startDate,
+        wasEnd: item._dragOrigEndDate || item.endDate,
+        start: item.startDate,
+        end: item.endDate
+      }
+    },
+
+    // The piece a bar was working inside before it moved. A bar that sat in a
+    // break belongs to the piece it is nearest to, so a fit always has
+    // somewhere to land.
+    segmentAround(parent, start, end) {
+      const overlap = segment =>
+        Math.min(segment.endDate.valueOf(), end.valueOf()) -
+        Math.max(segment.startDate.valueOf(), start.valueOf())
+      const touching = parent.segments.filter(
+        segment =>
+          segment.startDate.isSameOrBefore(end) &&
+          segment.endDate.isSameOrAfter(start)
+      )
+      // widest overlap wins, for a bar lying across a break
+      if (touching.length) {
+        return touching.reduce((best, segment) =>
+          overlap(segment) > overlap(best) ? segment : best
+        )
+      }
+      const distance = segment =>
+        segment.startDate.isAfter(end)
+          ? segment.startDate.diff(end)
+          : start.diff(segment.endDate)
+      return parent.segments.reduce((best, segment) =>
+        distance(segment) < distance(best) ? segment : best
+      )
+    },
+
+    // Only the piece the moved bar belongs to follows it, and only to the
+    // work that piece covers. Fitting a cut bar to everything underneath it
+    // would edit pieces that stand for unrelated blocks of work - a piece
+    // drafted ahead of any task, most visibly - because a piece is only a
+    // date range and nothing records which tasks belong to it.
+    fitSegmentToItsWork(parent, moved, pulledStart, pushedEnd) {
+      const segment = this.segmentAround(parent, moved.wasStart, moved.wasEnd)
+      const index = parent.segments.indexOf(segment)
+      const before = parent.segments[index - 1]
+      const after = parent.segments[index + 1]
+
+      // what this piece covers: the blocks of work already inside it, plus
+      // the one that just moved out of or across it
+      const members = [
+        ...this.leafRangesOf(parent).filter(
+          range =>
+            range.start.isSameOrBefore(segment.endDate) &&
+            range.end.isSameOrAfter(segment.startDate)
+        ),
+        { start: moved.start, end: moved.end }
+      ]
+
+      if (pulledStart) {
+        let start = moment.min(members.map(range => range.start)).clone()
+        // a piece stays clear of its neighbour and never crosses its own end
+        if (before) {
+          const floor = before.endDate.clone().add(1, 'days')
+          if (start.isBefore(floor)) start = floor
+        }
+        const ceiling = segment.endDate.clone().subtract(1, 'days')
+        if (start.isAfter(ceiling)) start = ceiling
+        if (!start.isSame(segment.startDate)) {
+          segment.startDate = start
+          segment.start_date = start.format('YYYY-MM-DD')
+          this.updateScheduleSegment({
+            ...segment,
+            end_date: segment.endDate.format('YYYY-MM-DD')
+          })
+        }
+      }
+
+      if (pushedEnd) {
+        let end = moment.max(members.map(range => range.end)).clone()
+        if (after) {
+          const ceiling = after.startDate.clone().subtract(1, 'days')
+          if (end.isAfter(ceiling)) end = ceiling
+        }
+        const floor = segment.startDate.clone().add(1, 'days')
+        if (end.isBefore(floor)) end = floor
+        if (!end.isSame(segment.endDate)) {
+          segment.endDate = end
+          segment.end_date = end.format('YYYY-MM-DD')
+          this.updateScheduleSegment({
+            ...segment,
+            start_date: segment.startDate.format('YYYY-MM-DD')
+          })
+        }
+      }
+
+      // the bar itself still spans its pieces
+      parent.startDate = moment
+        .min(parent.segments.map(piece => piece.startDate))
+        .clone()
+      parent.endDate = moment
+        .max(parent.segments.map(piece => piece.endDate))
+        .clone()
+    },
+
+    // Undated tasks have no bar to fit a parent around.
+    childDateRange(element) {
+      const children = this.childElementsOf(element).filter(
+        child => child.startDate && child.endDate
+      )
+      if (!children.length) return null
+      return {
+        start: moment.min(children.map(child => child.startDate)),
+        end: moment.max(children.map(child => child.endDate))
+      }
+    },
+
+    // The stamps outlive the drag, so a later edit through the side panel
+    // would otherwise be read as a move in whichever direction the bar was
+    // last dragged.
+    clearDragOrigin(item) {
+      delete item._dragOrigStartDate
+      delete item._dragOrigEndDate
+    },
+
+    // A parent bar follows the edge its children were pushed towards: drag a
+    // task earlier and its department starts with it, drag one later and the
+    // department ends with it. Only that edge moves. A move changes both of
+    // the child's dates, so refitting both would drag the far end of a rough
+    // draft along with every small nudge.
+    //
+    // The opposite direction is deliberately not symmetric. Lengthening a
+    // department cannot tell which task should absorb the extra room - one
+    // task, several, or none - so it leaves its children alone and stays a
+    // manual edit. Shortening one clips them, which the user confirms first.
+    //
+    // Without the drag origin (a side panel edit, or a bar in a multi-select
+    // that was never stamped) nothing moved as far as this can tell, so it
+    // falls back to growing only, which is what keeps a child from being
+    // drawn outside its parent.
+    fitParentsToChildren(item, moved) {
+      const pulledStart = moved.start.isBefore(moved.wasStart)
+      const pushedEnd = moved.end.isAfter(moved.wasEnd)
       let child = item
       let parent = child.parentElement
       while (parent) {
-        let grewStart = false
-        let grewEnd = false
-        if (child.startDate.isBefore(parent.startDate)) {
-          parent.startDate = child.startDate.clone()
-          grewStart = true
-        }
-        if (child.endDate.isAfter(parent.endDate)) {
-          parent.endDate = child.endDate.clone()
-          grewEnd = true
-        }
-        if (!grewStart && !grewEnd) return
-
-        // a cut parent is drawn from its segments, not its own start/end
-        // date, so the growth has to land on whichever piece sits at the
-        // edge being pushed out
         if (parent.segments?.length) {
-          const first = parent.segments[0]
-          const last = parent.segments[parent.segments.length - 1]
-          if (grewStart) {
-            first.startDate = parent.startDate.clone()
-            first.start_date = first.startDate.format('YYYY-MM-DD')
-            this.updateScheduleSegment({
-              ...first,
-              end_date: first.endDate.format('YYYY-MM-DD')
-            })
-          }
-          if (grewEnd) {
-            last.endDate = parent.endDate.clone()
-            last.end_date = last.endDate.format('YYYY-MM-DD')
-            this.updateScheduleSegment({
-              ...last,
-              start_date: last.startDate.format('YYYY-MM-DD')
-            })
-          }
+          this.fitSegmentToItsWork(parent, moved, pulledStart, pushedEnd)
         } else {
-          this.updateScheduleItem(parent)
+          const range = this.childDateRange(parent)
+          const nextStart =
+            pulledStart && range
+              ? range.start.clone()
+              : child.startDate.isBefore(parent.startDate)
+                ? child.startDate.clone()
+                : parent.startDate.clone()
+          const nextEnd =
+            pushedEnd && range
+              ? range.end.clone()
+              : child.endDate.isAfter(parent.endDate)
+                ? child.endDate.clone()
+                : parent.endDate.clone()
+
+          const settled =
+            nextStart.isSame(parent.startDate) && nextEnd.isSame(parent.endDate)
+          // Refusing rather than drawing a backwards bar: only reachable if a
+          // child sits outside the edge that is not being refitted.
+          if (!settled && nextStart.isBefore(nextEnd)) {
+            parent.startDate = nextStart
+            parent.endDate = nextEnd
+            this.updateScheduleItem(parent)
+          }
         }
         child = parent
         parent = parent.parentElement
@@ -1800,13 +1966,19 @@ export default {
         segment.end_date = segment.endDate.format('YYYY-MM-DD')
       }
 
+      // The piece is what moved, so it is the piece that decides which way
+      // and which part of a cut parent follows. Measuring the bar's whole
+      // span instead misses every move that leaves it unchanged - dragging
+      // an inner piece around inside its own bar.
+      const moved = this.movedRangeOf(segment)
       if (owner.segments.length) {
         const starts = owner.segments.map(item => item.startDate)
         const ends = owner.segments.map(item => item.endDate)
         owner.startDate = moment.min(starts).clone()
         owner.endDate = moment.max(ends).clone()
       }
-      this.expandParentsToContain(owner)
+      this.fitParentsToChildren(owner, moved)
+      this.clearDragOrigin(segment)
 
       if (owner.type === 'Task') {
         await this.saveTaskChanged(owner)
@@ -1876,13 +2048,15 @@ export default {
         // inside it. Deriving the end date from the estimation here made every
         // bar exactly as long as its estimation, which prevented rough drafts
         // and could not express an artist splitting time across several tasks.
-        this.expandParentsToContain(item)
+        this.fitParentsToChildren(item, this.movedRangeOf(item))
+        this.clearDragOrigin(item)
         await this.saveTaskChanged(item)
         return
       }
 
       if (item.startDate && item.endDate && item.parentElement) {
-        this.expandParentsToContain(item)
+        this.fitParentsToChildren(item, this.movedRangeOf(item))
+        this.clearDragOrigin(item)
       } else if (!item.parentElement) {
         if (!Array.isArray(item.children)) {
           await this.updateScheduleItem(item)
