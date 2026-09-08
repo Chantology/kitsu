@@ -17,8 +17,8 @@ lead dev:
 
 | Branch | What it has | What we need from testing |
 |---|---|---|
-| `schedule/cut-tool-testing` (this branch) | Features 1 + 2 | **Open UX feedback.** The cut tool's behaviour for edge cases (see *Worth being nasty about*) is not settled — tell us what feels wrong, not just what's broken. |
-| `schedule/task-type-filter` | Everything in this branch, plus a task-type visibility filter on the schedule toolbar | **Correctness review.** This one is closer to being proposed for `main` — the filter itself is small and the ask is "does it work / did we miss a case", not open design debate. |
+| `schedule/cut-tool-testing` | Features 1 + 2 | **Open UX feedback.** The cut tool's behaviour for edge cases (see *Worth being nasty about*) is not settled — tell us what feels wrong, not just what's broken. |
+| `schedule/task-type-filter` (this branch) | Everything in `cut-tool-testing`, plus a task-type visibility filter on the schedule toolbar | **Correctness review.** This one is closer to being proposed for `main` — the filter itself is small and the ask is "does it work / did we miss a case", not open design debate. |
 
 Both branches need the same Zou branch underneath. Pick whichever Kitsu branch
 matches what you're being asked to look at; everything below applies to both
@@ -47,7 +47,7 @@ zou upgrade-db          # required: creates the schedule_segment table
 
 ```bash
 # Kitsu
-git checkout schedule/cut-tool-testing
+git checkout schedule/task-type-filter   # or schedule/cut-tool-testing
 npm ci
 npm run dev
 ```
@@ -112,6 +112,35 @@ other pieces of that same department bar must stay put.
   start/end rather than the piece that actually moved.
 - Confirm the *other* department pieces (the ones the dragged task has
   nothing to do with) don't move at all.
+
+### Task-type filter (this branch only)
+
+A new control in the toolbar lets you hide task-type rows on this page
+without touching anyone else's view — it's per-tester, stored in the URL, not
+a shared setting.
+
+- Open the filter and hide a task type. Its row (and any rows nested under
+  it) disappears from the schedule immediately.
+- Reload the page. The hidden task type should stay hidden — the state lives
+  in the URL query string (`?hiddenTypes=...`), not just in memory.
+- Copy the URL with a task type hidden and open it in a new tab/incognito
+  window. The same task type should be hidden there too.
+- Hide a task type while its row is open in the side panel (selected for
+  editing). The side panel should close rather than keep editing a row that's
+  no longer visible.
+- Switch the entity-type dropdown (e.g. Shot → Asset) with a task type
+  hidden. The filter options should update to match what's actually on
+  screen — a filter entry for a task type that doesn't apply to the current
+  entity type would be confusing.
+- Hide every task type. The schedule should show an empty state, not an
+  error.
+- Confirm the filter itself doesn't appear at all when a production only has
+  one task type — nothing to filter, so the control should stay out of the
+  way.
+
+Since this feature is the one being proposed for `main` first, the ask here
+is narrower than for the cut tool: does it work correctly and did we miss a
+case, rather than open design feedback.
 
 ### Worth being nasty about
 
