@@ -1,6 +1,6 @@
 # Testing guide — flexible schedule timelines + cut tool
 
-This file exists only on the testing branch and is **not** part of the changes
+This file exists only on testing branches and is **not** part of the changes
 being proposed. It is here so a tester gets everything from one checkout.
 
 Two features, built against two Canny proposals already agreed with the CGWire
@@ -13,11 +13,23 @@ lead dev:
    — any bar can be cut into pieces, so interruptions (vacation, waiting on
    client feedback) show as real gaps, and each piece moves on its own.
 
+## Two branches, two different asks
+
+| Branch | What it has | What we need from testing |
+|---|---|---|
+| `schedule/cut-tool-testing` (this branch) | Features 1 + 2 | **Open UX feedback.** The cut tool's behaviour for edge cases (see *Worth being nasty about*) is not settled — tell us what feels wrong, not just what's broken. |
+| `schedule/task-type-filter` | Everything in this branch, plus a task-type visibility filter on the schedule toolbar | **Correctness review.** This one is closer to being proposed for `main` — the filter itself is small and the ask is "does it work / did we miss a case", not open design debate. |
+
+Both branches need the same Zou branch underneath. Pick whichever Kitsu branch
+matches what you're being asked to look at; everything below applies to both
+except the *Task-type filter* section, which only exists on
+`schedule/task-type-filter`.
+
 ## What to check out
 
 | Repo | Branch |
 |---|---|
-| Kitsu | `schedule/cut-tool-testing` (this branch) |
+| Kitsu | `schedule/cut-tool-testing` or `schedule/task-type-filter` (see table above) |
 | Zou | `schedule/add-schedule-segments` |
 | Gazu | nothing — no Gazu changes exist yet (see *Known gaps*) |
 
@@ -84,6 +96,23 @@ Toggle **Cut** in the toolbar (scissors icon), then:
 - Two tasks on one person's row where one is cut: a task that fits inside
   another's gap should sit on the **same** line, not be pushed down a row.
 
+#### Department bars following a cut task's drag
+
+A department (or sequence) bar is expected to pull its start/end to follow a
+task drag, but only the edge that moved — dragging a task later never pulls
+the *start* in, and dragging it earlier never pushes the *end* out. For a cut
+department, only the one piece the dragged task belongs to should move; the
+other pieces of that same department bar must stay put.
+
+- Cut a department bar into at least two pieces, put a cut task under one of
+  them, and drag one of the task's own pieces **entirely within its own
+  piece's date range** (not past either edge). The containing department
+  piece should still shrink/grow to fit — this used to silently do nothing,
+  because the old code measured the drag against the task's overall
+  start/end rather than the piece that actually moved.
+- Confirm the *other* department pieces (the ones the dragged task has
+  nothing to do with) don't move at all.
+
 ### Worth being nasty about
 
 - Double-click fast on a bar in cut mode. It should cut once, not twice.
@@ -119,21 +148,24 @@ which level of bar, whether it was already cut, and whether a reload changes the
 symptom. Two bugs in this feature took several rounds to pin down because the
 repro path was ambiguous.
 
-Frontend checks: `npm run test:unit` (1368 tests) and `npx eslint src/`.
+Frontend checks: `npm run test:unit` (1374 tests) and `npx eslint src/`.
 Backend: `DB_DATABASE=zoudb-test py.test tests/blueprints/crud/test_schedule_segment.py`
 (17 tests).
 
 ## For whoever submits this upstream
 
-The branches are already shaped as four independent submissions:
+The branches are already shaped as independent submissions:
 
 | # | Repo | Branch | Content |
 |---|---|---|---|
 | 1 | Kitsu | `schedule/decouple-window-from-estimation` | Flexible timelines. Frontend only, no migration, no new UI, mostly deletions. |
 | 2 | Zou | `schedule/add-schedule-segments` | `ScheduleSegment` model, migration, CRUD + project route, sync entries, tests. |
 | 3 | Kitsu | `schedule/render-schedule-segments` | Cut tool. Stacked on 1, depends on 2. |
-| 4 | Gazu | — | Not written. |
+| 4 | Kitsu | `schedule/task-type-filter` | Task-type visibility filter. Stacked on 3 — closer to submission-ready than the cut tool itself; see the branch table above. |
+| 5 | Gazu | — | Not written. |
 
 Before submitting #3, its history is worth squashing: it is one feature commit
-followed by ten fixes found during testing, which is useful for bisecting now
-but noisy for a reviewer. Keep the history until testing is signed off.
+followed by fixes found during testing (most recently, department bars not
+reliably following a cut task's drag — see *Cut tool* above), which is useful
+for bisecting now but noisy for a reviewer. Keep the history until testing is
+signed off.
