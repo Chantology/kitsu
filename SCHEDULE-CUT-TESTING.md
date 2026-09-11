@@ -73,6 +73,10 @@ confirming that is part of the test.
   chase it.
 - Move a task beyond a department bar's edge. The department bar grows to
   contain it but never shrinks back.
+- Move a task that stays well inside its department bar's current dates
+  (a department drafted with slack around its tasks). The department bar
+  should **not** move at all — only a drag that actually reaches past the
+  department's current edge is allowed to move it.
 - Type an end date in the side panel (that field used to be disabled).
 - Bars may now start on a weekend. That is intended for rough drafting — the
   implicit "snap to business day" is gone.
@@ -102,16 +106,24 @@ A department (or sequence) bar is expected to pull its start/end to follow a
 task drag, but only the edge that moved — dragging a task later never pulls
 the *start* in, and dragging it earlier never pushes the *end* out. For a cut
 department, only the one piece the dragged task belongs to should move; the
-other pieces of that same department bar must stay put.
+other pieces of that same department bar must stay put. And in either
+direction, the edge only ever **extends** — it never shrinks in response to a
+task move, even if that task was the only thing keeping it that wide. Only a
+manual resize of the department bar itself is allowed to make it shorter
+(the clip-and-confirm behaviour above).
 
 - Cut a department bar into at least two pieces, put a cut task under one of
   them, and drag one of the task's own pieces **entirely within its own
   piece's date range** (not past either edge). The containing department
-  piece should still shrink/grow to fit — this used to silently do nothing,
-  because the old code measured the drag against the task's overall
-  start/end rather than the piece that actually moved.
+  piece should **not** move — this used to silently do nothing at all
+  (measuring the drag against the task's overall start/end rather than the
+  piece that actually moved), then briefly over-corrected into recomputing
+  the piece's edge from scratch on every such drag, which shrank it whenever
+  the piece had any slack around its actual work.
+- Now drag that piece far enough to actually cross the containing department
+  piece's current edge. The department piece should extend to match.
 - Confirm the *other* department pieces (the ones the dragged task has
-  nothing to do with) don't move at all.
+  nothing to do with) don't move at all in either case.
 
 ### Worth being nasty about
 
@@ -148,7 +160,7 @@ which level of bar, whether it was already cut, and whether a reload changes the
 symptom. Two bugs in this feature took several rounds to pin down because the
 repro path was ambiguous.
 
-Frontend checks: `npm run test:unit` (1374 tests) and `npx eslint src/`.
+Frontend checks: `npm run test:unit` (1378 tests) and `npx eslint src/`.
 Backend: `DB_DATABASE=zoudb-test py.test tests/blueprints/crud/test_schedule_segment.py`
 (17 tests).
 
