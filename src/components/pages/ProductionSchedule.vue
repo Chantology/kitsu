@@ -1679,7 +1679,13 @@ export default {
       ]
 
       if (pulledStart) {
-        let start = moment.min(members.map(range => range.start)).clone()
+        // never later than the piece's own current start - a fit only ever
+        // extends a piece, the same as the plain-parent branch below, so a
+        // piece drafted ahead of its work does not collapse onto it the
+        // moment any task inside it is nudged
+        let start = moment
+          .min([segment.startDate, ...members.map(range => range.start)])
+          .clone()
         // a piece stays clear of its neighbour and never crosses its own end
         if (before) {
           const floor = before.endDate.clone().add(1, 'days')
@@ -1698,7 +1704,10 @@ export default {
       }
 
       if (pushedEnd) {
-        let end = moment.max(members.map(range => range.end)).clone()
+        // never earlier than the piece's own current end - see pulledStart
+        let end = moment
+          .max([segment.endDate, ...members.map(range => range.end)])
+          .clone()
         if (after) {
           const ceiling = after.startDate.clone().subtract(1, 'days')
           if (end.isAfter(ceiling)) end = ceiling
@@ -1769,15 +1778,18 @@ export default {
           this.fitSegmentToItsWork(parent, moved, pulledStart, pushedEnd)
         } else {
           const range = this.childDateRange(parent)
+          // never later/earlier than the parent's own current bound - a
+          // parent drafted ahead of its children only ever extends further,
+          // it does not collapse onto them the moment one is nudged
           const nextStart =
             pulledStart && range
-              ? range.start.clone()
+              ? moment.min(parent.startDate, range.start).clone()
               : child.startDate.isBefore(parent.startDate)
                 ? child.startDate.clone()
                 : parent.startDate.clone()
           const nextEnd =
             pushedEnd && range
-              ? range.end.clone()
+              ? moment.max(parent.endDate, range.end).clone()
               : child.endDate.isAfter(parent.endDate)
                 ? child.endDate.clone()
                 : parent.endDate.clone()

@@ -254,7 +254,7 @@ describe('Schedule page - fitting a parent bar to the child that moved', () => {
     rafSpy.mockRestore()
   })
 
-  test('pulls the parent start back to a task dragged earlier, leaving the end', async () => {
+  test('leaves a drafted start alone while a task move stays inside it', async () => {
     const page = buildPage()
     const hierarchy = buildHierarchy()
     const wrapper = mountSchedule(hierarchy, page)
@@ -265,8 +265,29 @@ describe('Schedule page - fitting a parent bar to the child that moved', () => {
     // the drop really did reach the page, rather than the fit being skipped
     expect(page.saveTaskChanged).toHaveBeenCalledWith(task)
     expect(task.startDate.isBefore(moment('2026-08-25'))).toBe(true)
-    // still inside the drafted department, so growing alone would not move it
+    // still inside the drafted department - only a drag that actually
+    // crosses the drafted edge is allowed to move it
     expect(task.startDate.isAfter(moment('2026-08-01'))).toBe(true)
+    expect(hierarchy.childElement.startDate.isSame(moment('2026-08-01'))).toBe(
+      true
+    )
+    expect(hierarchy.rootElement.startDate.isSame(moment('2026-08-01'))).toBe(
+      true
+    )
+
+    wrapper.unmount()
+  })
+
+  test('pulls the drafted start out once a task drag actually crosses it', async () => {
+    const page = buildPage()
+    const hierarchy = buildHierarchy()
+    const wrapper = mountSchedule(hierarchy, page)
+    const [task] = hierarchy.tasks
+
+    // far enough left to pass the drafted start (2026-08-01)
+    await dragTaskBy(wrapper, 0, -600)
+
+    expect(task.startDate.isBefore(moment('2026-08-01'))).toBe(true)
     expect(hierarchy.childElement.startDate.isSame(task.startDate)).toBe(true)
     expect(hierarchy.rootElement.startDate.isSame(task.startDate)).toBe(true)
     expect(hierarchy.childElement.endDate.isSame(moment('2026-10-01'))).toBe(
@@ -279,7 +300,7 @@ describe('Schedule page - fitting a parent bar to the child that moved', () => {
     wrapper.unmount()
   })
 
-  test('pushes the parent end out to a task dragged later, leaving the start', async () => {
+  test('leaves a drafted end alone while a task move stays inside it', async () => {
     const page = buildPage()
     const hierarchy = buildHierarchy()
     const wrapper = mountSchedule(hierarchy, page)
@@ -288,8 +309,27 @@ describe('Schedule page - fitting a parent bar to the child that moved', () => {
     await dragTaskBy(wrapper, 0, 120)
 
     expect(task.endDate.isAfter(moment('2026-09-20'))).toBe(true)
-    // still inside the drafted department, so growing alone would not move it
     expect(task.endDate.isBefore(moment('2026-10-01'))).toBe(true)
+    expect(hierarchy.childElement.endDate.isSame(moment('2026-10-01'))).toBe(
+      true
+    )
+    expect(hierarchy.rootElement.endDate.isSame(moment('2026-10-01'))).toBe(
+      true
+    )
+
+    wrapper.unmount()
+  })
+
+  test('pushes the drafted end out once a task drag actually crosses it', async () => {
+    const page = buildPage()
+    const hierarchy = buildHierarchy()
+    const wrapper = mountSchedule(hierarchy, page)
+    const [task] = hierarchy.tasks
+
+    // far enough right to pass the drafted end (2026-10-01)
+    await dragTaskBy(wrapper, 0, 300)
+
+    expect(task.endDate.isAfter(moment('2026-10-01'))).toBe(true)
     expect(hierarchy.childElement.endDate.isSame(task.endDate)).toBe(true)
     expect(hierarchy.rootElement.endDate.isSame(task.endDate)).toBe(true)
     expect(hierarchy.childElement.startDate.isSame(moment('2026-08-01'))).toBe(
@@ -302,7 +342,7 @@ describe('Schedule page - fitting a parent bar to the child that moved', () => {
     wrapper.unmount()
   })
 
-  test('fits only the piece the task was working in, leaving the others', async () => {
+  test('leaves the piece a task works in alone while the drag stays inside it', async () => {
     const page = buildPage()
     const hierarchy = buildCutDepartment()
     const [leading, working, trailing] = hierarchy.segments
@@ -312,8 +352,29 @@ describe('Schedule page - fitting a parent bar to the child that moved', () => {
     await dragTaskBy(wrapper, 0, -60)
 
     expect(hierarchy.task.startDate.isBefore(moment('2026-08-25'))).toBe(true)
-    expect(working.startDate.isSame(hierarchy.task.startDate)).toBe(true)
+    // still inside the piece's own drafted start (2026-08-20)
+    expect(working.startDate.isSame(moment('2026-08-20'))).toBe(true)
     // the block of work that has no task under it must not be touched
+    expect(leading.startDate.isSame(moment('2026-07-06'))).toBe(true)
+    expect(leading.endDate.isSame(moment('2026-07-10'))).toBe(true)
+    expect(trailing.startDate.isSame(moment('2026-10-05'))).toBe(true)
+    expect(trailing.endDate.isSame(moment('2026-10-15'))).toBe(true)
+
+    wrapper.unmount()
+  })
+
+  test('pulls a piece start out once the task drag actually crosses it', async () => {
+    const page = buildPage()
+    const hierarchy = buildCutDepartment()
+    const [leading, working, trailing] = hierarchy.segments
+
+    const wrapper = mountSchedule(hierarchy, page)
+
+    // far enough left to pass the piece's own drafted start (2026-08-20)
+    await dragTaskBy(wrapper, 0, -300)
+
+    expect(hierarchy.task.startDate.isBefore(moment('2026-08-20'))).toBe(true)
+    expect(working.startDate.isSame(hierarchy.task.startDate)).toBe(true)
     expect(leading.startDate.isSame(moment('2026-07-06'))).toBe(true)
     expect(leading.endDate.isSame(moment('2026-07-10'))).toBe(true)
     expect(trailing.startDate.isSame(moment('2026-10-05'))).toBe(true)
@@ -339,7 +400,7 @@ describe('Schedule page - fitting a parent bar to the child that moved', () => {
     wrapper.unmount()
   })
 
-  test('follows a piece dragged inside its own bar, which leaves the bar spanning the same days', async () => {
+  test('leaves the block of work a cut piece belongs to alone while the drag stays inside it', async () => {
     const page = buildPage()
     const hierarchy = buildCutTaskInCutDepartment()
     const wrapper = mountSchedule(hierarchy, page)
@@ -353,8 +414,8 @@ describe('Schedule page - fitting a parent bar to the child that moved', () => {
     expect(hierarchy.task.endDate.isSame(moment('2026-09-10'))).toBe(true)
     expect(firstPiece.endDate.isAfter(moment('2026-08-16'))).toBe(true)
 
-    // the block of work the piece lives in follows it
-    expect(working.endDate.isSame(firstPiece.endDate)).toBe(true)
+    // still inside the block's own drafted end (2026-08-26)
+    expect(working.endDate.isSame(moment('2026-08-26'))).toBe(true)
     // and no other block is touched
     expect(early.startDate.isSame(moment('2026-07-21'))).toBe(true)
     expect(early.endDate.isSame(moment('2026-07-31'))).toBe(true)
@@ -364,16 +425,39 @@ describe('Schedule page - fitting a parent bar to the child that moved', () => {
     wrapper.unmount()
   })
 
-  test('fits the parent to the earliest sibling, not just the dragged task', async () => {
+  test('pushes the block of work a cut piece belongs to out once the drag actually crosses it', async () => {
     const page = buildPage()
-    const early = buildTask('task-early', 'SH005', '2026-08-10', '2026-08-14')
+    const hierarchy = buildCutTaskInCutDepartment()
+    const wrapper = mountSchedule(hierarchy, page)
+    const [early, working, third, last] = hierarchy.segments
+    const [firstPiece] = hierarchy.task.segments
+
+    // far enough right to pass the block's own drafted end (2026-08-26)
+    await dragTaskBy(wrapper, 0, 260)
+
+    expect(hierarchy.task.endDate.isSame(moment('2026-09-10'))).toBe(true)
+    expect(firstPiece.endDate.isAfter(moment('2026-08-26'))).toBe(true)
+    expect(working.endDate.isSame(firstPiece.endDate)).toBe(true)
+    expect(early.startDate.isSame(moment('2026-07-21'))).toBe(true)
+    expect(early.endDate.isSame(moment('2026-07-31'))).toBe(true)
+    expect(third.startDate.isSame(moment('2026-08-31'))).toBe(true)
+    expect(last.endDate.isSame(moment('2026-10-18'))).toBe(true)
+
+    wrapper.unmount()
+  })
+
+  test('fits a crossed drafted start to the earliest sibling, not just the dragged task', async () => {
+    const page = buildPage()
+    const early = buildTask('task-early', 'SH005', '2026-07-20', '2026-07-24')
     const moved = buildTask('task-moved', 'SH010', '2026-08-25', '2026-09-20')
     const hierarchy = buildHierarchy([early, moved])
     const wrapper = mountSchedule(hierarchy, page)
 
-    // drag the later task earlier, but not past the sibling that starts first
-    await dragTaskBy(wrapper, 1, -60)
+    // past the drafted start (2026-08-01), but not past the sibling
+    // that already starts before it (2026-07-20)
+    await dragTaskBy(wrapper, 1, -560)
 
+    expect(moved.startDate.isBefore(moment('2026-08-01'))).toBe(true)
     expect(moved.startDate.isAfter(early.startDate)).toBe(true)
     expect(hierarchy.rootElement.startDate.isSame(early.startDate)).toBe(true)
 
