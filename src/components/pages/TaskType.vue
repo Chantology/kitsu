@@ -1946,29 +1946,35 @@ const resetScheduleScroll = () => {
 // schedule once per burst instead of once per event
 const resetScheduleItemsDebounced = func.debounce(resetScheduleItems, 400)
 
+// Same bursts, and this is the heavier half: onSearchChange walks every
+// entity, re-sorts the tasks and rebuilds the search index. The field is
+// read again on fire, as the page may have been left in the meantime.
+const refreshTasksDebounced = func.debounce(() => {
+  if (searchFieldRef.value) onSearchChange(searchFieldRef.value.getValue())
+}, 400)
+
 const onRemoteTaskUpdate = eventData => {
   resetScheduleItemsDebounced()
+  const task = taskMap.value.get(eventData.task_id)
   if (
     !isActiveTab('schedule') &&
-    taskMap.value.get(eventData.task_id) &&
+    task &&
+    // getTasks only keeps the current task type, so an update on another one
+    // cannot change what is displayed.
+    task.task_type_id === currentTaskType.value?.id &&
     nbSelectedTasks.value === 0 &&
     searchFieldRef.value &&
     searchFieldRef.value.getValue() === ''
   ) {
-    resetTaskIndex()
-    nextTick(() => {
-      onSearchChange(searchFieldRef.value.getValue())
-    })
+    // The guard above forces an empty search field, so onSearchChange falls
+    // into resetTasks(), which rebuilds the index from the same data.
+    refreshTasksDebounced()
   }
 }
 
 // Equivalent of the Options API created() hook: runs during setup.
 if (!currentProduction.value) {
   store.dispatch('setProduction', route.params.production_id)
-} else {
-  const options = { productionId: currentProduction.value.id }
-  if (currentEpisode.value) options.episodeId = currentEpisode.value.id
-  store.commit('RESET_PRODUCTION_PATH', options)
 }
 
 // Watchers
@@ -2027,17 +2033,6 @@ watch(currentProduction, () => {
 
 watch(nbSelectedTasks, () => {
   updateTaskInQuery()
-})
-
-// Quickfix for the edge case where the backPath is not properly set
-// because it was set when the episode was not fully loaded.
-watch(currentEpisode, () => {
-  if (currentEpisode.value && !backPath.value.params?.episode_id) {
-    store.commit('RESET_PRODUCTION_PATH', {
-      productionId: currentProduction.value.id,
-      episodeId: currentEpisode.value.id
-    })
-  }
 })
 
 watch(

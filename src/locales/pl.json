@@ -79,7 +79,7 @@
     },
     "board": {
       "title": "Tablica",
-      "empty": "Twoja tablica kanban jest obecnie pusta. Oznacza to, że w ustawieniach produkcji nie skonfigurowano statusów zadań dla Twojej roli.",
+      "empty": "Nie ma nic do pokazania na tablicy: nie masz bieżących zadań, wyszukiwanie nie zwróciło wyników albo w ustawieniach produkcji nie włączono żadnych statusów zadań dla Twojej roli.",
       "settings": {
         "title": "Status na tablicy",
         "visible": "Wyświetlany na tablicy kanban dla...",
@@ -88,8 +88,8 @@
       }
     },
     "bots": {
-      "active_bots": "aktywny bot | aktywne boty",
-      "bots": "bot | boty",
+      "active_bots": "aktywny bot | aktywnych botów",
+      "bots": "bot | botów",
       "confirm_edit": "Zapisz zmiany bota",
       "copy_token_warning": "Pamiętaj, aby skopiować poniższy token. Nie zobaczysz go ponownie.",
       "create": "Utwórz bota",
@@ -116,7 +116,11 @@
       "episode_casting": "Casting odcinka",
       "hide_library": "Ukryj bibliotekę",
       "label": "Etykieta",
+      "occurrences": "Wystąpienia",
       "picture_mode": "Przełącz na tryb graficzny",
+      "remove_from_casting": "Usuń z castingu",
+      "view_as_cards": "Widok kart",
+      "view_as_list": "Widok listy",
       "save_error": "Błąd podczas zapisywania castingu",
       "show_library": "Pokaż bibliotekę",
       "text_mode": "Przełącz na tryb tekstowy",
@@ -202,6 +206,14 @@
         "senior": "Senior"
       }
     },
+    "burndown": {
+      "estimations": "Estymacje",
+      "ideal": "Idealny",
+      "projection": "Prognoza",
+      "remaining_days": "Pozostałe osobodni",
+      "remaining_tasks": "Pozostałe zadania",
+      "title": "Wykres burndown"
+    },
     "chats": {
       "delete_message": "Czy na pewno chcesz usunąć tę wiadomość?",
       "delete_message_confirm": "Usuń wiadomość",
@@ -210,7 +222,11 @@
       "no_message_yet": "Brak wiadomości",
       "no_chat": "Nie uczestniczysz obecnie w żadnym czacie obiektu. Wyszukaj obiekt i dołącz do czatu na jego stronie.",
       "search_entity": "Szukaj obiektu",
-      "title": "Czaty obiektów"
+      "title": "Czaty obiektów",
+      "join_error": "Wystąpił błąd podczas dołączania do czatu.",
+      "leave_error": "Wystąpił błąd podczas opuszczania czatu.",
+      "loading_error": "Wystąpił błąd podczas wczytywania czatu.",
+      "send_error": "Wystąpił błąd podczas wysyłania wiadomości."
     },
     "comments": {
       "title": "Komentarze",
@@ -246,12 +262,15 @@
       "pinned": "Przypięty",
       "pinned_revision": "Przypięta wersja",
       "player": {
+        "audio_unavailable": "Dźwięk niedostępny",
+        "image_unavailable": "Obraz niedostępny",
         "play": "Odtwórz",
         "pause": "Wstrzymaj",
         "mute": "Wycisz",
         "unmute": "Wyłącz wyciszenie",
         "fullscreen": "Pełny ekran",
-        "download": "Pobierz"
+        "download": "Pobierz",
+        "video_unavailable": "Wideo niedostępne"
       },
       "post_status": "Dodaj komentarz",
       "previews": "Pliki podglądu do opublikowania jako nowa wersja",
@@ -542,6 +561,7 @@
       "fields": {
         "name": "nazwa",
         "description": "opis",
+        "time_spent": "Czas",
         "placeholder": "E01"
       },
       "status": {
@@ -561,7 +581,7 @@
       "delete_text": "Czy na pewno chcesz usunąć ten sprzęt?",
       "edit_title": "Edytuj sprzęt",
       "new_hardware_item": "Nowy sprzęt",
-      "number": "sprzęt | sprzęty",
+      "number": "sprzęt | sprzętów",
       "title": "Sprzęt",
       "fields": {
         "inventory_amount": "Ilość w magazynie",
@@ -727,6 +747,7 @@
       }
     },
     "main": {
+      "technical_details": "Szczegóły techniczne:",
       "about": "O programie",
       "active": "Aktywne",
       "activity": "Aktywność",
@@ -763,8 +784,10 @@
       "day": "Dzień",
       "days": "dzień | dni",
       "days_spent": "dzień przepracowany | dni przepracowanych",
+      "days_expected": "oczekiwany dzień | oczekiwane dni",
       "days_estimated": "dzień szacowany | dni szacowanych",
       "hours_spent": "godzina przepracowana | godzin przepracowanych",
+      "hours_expected": "oczekiwana godzina | oczekiwane godziny",
       "hours_estimated": "godzina szacowana | godzin szacowanych",
       "delete": "Usuń",
       "delete_all": "Usuń wszystko",
@@ -876,6 +899,8 @@
       "show": "Pokaż",
       "show_support_chat": "Pokaż czat wsparcia",
       "skip_to_content": "Przejdź do treści",
+      "grouped_by": "Pogrupowane według",
+      "none": "Brak",
       "sorted_by": "Posortowano według",
       "sort_by": "Sortuj według",
       "start_date": "Data rozpoczęcia",
@@ -908,6 +933,8 @@
       },
       "csv": {
         "choose": "Wybierz",
+        "error_imported_rows": "Przed błędem zaimportowano {count} wiersz. | Przed błędem zaimportowano {count} wierszy.",
+        "error_line": "Wiersz {line}",
         "error_upload": "Wystąpił błąd podczas przesyłania pliku CSV.",
         "export_current_view": "Eksportuj bieżący widok",
         "export_file": "Eksportuj dane do pliku CSV",
@@ -941,7 +968,7 @@
           "title": "Opcje",
           "update": "Aktualizuj istniejące dane"
         },
-        "new_entities_confirmation": "Potwierdzam, że chcę utworzyć ten nowy wpis | Potwierdzam, że chcę utworzyć te {count} nowe wpisy",
+        "new_entities_confirmation": "Potwierdzam, że chcę utworzyć ten nowy wpis | Potwierdzam, że chcę utworzyć nowe wpisy ({count})",
         "new_entities_to_create": "{count} wiersz nie pasuje do żadnego istniejącego wpisu i zostanie utworzony jako nowy wpis: | {count} wierszy nie pasuje do żadnych istniejących wpisów i zostanie utworzonych jako nowe wpisy:"
       },
       "edl": {
@@ -974,6 +1001,7 @@
       "subscribe": "Subskrybuj powiadomienia"
     },
     "my_checks": {
+      "build_playlist_loaded_only": "Tylko zadania wczytane na listę są uwzględniane w playliście",
       "title": "Zadanie do sprawdzenia | Zadania do sprawdzenia"
     },
     "news": {
@@ -1043,14 +1071,14 @@
       "publish": "Publikacja",
       "published": "opublikował(a) podgląd",
       "show_comments": "Pokaż komentarze",
-      "unread_notifications": "nieprzeczytane powiadomienie | nieprzeczytane powiadomienia",
+      "unread_notifications": "nieprzeczytane powiadomienie | nieprzeczytanych powiadomień",
       "title": "Powiadomienia",
       "watching": "obserwowane",
       "with_preview": "z podglądem"
     },
     "people": {
       "active": "Aktywni",
-      "active_persons": "aktywny użytkownik | aktywni użytkownicy",
+      "active_persons": "aktywny użytkownik | aktywnych użytkowników",
       "add_member_to_team": "Dodaj członka do zespołu",
       "confirm_edit": "Zapisz zmiany użytkownika",
       "create": "Utwórz użytkownika",
@@ -1074,7 +1102,7 @@
       "invite_link_error": "Wystąpił błąd podczas generowania linku zaproszenia",
       "new_person": "Dodaj nowego użytkownika",
       "no_task_assigned": "Nie masz przypisanych żadnych bieżących zadań",
-      "persons": "użytkownik | użytkownicy",
+      "persons": "użytkownik | użytkowników",
       "project_role": "Rola projektu",
       "seats_remaining": "brak wolnych miejsc | pozostało {count} miejsce | pozostało miejsc: {count}",
       "running_tasks": "Bieżące zadania",
@@ -1094,7 +1122,7 @@
       "change_password_error": "Wystąpił błąd podczas zmiany hasła. Sprawdź poprawność nowego hasła.",
       "disable_2FA": "Wyłącz 2FA",
       "disable_2FA_error": "Wystąpił błąd podczas wyłączania uwierzytelniania dwuskładnikowego.",
-      "self_role_downgrade_confirm": "Obniżyć własną rolę z {currentRole} na {newRole}? Natychmiast tracisz uprawnienia administratora: tworzenie produkcji i zarządzanie użytkownikami nie będzie już możliwe, a przywrócić twoją rolę może tylko inny {currentRole}.",
+      "self_role_downgrade_confirm": "Obniżyć własną rolę z {currentRole} na {newRole}? Natychmiast tracisz uprawnienia administratora: tworzenie produkcji i zarządzanie użytkownikami nie będzie już możliwe, a przywrócić Twoją rolę może tylko inny {currentRole}.",
       "fields": {
         "active": "Aktywny",
         "contract": "Umowa",
@@ -1173,6 +1201,7 @@
       "add_episode": "Dodaj cały odcinek",
       "add_movie": "Dodaj cały film",
       "apply_task_type_change": "Spowoduje to ustawienie ostatniej wersji danego typu zadania dla wszystkich obiektów.",
+      "change_task_type_error": "Wystąpił błąd podczas zmiany typu zadania.",
       "update_versions_title": "Zaktualizuj wybrane wersje",
       "update_to_latest_version": "Zaktualizuj do najnowszej wersji",
       "update_to_latest_version_help": "Ustaw najnowszą wersję każdego obiektu, zachowując jego bieżący typ zadania.",
@@ -1252,6 +1281,7 @@
       "unmute": "Wyłącz wyciszenie",
       "updated_at": "Zaktualizowano:",
       "remove": "usuń",
+      "view_as_playlist": "Wyświetl jako playlistę",
       "view_created": "Wyświetl playlistę",
       "volume_level": "Głośność: {level}%",
       "fields": {
@@ -1339,11 +1369,13 @@
       "delete_error": "Wystąpił błąd podczas usuwania tej produkcji. Mogą z nią być nadal powiązane istniejące dane. Czy na pewno z tą produkcją nie jest powiązane żadne zadanie, ujęcie ani asset? Kitsu nie pozwala na usuwanie produkcji. Jeśli nie chcesz już widzieć tej produkcji, możesz ją zamiast tego zamknąć.",
       "edit_error": "Wystąpił błąd podczas edytowania produkcji. Skontaktuj się z naszym zespołem wsparcia.",
       "edit_title": "Edytuj",
-      "load_stats": "Wczytaj statystyki",
+      "hide_stats": "Ukryj statystyki",
+      "show_stats": "Pokaż statystyki",
       "new_production": "Dodaj produkcję",
       "number": "produkcja | produkcji",
       "open_productions": "Moje produkcje",
       "picture": "Zmień obraz",
+      "remove_picture": "Usuń obraz",
       "title": "Produkcje",
       "creation": {
         "add_assets": "Dodaj assety (opcjonalnie)",
@@ -1399,6 +1431,7 @@
         "episode_span": "Odstęp między odcinkami",
         "fps": "FPS",
         "is_clients_isolated": "Izoluj komentarze klientów (niewidoczne dla innych klientów)",
+        "is_frame_in_numbering": "Rozpocznij licznik klatek odtwarzacza od klatki początkowej",
         "is_preview_download_allowed": "Pozwól artystom pobierać podglądy",
         "is_publish_default": "Domyślnie ustawiaj widżet komentarzy dla artystów w trybie publikacji",
         "is_set_preview_automated": "Automatycznie ustawiaj nowy podgląd jako miniaturę obiektu",
@@ -1498,6 +1531,7 @@
     "profile": {
       "change_avatar": "Zmień awatar",
       "clear_avatar": "Usuń awatar",
+      "date_format": "Format daty",
       "info_title": "Informacje",
       "language": "Język",
       "notifications_title": "Powiadomienia",
@@ -1511,6 +1545,7 @@
       "password_title": "Zmień hasło",
       "timezone": "Strefa czasowa",
       "title": "Twój profil",
+      "use_12_hour_clock": "Zegar 12-godzinny (AM/PM)",
       "webhook_error": "webhook Mattermost nie odpowiada żadnemu hookowi",
       "avatar": {
         "title": "Zmień awatar",
@@ -1531,7 +1566,7 @@
       },
       "two_factor_authentication": {
         "title": "Uwierzytelnianie dwuskładnikowe",
-        "description": "Uwierzytelnianie dwuskładnikowe (<abbr title=\"Two-Factor Authentication\">2FA</abbr>) dodaje dodatkową warstwę zabezpieczeń do Twojego konta. Po jego włączeniu przy każdym logowaniu oprócz hasła będzie wymagana druga forma weryfikacji. Jako drugiego składnika możesz użyć aplikacji uwierzytelniającej (<abbr title=\"Time-based One-Time Password\">TOTP</abbr>), weryfikacji e-mail (<abbr title=\"One-Time Password\">OTP</abbr>) lub sprzętowego klucza bezpieczeństwa (<abbr title=\"Fast IDentity Online\">FIDO</abbr>).",
+        "description": "Uwierzytelnianie dwuskładnikowe (<abbr title=\"Two-Factor Authentication (Uwierzytelnianie dwuskładnikowe)\">2FA</abbr>) dodaje dodatkową warstwę zabezpieczeń do Twojego konta. Po jego włączeniu przy każdym logowaniu oprócz hasła będzie wymagana druga forma weryfikacji. Jako drugiego składnika możesz użyć aplikacji uwierzytelniającej (<abbr title=\"Time-based One-Time Password (Jednorazowe hasło oparte na czasie)\">TOTP</abbr>), weryfikacji e-mail (<abbr title=\"One-Time Password (Jednorazowe hasło)\">OTP</abbr>) lub sprzętowego klucza bezpieczeństwa (<abbr title=\"Fast IDentity Online (Szybkie uwierzytelnianie tożsamości online)\">FIDO</abbr>).",
         "mandatory": "Twoja organizacja wymaga uwierzytelniania dwuskładnikowego. Włącz co najmniej jedną metodę, aby kontynuować.",
         "enabled": "Uwierzytelnianie dwuskładnikowe włączone",
         "status_enabled": "Włączone",
@@ -1629,7 +1664,7 @@
       "player_placeholder": "Tutaj zostanie wyświetlony odtwarzacz.",
       "no_preview": "Brak podglądu",
       "no_comments_yet": "Nie ma jeszcze komentarzy.",
-      "comment_placeholder": "Zostaw komentarz...",
+      "comment_placeholder": "Napisz komentarz...",
       "comments_disabled": "Komentarze dla tego linku są wyłączone.",
       "download_preview": "Pobierz podgląd",
       "identity_required": "Przed opublikowaniem musisz podać swoje imię.",
@@ -1647,7 +1682,7 @@
       "edit_title": "Edytuj status zadania",
       "library_title": "Biblioteka statusów zadań",
       "name": "status zadania",
-      "number": "status zadania | statusy zadań",
+      "number": "status zadania | statusów zadań",
       "new_task_status": "Dodaj status zadania",
       "title": "Statusy zadań",
       "title_entities": "Statusy dla obiektów",
@@ -1675,6 +1710,9 @@
       "add_task_type_to_library": "Dodaj typ zadania do biblioteki",
       "delete_text": "Czy na pewno chcesz usunąć {name} z bazy danych?",
       "delete_error": "Wystąpił błąd podczas usuwania tego typu zadania. Mogą istnieć dane, które są obecnie z nim powiązane. Czy na pewno żadne zadanie nie jest powiązane z tym typem zadania?",
+      "delete_blocked_by_links": "Ten typ zadania jest nadal używany w harmonogramie lub w przepływie pracy niektórych produkcji. Odłączenie go usunie jego daty z harmonogramu we wszystkich produkcjach.",
+      "delete_blocked_by_tasks": "Nadal istnieją zadania używające tego typu zadania. Usuń je lub przypisz ponownie przed jego usunięciem.",
+      "delete_force": "Odłącz i usuń",
       "edit_title": "Edytuj typ zadania",
       "create_error": "Wystąpił błąd podczas tworzenia typu zadania. Sprawdź, czy nie istnieje już typ zadania o podobnej nazwie.",
       "library_title": "Biblioteka typów zadań",
@@ -1713,6 +1751,7 @@
         "name": "Nazwa",
         "description": "opis",
         "person": "Osoba",
+        "time_spent": "Czas",
         "placeholder": "SQ01"
       }
     },
@@ -1744,16 +1783,44 @@
         "name": "Nazwa",
         "episode": "Odc.",
         "description": "Opis",
-        "person": "Autor zmian"
+        "person": "Autor zmiany",
+        "time_spent": "Czas"
       }
     },
     "schedule": {
-      "title": "Harmonogram",
-      "title_main": "Harmonogram główny",
-      "overall_man_days": "Osobodni",
-      "md": "os.dni",
-      "today": "Dziś",
-      "zoom_level": "Poziom powiększenia",
+      "apply_to_prod": "Zastosuj do produkcji",
+      "apply_to_prod_confirm": "Czy na pewno chcesz zastosować tę wersję harmonogramu do bieżącej produkcji? Spowoduje to nadpisanie bieżących wartości zadań.",
+      "apply_to_prod_error": "Wystąpił błąd podczas stosowania wersji harmonogramu do bieżącej produkcji.",
+      "assign": "Przypisz do:",
+      "confirm_move_children": "Przesunięcie tego paska przytnie lub przesunie {count} podelement, aby zmieścił się w nowych granicach. Kontynuować? | Przesunięcie tego paska przytnie lub przesunie {count} podelementów, aby zmieściły się w nowych granicach. Kontynuować?",
+      "create_version": "Utwórz wersję harmonogramu",
+      "cut_tool": "Przetnij",
+      "cut_tool_description": "Kliknij pasek, aby przeciąć go na dwie części, kliknij przerwę, aby ją ponownie zamknąć",
+      "delete_version": "Usuń wersję harmonogramu",
+      "delete_version_error": "Wystąpił błąd podczas usuwania tej wersji harmonogramu. Skontaktuj się z naszym zespołem wsparcia.",
+      "delete_version_message": "Czy na pewno chcesz usunąć wersję harmonogramu {name}? Potwierdź, wpisując poniżej nazwę wersji harmonogramu.",
+      "drop_forbidden_department": "Nie należy do działu zadania",
+      "drop_forbidden_person": "Osoba spoza Twoich działów",
+      "drop_forbidden_role": "Brak prawa do przypisywania w tej produkcji",
+      "drop_forbidden_task_type": "Typ zadania spoza Twoich działów",
+      "drop_forbidden_team": "Nie należy do zespołu produkcji",
+      "edit_task": "Edytuj zadanie",
+      "edit_version": "Edytuj wersję harmonogramu",
+      "edit_version_error": "Wystąpił błąd podczas zapisywania wersji harmonogramu. Spróbuj ponownie.",
+      "edit_version_exist": "Wersja o podobnej nazwie już istnieje.",
+      "estimated_daily_quotas": "Automatycznie oszacowane normy dzienne:",
+      "export": "Eksportuj harmonogram",
+      "export_error": "Wystąpił błąd podczas eksportowania danych.",
+      "fields": {
+        "create_from_version": "Utwórz nowy lub na podstawie wersji",
+        "new": "nowy harmonogram",
+        "name": "nazwa wersji",
+        "locked": "zablokowana wersja"
+      },
+      "force_unassign": "Nadpisz poprzednie przypisania",
+      "forced_daily_quotas": "Wymuszone normy dzienne:",
+      "hours": "godz.",
+      "md": "osobodni",
       "milestone": {
         "add_milestone": "Dodaj kamień milowy na",
         "delete_milestone": "Usuń kamień milowy",
@@ -1764,48 +1831,33 @@
       "mode": "Tryb widoku",
       "mode_prev": "Prognoza",
       "mode_real": "Rzeczywisty",
-      "version": "Wersja",
-      "apply_to_prod": "Zastosuj do produkcji",
-      "apply_to_prod_confirm": "Czy na pewno chcesz zastosować tę wersję harmonogramu do bieżącej produkcji? Spowoduje to nadpisanie bieżących wartości zadań.",
-      "apply_to_prod_error": "Wystąpił błąd podczas stosowania wersji harmonogramu do bieżącej produkcji.",
-      "assign": "Przypisz do:",
-      "export": "Eksportuj harmonogram",
-      "export_error": "Wystąpił błąd podczas eksportowania danych.",
-      "reset_list": "Zresetuj listę",
-      "no_entity": "Brak obiektów do przypisania",
+      "new_version": "Nowa wersja",
       "no_assignee": "Brak osób do przypisania",
+      "no_entity": "Brak obiektów do przypisania",
+      "overall_man_days": "Osobodni",
+      "reset_list": "Zresetuj listę",
       "select_task_type": "Wybierz typ zadania",
       "show_assigned": "Pokaż przypisane obiekty",
-      "force_unassign": "Nadpisz poprzednie przypisania",
-      "forced_daily_quotas": "Wymuszone normy dzienne:",
-      "estimated_daily_quotas": "Automatycznie oszacowane normy dzienne:",
-      "edit_task": "Edytuj zadanie",
-      "new_version": "Nowa wersja",
-      "create_version": "Utwórz wersję harmonogramu",
-      "edit_version": "Edytuj wersję harmonogramu",
-      "edit_version_error": "Wystąpił błąd podczas zapisywania wersji harmonogramu. Spróbuj ponownie.",
-      "edit_version_exist": "Wersja o podobnej nazwie już istnieje.",
-      "delete_version": "Usuń wersję harmonogramu",
-      "delete_version_error": "Wystąpił błąd podczas usuwania tej wersji harmonogramu. Skontaktuj się z naszym zespołem wsparcia.",
-      "delete_version_message": "Czy na pewno chcesz usunąć wersję harmonogramu {name}? Potwierdź, wpisując poniżej nazwę wersji harmonogramu.",
+      "title": "Harmonogram",
+      "title_main": "Harmonogram główny",
+      "today": "Dziś",
+      "version": "Wersja",
       "versions": {
         "reference": "Prognoza referencyjna",
         "from": "z",
         "locked": "zablokowana",
         "canceled": "anulowana"
       },
-      "fields": {
-        "create_from_version": "Utwórz nowy lub na podstawie wersji",
-        "new": "nowy harmonogram",
-        "name": "nazwa wersji",
-        "locked": "zablokowana wersja"
-      }
+      "zoom_level": "Poziom powiększenia"
     },
     "team_schedule": {
       "busy": "Zajęty przy innej produkcji",
+      "empty": "Żadna osoba nie pasuje do bieżących filtrów. Spróbuj poszerzyć filtry studia, działu lub produkcji.",
+      "no_assignment_role": "Nie możesz przypisywać zadań w tej produkcji.",
+      "no_department_task_type": "Żaden typ zadania z Twoich działów nie pasuje do filtru produkcji.",
+      "person_placeholder": "Wybierz osobę...",
       "title": "Harmonogram",
-      "title_main": "Harmonogram zespołu",
-      "person_placeholder": "Wybierz osobę..."
+      "title_main": "Harmonogram zespołu"
     },
     "quota": {
       "average": "Średnia",
@@ -1844,6 +1896,10 @@
       "week": "Tydzień"
     },
     "shots": {
+      "bulk_error": "Zbiorcze tworzenie nie powiodło się. Spróbuj ponownie.",
+      "bulk_generate": "Generuj",
+      "bulk_invalid_start": "Nazwa początkowa musi kończyć się liczbą.",
+      "bulk_tab": "Zbiorczo",
       "casting": "Casting ujęcia",
       "cancel_text": "Czy na pewno chcesz zarchiwizować {name}?",
       "creation_explanation": "Aby dodać ujęcia, musisz najpierw utworzyć odcinek i sekwencję. Wpisz nazwę odcinka na dole lewej kolumny, a następnie kliknij „Dodaj”, aby utworzyć nowy odcinek. Wybierz ten odcinek i powtórz tę samą operację dla sekwencji. Na koniec wybierz sekwencję i wpisz nazwę ujęcia w polu na dole prawej kolumny. Kliknij przycisk „Dodaj” poniżej. Twoje pierwsze ujęcie zostało utworzone. Możesz dodać ich znacznie więcej! Jeśli to nie serial telewizyjny, możesz od razu utworzyć sekwencję.",
@@ -1873,10 +1929,12 @@
       "restore_error": "Wystąpił błąd podczas przywracania tego ujęcia.",
       "sequences": "Sekwencje",
       "show_timecode": "Pokaż punkty wejścia i wyjścia jako timecode",
+      "single_tab": "Pojedynczo",
       "tasks": "Zadania ujęcia",
       "title": "Ujęcia",
       "wrong_file_duration": "Czas trwania jednego z przesłanych plików wideo nie odpowiada oczekiwanemu czasowi trwania bieżącego ujęcia.",
       "fields": {
+        "count": "Liczba",
         "description": "Opis",
         "nb_drawings": "Rysunki",
         "nb_frames": "Klatki",
@@ -1891,6 +1949,8 @@
         "production": "Prod.",
         "resolution": "Rozdzielczość",
         "sequence": "Sekwencja",
+        "start": "Początek",
+        "step": "Krok",
         "time_spent": "Czas"
       }
     },
@@ -1920,7 +1980,7 @@
       "add_revision_confirm": "Dodaj pliki do publikacji",
       "all_tasks": "Wszystkie zadania",
       "auto_revision": "Przywróć automatyczny numer wersji",
-      "assign": "Przypisz do wybranego zadania | Przypisz do wybranych zadań ({nbSelectedTasks}) ",
+      "assign": "Przypisz do wybranego zadania | Przypisz do wybranych zadań ({nbSelectedTasks})",
       "assignation_disclaimer": "Jeśli na liście brakuje osób, oznacza to, że nie należą do zespołu.",
       "assign_explanation": "Wybierz osobę do przypisania...",
       "assignation_warning": "Uwaga: nie zobaczysz wyniku, ponieważ przypisania są ukryte",
@@ -1934,7 +1994,7 @@
       "change_status_to": "Zmień status zadania na:",
       "change_status": "Dodaj komentarz",
       "change_preview": "Zmień podgląd",
-      "change_priority": "Zmień priorytet wybranego zadania | Zmień priorytet wybranych zadań ({nbSelectedTasks}) ",
+      "change_priority": "Zmień priorytet wybranego zadania | Zmień priorytet wybranych zadań ({nbSelectedTasks})",
       "change_priority_to": "Nowy priorytet:",
       "change_task_status": "Zmień status wybranego zadania | Zmień status wybranych zadań ({nbSelectedTasks})",
       "clear_all_assignations": "usuń wszystkie przypisania",
@@ -2002,7 +2062,7 @@
       "late": "Status opóźnienia",
       "my_checks": "Moje sprawdzenia",
       "my_tasks": "Moje zadania",
-      "nb_selected_tasks": "wybrano {nbSelectedTasks} zadanie | wybrano {nbSelectedTasks} zadań",
+      "nb_selected_tasks": "Zaznaczono {nbSelectedTasks} zadanie | Zaznaczono {nbSelectedTasks} zadań",
       "new_revision_number": "Nowy numer wersji",
       "next": "następne zadanie",
       "no_assignation_right": "Nie masz uprawnień do zarządzania przypisaniami",
@@ -2120,19 +2180,25 @@
       "delete_text": "Czy na pewno chcesz usunąć tę licencję na oprogramowanie?",
       "edit_title": "Edytuj licencję na oprogramowanie",
       "new_software_license": "Nowa licencja na oprogramowanie",
-      "number": "licencja na oprogramowanie | licencje na oprogramowanie",
+      "number": "licencja na oprogramowanie | licencji na oprogramowanie",
       "title": "Licencje na oprogramowanie",
       "fields": {
         "extension": "Rozszerzenie",
         "name": "Nazwa",
         "monthly_cost": "Koszt miesięczny",
         "inventory_amount": "Stan magazynowy",
-        "short_name": "Skrócona nazwa",
+        "short_name": "Krótka nazwa",
         "status": "Status",
         "version": "Wersja"
       }
     },
     "timesheets": {
+      "chart": "Wykres czasu",
+      "empty": "Brak zarejestrowanego czasu w tym okresie przy bieżących filtrach.",
+      "expected": "oczekiwane",
+      "in_salary": "w wynagrodzeniu",
+      "salary": "Wynagrodzenie",
+      "with_time_logged": "Z zarejestrowanym czasem",
       "confirm_day_off": "Oznaczenie tego dnia jako dnia wolnego usunie cały czas zarejestrowany w tym dniu. Czy na pewno chcesz kontynuować?",
       "confirm_day_offs": "Oznaczenie tych dni jako dni wolnych usunie cały czas zarejestrowany w tych dniach. Czy na pewno chcesz kontynuować?",
       "confirm_unset_day_offs": "Dni wolne są obecnie ustawione od {start} do {end}. Czy na pewno chcesz usunąć ten okres?",
@@ -2156,7 +2222,7 @@
       "period": "Okres",
       "description": "Opis",
       "updated_at": "Data aktualizacji",
-      "nb_days_off": "Dzień wolny | Dni wolne",
+      "nb_days_off": "Dzień wolny | Dni wolnych",
       "no_day_off": "Brak dni wolnych w wybranym okresie.",
       "no_days_off": "Nie zarejestrowano jeszcze żadnego dnia wolnego.",
       "add": "Dodaj dzień wolny",

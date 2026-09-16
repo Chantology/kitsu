@@ -258,7 +258,7 @@ import moment from 'moment'
 import { mapGetters, mapActions } from 'vuex'
 
 import csv from '@/lib/csv'
-import { sortByName } from '@/lib/sorting'
+import { getExportDescriptors } from '@/lib/descriptors'
 import stringHelpers from '@/lib/string'
 
 import { searchMixin } from '@/components/mixins/search'
@@ -431,6 +431,7 @@ export default {
     } else {
       if (!this.isAssetsLoading) this.initialLoading = false
       finalize()
+      this.reloadEpisodeAssetsIfNeeded()
     }
   },
 
@@ -445,6 +446,7 @@ export default {
       'assetsPath',
       'assetListScrollPosition',
       'assetsCsvFormData',
+      'assetsLoadingKey',
       'assetSearchText',
       'assetSorting',
       'assetTypes',
@@ -780,11 +782,11 @@ export default {
           this.$t('assets.fields.description'),
           this.$t('assets.fields.ready_for')
         ])
-        sortByName([...this.currentProduction.descriptors])
-          .filter(d => d.entity_type === 'Asset')
-          .forEach(descriptor => {
+        getExportDescriptors(this.currentProduction, 'Asset').forEach(
+          descriptor => {
             headers.push(descriptor.name)
-          })
+          }
+        )
         if (this.isAssetTime) {
           headers.push(this.$t('assets.fields.time_spent'))
         }
@@ -840,13 +842,34 @@ export default {
       if (this.resetTimeout) clearTimeout(this.resetTimeout)
       this.resetTimeout = setTimeout(() => {
         this.resetTimeout = null
-        if (this.isAssetsLoading) return
+        // No bail while a load runs: the store queues the new scope behind the
+        // in-flight one, where returning would drop the episode switch.
         this.initialLoading = true
         this.loadAssets().then(() => {
           this.initialLoading = false
           this.applySearchFromUrl()
         })
       }, 50)
+    },
+
+    // The topbar sets the current episode before this page instance exists, so
+    // the currentEpisode watcher below cannot fire on a fresh mount: without
+    // this check the cache of the episode left behind is displayed as is.
+    reloadEpisodeAssetsIfNeeded() {
+      const scope = this.isTVShow ? (this.currentEpisode?.id ?? '') : ''
+      if (
+        !this.currentProduction ||
+        this.assetsLoadingKey === `${this.currentProduction.id}/${scope}`
+      ) {
+        return
+      }
+      this.$refs['asset-search-field']?.setValue('')
+      this.$store.commit('SET_ASSET_LIST_SCROLL_POSITION', 0)
+      this.initialLoading = true
+      this.loadAssets().then(() => {
+        this.initialLoading = false
+        this.applySearchFromUrl()
+      })
     }
   },
 
@@ -866,18 +889,7 @@ export default {
     },
 
     currentSection() {
-      if (
-        this.isTVShow &&
-        this.currentEpisode?.id &&
-        !this.displayedAssets.find(
-          asset => asset.episode_id === this.currentEpisode.id
-        )
-      ) {
-        this.searchField.setValue('')
-        this.$store.commit('SET_ASSET_LIST_SCROLL_POSITION', 0)
-        this.initialLoading = true
-        this.reset()
-      }
+      this.reloadEpisodeAssetsIfNeeded()
     }
   },
 

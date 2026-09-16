@@ -450,6 +450,8 @@
               <div
                 class="entity-line root-element"
                 :style="entityLineStyle(rootElement, true)"
+                @dragenter="onRootDragEnter($event, rootElement)"
+                @dragleave="onRootDragLeave($event, rootElement)"
                 v-show="!hideRoot"
               >
                 <div
@@ -476,11 +478,7 @@
                     v-show="isVisible(bar)"
                     role="button"
                     tabindex="0"
-                    @click="
-                      cutMode
-                        ? onBarCutClick(rootElement, $event)
-                        : $emit('root-element-selected', rootElement)
-                    "
+                    @click="onRootBarClick(rootElement, $event)"
                     @keydown.enter.prevent="
                       $emit('root-element-selected', rootElement)
                     "
@@ -506,7 +504,7 @@
               </div>
 
               <div
-                class="children"
+                class="children children-loading"
                 :style="childrenStyle(rootElement, multiline)"
                 v-if="rootElement.expanded && rootElement.loading"
               >
@@ -522,7 +520,7 @@
                 :style="childrenStyle(rootElement, multiline)"
                 v-else-if="rootElement.expanded"
                 @dragenter="onTaskDragEnter($event, rootElement)"
-                @dragover="onTaskDragOver"
+                @dragover="onTaskDragOver($event, rootElement)"
                 @dragleave="onTaskDragLeave"
                 @drop="onTaskDrop($event, rootElement)"
               >
@@ -531,6 +529,38 @@
                   v-if="invertLinesColor"
                 >
                   <!-- to invert odd/event line color -->
+                </div>
+                <template
+                  v-if="
+                    dropTarget.rootElementId === rootElement.id &&
+                    !dropTarget.forbidden
+                  "
+                >
+                  <div
+                    class="drop-ghost"
+                    :key="`drop-ghost-${segment.id}`"
+                    :style="{
+                      left: `${segment.left}px`,
+                      width: `${segment.width}px`,
+                      '--timebar-color': segment.color || undefined
+                    }"
+                    v-for="segment in dropTarget.segments"
+                  ></div>
+                </template>
+                <div
+                  class="drop-forbidden"
+                  v-if="
+                    dropTarget.rootElementId === rootElement.id &&
+                    dropTarget.forbidden
+                  "
+                >
+                  <span
+                    class="drop-forbidden-message"
+                    :style="{ left: `${dropTarget.messageLeft + 16}px` }"
+                  >
+                    <ban-icon :size="14" />
+                    {{ $t(`schedule.drop_forbidden_${dropTarget.forbidden}`) }}
+                  </span>
                 </div>
                 <div
                   class="entity-line child-line"
@@ -675,9 +705,7 @@
                       role="button"
                       tabindex="0"
                       @click="
-                        cutMode
-                          ? onBarCutClick(childElement, $event)
-                          : $emit('item-selected', rootElement, childElement)
+                        onChildBarClick(rootElement, childElement, $event)
                       "
                       @keydown.enter.prevent="
                         $emit('item-selected', rootElement, childElement)
@@ -797,15 +825,12 @@
                             @mousedown="moveTimebar(bar, $event)"
                             @touchstart="moveTimebar(bar, $event)"
                             @click="
-                              cutMode
-                                ? onBarCutClick(task, $event)
-                                : $emit(
-                                    'task-selected',
-                                    rootElement,
-                                    childElement,
-                                    task,
-                                    selection
-                                  )
+                              onTaskBarClick(
+                                rootElement,
+                                childElement,
+                                task,
+                                $event
+                              )
                             "
                             @keydown.enter.prevent="
                               $emit(
@@ -867,11 +892,13 @@ import {
   onMounted,
   reactive,
   ref,
+  toRaw,
   watch
 } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useStore } from 'vuex'
 import {
+  BanIcon,
   BriefcaseIcon,
   ChevronDownIcon,
   ChevronRightIcon,
@@ -912,6 +939,12 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
+  // page rule (item, person) => reason of the refusal or null, asked after
+  // the team check and shown through schedule.drop_forbidden_<reason>
+  assignRule: {
+    type: Function,
+    default: null
+  },
   draggedItems: {
     type: Array,
     default: () => []
@@ -919,10 +952,6 @@ const props = defineProps({
   endDate: {
     type: Object,
     required: true
-  },
-  isError: {
-    type: Boolean,
-    default: false
   },
   isLoading: {
     type: Boolean,
@@ -1044,7 +1073,7 @@ const currentProduction = computed(() => store.getters.currentProduction)
 const dateFormat = computed(() => store.getters.dateFormat)
 const departmentMap = computed(() => store.getters.departmentMap)
 
-const displayDate = date => formatDisplayDate(date, dateFormat.value)
+const displayDate = date => formatDisplayDate(toRaw(date), dateFormat.value)
 const isCurrentUserProductionManager = computed(
   () => store.getters.isCurrentUserProductionManager
 )
@@ -1156,9 +1185,31 @@ let dragSourcePersonId = null
 // map knows which row the next hop must unassign
 const dragPersonByItem = new Map()
 
+// a native click still fires on mouseup after a genuine drag (mousedown and
+// mouseup landed on the same bar), so an unguarded click handler would
+// re-select/expand the row right after every move. stopBrowsing sets this
+// once it detects the pointer actually moved; the next click consumes it.
+let justDragged = false
+
 // cached wrapper rect: getBoundingClientRect on every mousemove forces a
 // layout; invalidated on resize and zoom via resetScheduleSize
 let wrapperRect = null
+
+// spring-loading: hovering a collapsed person while dragging a task
+// expands the row after a short delay, so its drop zone appears under
+// the drag
+let expandHoverTimer = null
+let expandHoverRootId = null
+
+// external tasks hovering a person row: drives the drop-preview ghost
+// bars (allowed, one segment per dragged task) or the crossed-out
+// overlay (forbidden)
+const dropTarget = reactive({
+  forbidden: null,
+  messageLeft: 0,
+  rootElementId: null,
+  segments: []
+})
 let positionBarFrame = null
 let moveFrame = null
 let lastMoveEvent = null
@@ -1345,6 +1396,12 @@ const unitOfTime = computed(() => {
 })
 
 // Methods
+//
+// The items keep their moments in reactive state. The helpers below read
+// them with toRaw so the clone/diff/format chains stop paying a Proxy trap
+// per internal moment field, which leaves only the property read tracked:
+// always assign a new moment to an item date (clone first), never mutate
+// one in place with add/subtract/startOf, or the bars stop re-rendering.
 
 const getNbLines = (items = []) => {
   const values = items.map(item => item.line || 0)
@@ -1411,8 +1468,12 @@ const refreshManDays = rootElement => {
 }
 
 const isVisible = timeElement => {
-  const isStartDateOk = timeElement.startDate.isSameOrAfter(props.startDate)
-  const isEndDateOk = timeElement.endDate.isSameOrBefore(dayAfterEndDate.value)
+  const isStartDateOk = toRaw(timeElement.startDate).isSameOrAfter(
+    toRaw(props.startDate)
+  )
+  const isEndDateOk = toRaw(timeElement.endDate).isSameOrBefore(
+    dayAfterEndDate.value
+  )
   return isStartDateOk && isEndDateOk
 }
 
@@ -1454,6 +1515,10 @@ const onMouseMove = event => {
 // document-level move listeners are attached only for the duration of a drag
 // or browse: a permanent listener ran on every mousemove of the whole page
 const startMoveTracking = () => {
+  // a new interaction begins: drop any drag-click flag left armed by a
+  // drag whose trailing click never fired (release off the bar, touch
+  // drags), otherwise it would swallow this interaction's genuine click
+  justDragged = false
   addEvents(moveEvents)
 }
 
@@ -1520,17 +1585,18 @@ const isValidItemDates = (startDate, endDate) => {
 // end) resolve to the nearest boundary instead of undefined, which made the
 // drag computations crash or silently no-op
 const getDisplayedDaysIndex = date => {
-  const index = displayedDaysIndex.value[date.format('YYYY-MM-DD')]
+  const rawDate = toRaw(date)
+  const index = displayedDaysIndex.value[rawDate.format('YYYY-MM-DD')]
   if (index !== undefined) {
     return index
   }
-  return date.isBefore(props.startDate) ? 0 : displayedDays.value.length - 1
+  return rawDate.isBefore(props.startDate) ? 0 : displayedDays.value.length - 1
 }
 
 const getDisplayedWeeksIndex = date => {
   // clone before startOf: moment mutates in place and callers pass the
   // items' own dates, which snapped them back to their week's Monday
-  const monday = date.clone().startOf('isoweek')
+  const monday = toRaw(date).clone().startOf('isoweek')
   const index = displayedWeeksIndex.value[monday.format('YYYY-MM-DD')]
   if (index !== undefined) {
     return index
@@ -1891,9 +1957,11 @@ const isOverlapping = item => {
   return (
     props.withGhosts &&
     ((item.previousElement &&
-      item.startDate.isSameOrBefore(item.previousElement.endDate)) ||
+      toRaw(item.startDate).isSameOrBefore(
+        toRaw(item.previousElement.endDate)
+      )) ||
       (item.nextElement &&
-        item.endDate.isSameOrAfter(item.nextElement.startDate)))
+        toRaw(item.endDate).isSameOrAfter(toRaw(item.nextElement.startDate))))
   )
 }
 
@@ -2085,6 +2153,7 @@ const stopBrowsing = event => {
   }
   if (currentElement.value) {
     if (initialClientX !== getClientX(event)) {
+      justDragged = true
       // on moving or resizing selected items
       selection.value.forEach(item => {
         emit('item-changed', item)
@@ -2161,13 +2230,14 @@ const taskTimesheets = (rootElement, taskId) => {
 }
 
 const dateDiff = (startDate, endDate, unit = 'days') => {
-  if (startDate.isSame(endDate) || !startDate.isValid() || !endDate.isValid()) {
+  const start = toRaw(startDate)
+  const end = toRaw(endDate)
+  if (start.isSame(end) || !start.isValid() || !end.isValid()) {
     return 0
   }
-  const first = startDate.clone().utc().startOf('day')
-  const last = endDate.clone().utc().endOf('day')
-  const diff = last.diff(first, unit)
-  return diff
+  const first = start.clone().utc().startOf('day')
+  const last = end.clone().utc().endOf('day')
+  return last.diff(first, unit)
 }
 
 // Styles
@@ -2407,6 +2477,44 @@ const onBarCutClick = (timeElement, event) => {
   if (day) emit('bar-cut', timeElement, day.format('YYYY-MM-DD'))
 }
 
+// True the first time it's called after a drag, then resets, so it skips
+// only that one trailing click and not the next genuine one.
+const consumeDragClick = () => {
+  if (!justDragged) return false
+  justDragged = false
+  return true
+}
+
+// While the cut tool is armed a click cuts the bar rather than selecting it.
+// It runs before the drag-click guard, which has nothing to swallow here:
+// moveTimebar refuses to drag in cut mode, so no trailing click of its own
+// is coming. The guard's flag is cleared by the press regardless, since the
+// timeline's own mousedown handler opens an interaction either way - this
+// order just keeps the cut from depending on that.
+const cutsInsteadOfSelecting = (timeElement, event) => {
+  if (!props.cutMode) return false
+  onBarCutClick(timeElement, event)
+  return true
+}
+
+const onRootBarClick = (rootElement, event) => {
+  if (cutsInsteadOfSelecting(rootElement, event)) return
+  if (consumeDragClick()) return
+  emit('root-element-selected', rootElement)
+}
+
+const onChildBarClick = (rootElement, childElement, event) => {
+  if (cutsInsteadOfSelecting(childElement, event)) return
+  if (consumeDragClick()) return
+  emit('item-selected', rootElement, childElement)
+}
+
+const onTaskBarClick = (rootElement, childElement, task, event) => {
+  if (cutsInsteadOfSelecting(task, event)) return
+  if (consumeDragClick()) return
+  emit('task-selected', rootElement, childElement, task, selection.value)
+}
+
 const getTimebarLeft = timeElement => {
   const startDate = timeElement.startDate || props.startDate
   const startDiff = dateDiff(props.startDate, startDate, unitOfTime.value)
@@ -2414,11 +2522,11 @@ const getTimebarLeft = timeElement => {
 }
 
 const getTimebarWidth = timeElement => {
-  const startDate = timeElement.startDate || props.startDate
+  const startDate = toRaw(timeElement.startDate || props.startDate)
   let endDate =
-    timeElement.endDate ||
-    (timeElement.startDate && timeElement.startDate.clone().add(1, 'days')) ||
-    props.startDate.clone().add(1, 'days')
+    toRaw(timeElement.endDate) ||
+    (timeElement.startDate && startDate.clone().add(1, 'days')) ||
+    toRaw(props.startDate).clone().add(1, 'days')
 
   if (
     timeElement.man_days > 0 &&
@@ -2559,24 +2667,62 @@ const addMilestoneTitle = day => {
   return `${t('schedule.milestone.add_milestone')} ${day.format('YYYY-MM-DD')}`
 }
 
-const checkUserIsAllowed = (item, person) => {
+const getDropForbiddenReason = (item, person) => {
   // person may be any root element (e.g. a task type row on the production
   // schedule): only actual person rows carry a departments list
   if (!item || !person?.departments) {
-    return false
+    return 'team'
   }
   const production = openProductions.value.find(
     ({ id }) => id === item.project_id
   )
-  if (!production) {
-    return false
+  if (!production || !production.team.includes(person.id)) {
+    return 'team'
   }
-  const isTeamMember = production.team.includes(person.id)
+  const reason = props.assignRule?.(item, person)
+  if (reason) {
+    return reason
+  }
   const isDepartmentMember =
     !person.departments.length ||
     !item.department ||
     person.departments.includes(item.department.id)
-  return isTeamMember && isDepartmentMember
+  return isDepartmentMember ? null : 'department'
+}
+
+const checkUserIsAllowed = (item, person) =>
+  !getDropForbiddenReason(item, person)
+
+const cancelExpandHover = () => {
+  clearTimeout(expandHoverTimer)
+  expandHoverRootId = null
+}
+
+const onRootDragEnter = (event, rootElement) => {
+  if (!props.draggedItems?.length) {
+    return
+  }
+  if (rootElement.expanded || rootElement.loading) {
+    return
+  }
+  if (expandHoverRootId === rootElement.id) {
+    return
+  }
+  clearTimeout(expandHoverTimer)
+  expandHoverRootId = rootElement.id
+  expandHoverTimer = setTimeout(() => {
+    expandHoverRootId = null
+    expandRootElement(rootElement)
+  }, 600)
+}
+
+const onRootDragLeave = (event, rootElement) => {
+  if (event.currentTarget.contains(event.relatedTarget)) {
+    return
+  }
+  if (expandHoverRootId === rootElement.id) {
+    cancelExpandHover()
+  }
 }
 
 const onTaskDragEnter = (event, rootElement) => {
@@ -2585,44 +2731,32 @@ const onTaskDragEnter = (event, rootElement) => {
     dataKey => dataKey === `task-type-${rootElement.task_type_id}`
   )
   if (!draggedItemTaskType) {
-    const item = props.draggedItems?.[0]
-    const isAllowed = checkUserIsAllowed(item, rootElement)
-    if (!isAllowed) {
+    const items = props.draggedItems || []
+    if (!items.length) {
+      return
+    }
+    // one forbidden task forbids the whole batch: no silent partial drop
+    const reason = items
+      .map(item => getDropForbiddenReason(item, rootElement))
+      .find(Boolean)
+    if (reason) {
+      dropTarget.rootElementId = rootElement.id
+      dropTarget.forbidden = reason
       return
     }
   }
   event.currentTarget.classList.add('droppable')
 }
 
-const onTaskDragOver = event => {
-  event.preventDefault()
-}
-
-const onTaskDragLeave = event => {
-  event.target.classList.remove('droppable')
-}
-
-const onTaskDrop = (event, rootElement) => {
-  event.target.classList.remove('droppable')
-
-  let item = props.draggedItems?.[0]
-  if (!item) {
-    const entityId = event.dataTransfer.getData('entityId')
-    const taskTypeId = event.dataTransfer.getData('taskTypeId')
-    if (!entityId || taskTypeId !== rootElement.task_type_id) {
-      return // invalid task type
-    }
-    item = { entity_id: entityId }
-  } else if (!checkUserIsAllowed(item, rootElement)) {
-    return // invalid user rights
-  }
-
-  // resolve the hovered column the same way as the position bar: the
-  // previous math hardcoded a 300px entity panel offset and counted week
-  // cells as days, landing drops on the wrong date
+// resolve the hovered column the same way as the position bar: the
+// previous math hardcoded a 300px entity panel offset and counted week
+// cells as days, landing drops on the wrong date.
+// Multiple tasks chain sequentially from the aimed day: each next task
+// starts on the first business day after the previous one ends.
+const getDropRanges = (event, rootElement, items) => {
   const columns = isWeekMode.value ? weeksAvailable.value : displayedDays.value
   if (!columns.length) {
-    return
+    return []
   }
   if (!wrapperRect) {
     wrapperRect = timelineContentWrapperRef.value.getBoundingClientRect()
@@ -2632,27 +2766,103 @@ const onTaskDrop = (event, rootElement) => {
     (timelineContentWrapperRef.value.scrollLeft + cursorX) / cellWidth.value
   )
   const dropDate = columns[Math.min(Math.max(index, 0), columns.length - 1)]
-  const startDate = addBusinessDays(dropDate, 0, rootElement.daysOff)
-  const endDate = item.estimation
-    ? addBusinessDays(
-        startDate,
-        minutesToDays(organisation.value, item.estimation) - 1,
-        rootElement.daysOff
-      )
-    : startDate
+  let cursorDate = addBusinessDays(dropDate, 0, rootElement.daysOff)
+  return items.map(item => {
+    const startDate = cursorDate
+    const endDate = item?.estimation
+      ? addBusinessDays(
+          startDate,
+          minutesToDays(organisation.value, item.estimation) - 1,
+          rootElement.daysOff
+        )
+      : startDate
+    cursorDate = addBusinessDays(endDate, 1, rootElement.daysOff)
+    return { item, startDate, endDate }
+  })
+}
 
-  // convert to schedule item
-  item.full_entity_name = `${item.entity_type_name} / ${item.entity_name}`
-  item.start_date = startDate.format('YYYY-MM-DD')
-  item.due_date = endDate.format('YYYY-MM-DD')
-  item.parentElement = rootElement
+const onTaskDragOver = (event, rootElement) => {
+  const items = props.draggedItems || []
+  if (
+    items.length &&
+    dropTarget.forbidden &&
+    dropTarget.rootElementId === rootElement.id
+  ) {
+    // the explanation pill follows the cursor so it cannot be missed
+    if (!wrapperRect) {
+      wrapperRect = timelineContentWrapperRef.value.getBoundingClientRect()
+    }
+    dropTarget.messageLeft =
+      timelineContentWrapperRef.value.scrollLeft +
+      getClientX(event) -
+      wrapperRect.left
+    // no preventDefault: the browser shows the native no-drop cursor
+    return
+  }
+  event.preventDefault()
+  if (!items.length) {
+    return
+  }
+  const ranges = getDropRanges(event, rootElement, items)
+  if (!ranges.length) {
+    return
+  }
+  dropTarget.rootElementId = rootElement.id
+  dropTarget.segments = ranges.map(({ item, startDate, endDate }) => ({
+    id: item.id,
+    left: getTimebarLeft({ startDate }),
+    width: getTimebarWidth({ startDate, endDate }),
+    color: item.type_color || null
+  }))
+}
 
-  emit(
-    'item-drop',
-    item,
-    rootElement,
-    props.multiline ? refreshItemPositions : undefined
-  )
+const clearDropTarget = () => {
+  dropTarget.rootElementId = null
+  dropTarget.forbidden = null
+  dropTarget.segments = []
+}
+
+const onTaskDragLeave = event => {
+  // child elements fire dragleave too: only react when the cursor
+  // actually leaves the row
+  if (event.currentTarget.contains(event.relatedTarget)) {
+    return
+  }
+  event.currentTarget.classList.remove('droppable')
+  clearDropTarget()
+}
+
+const onTaskDrop = (event, rootElement) => {
+  event.currentTarget.classList.remove('droppable')
+  clearDropTarget()
+
+  let items = props.draggedItems?.length ? [...props.draggedItems] : null
+  if (!items) {
+    const entityId = event.dataTransfer.getData('entityId')
+    const taskTypeId = event.dataTransfer.getData('taskTypeId')
+    if (!entityId || taskTypeId !== rootElement.task_type_id) {
+      return // invalid task type
+    }
+    items = [{ entity_id: entityId }]
+  } else if (items.some(item => !checkUserIsAllowed(item, rootElement))) {
+    return // invalid user rights
+  }
+
+  const ranges = getDropRanges(event, rootElement, items)
+  ranges.forEach(({ item, startDate, endDate }) => {
+    // convert to schedule item
+    item.full_entity_name = `${item.entity_type_name} / ${item.entity_name}`
+    item.start_date = startDate.format('YYYY-MM-DD')
+    item.due_date = endDate.format('YYYY-MM-DD')
+    item.parentElement = rootElement
+
+    emit(
+      'item-drop',
+      item,
+      rootElement,
+      props.multiline ? refreshItemPositions : undefined
+    )
+  })
 }
 
 const exportData = () => {
@@ -2663,6 +2873,18 @@ const exportData = () => {
 }
 
 // Watchers
+
+// the drag can end anywhere (drop elsewhere, Escape): dragleave alone
+// cannot be trusted to clear the drop preview or the spring-load timer
+watch(
+  () => props.draggedItems,
+  items => {
+    if (!items?.length) {
+      clearDropTarget()
+      cancelExpandHover()
+    }
+  }
+)
 
 watch(
   () => props.startDate,
@@ -2742,6 +2964,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  cancelExpandHover()
   removeEvents(domEvents)
   removeEvents(moveEvents)
   if (positionBarFrame) cancelAnimationFrame(positionBarFrame)
@@ -2776,8 +2999,8 @@ defineExpose({
 const itemRanges = (item, unitOfTime, minDate) => {
   const bars = item.segments?.length ? item.segments : [item]
   return bars.map(bar => [
-    bar.startDate.clone().startOf(unitOfTime).diff(minDate, unitOfTime),
-    bar.endDate.clone().endOf(unitOfTime).diff(minDate, unitOfTime)
+    toRaw(bar.startDate).clone().startOf(unitOfTime).diff(minDate, unitOfTime),
+    toRaw(bar.endDate).clone().endOf(unitOfTime).diff(minDate, unitOfTime)
   ])
 }
 
@@ -2786,7 +3009,7 @@ const setItemPositions = (items, unitOfTime = 'days') => {
     return
   }
   const minDate = moment
-    .min(items.map(item => item.startDate))
+    .min(items.map(item => toRaw(item.startDate)))
     .clone()
     .startOf(unitOfTime)
 
@@ -3137,6 +3360,9 @@ const setItemPositions = (items, unitOfTime = 'days') => {
         top: 0;
         bottom: 0;
         background: rgba(200, 255, 200, 0.3);
+        // purely visual overlay: crossing it must not fire dragleave on
+        // the row below (it made the drop ghost flicker)
+        pointer-events: none;
         z-index: 100;
 
         &.today {
@@ -3157,6 +3383,7 @@ const setItemPositions = (items, unitOfTime = 'days') => {
         width: 1px;
         border-left: 1px dashed black;
         margin-left: -0.5px;
+        pointer-events: none;
         z-index: 100;
       }
 
@@ -3433,10 +3660,84 @@ const setItemPositions = (items, unitOfTime = 'days') => {
   justify-content: center;
 }
 
+// Keep the expanded row at a stable two-line height while its tasks
+// load, so the content doesn't jump in under the spinner.
+.children-loading {
+  align-items: center;
+  display: flex;
+  min-height: 90px;
+
+  .children-loader {
+    flex: 1;
+  }
+}
+
 .children {
   position: relative;
   margin-bottom: 1em;
   min-height: 40px;
+}
+
+// preview of where the dragged task would land, at its estimated span
+.drop-ghost {
+  background: color-mix(
+    in srgb,
+    var(--timebar-color, #888) 25%,
+    var(--background)
+  );
+  border: 2px dashed var(--timebar-color, #888);
+  border-radius: 4px;
+  height: 30px;
+  pointer-events: none;
+  position: absolute;
+  top: 5px;
+  z-index: 200;
+}
+
+.dark .drop-ghost {
+  // the dark background swallows the 25% tint: raise the color share
+  background: color-mix(
+    in srgb,
+    var(--timebar-color, #888) 55%,
+    var(--background)
+  );
+}
+
+// crossed-out row: the person cannot receive the dragged task
+.drop-forbidden {
+  align-items: center;
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(229, 57, 53, 0.08),
+    rgba(229, 57, 53, 0.08) 10px,
+    transparent 10px,
+    transparent 20px
+  );
+  bottom: 0;
+  display: flex;
+  left: 0;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  top: 0;
+  z-index: 200;
+
+  .drop-forbidden-message {
+    align-items: center;
+    background: var(--background-alt-2);
+    border: 1px solid $red;
+    border-radius: 999px;
+    color: $red;
+    display: flex;
+    font-size: 0.9em;
+    gap: 0.4em;
+    padding: 0.25em 0.75em;
+    // follows the drag cursor (left is set inline on dragover)
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    white-space: nowrap;
+  }
 }
 .timeline-element:last-child .children {
   margin-bottom: 0;
@@ -3774,6 +4075,23 @@ input[type='number'] {
         background-color: #414349;
       }
     }
+  }
+}
+@media screen and (max-width: 768px) {
+  .entities,
+  .total-man-days {
+    min-width: 180px;
+  }
+
+  .entities .entity-line {
+    max-width: 180px;
+    min-width: 180px;
+  }
+
+  .child-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 </style>

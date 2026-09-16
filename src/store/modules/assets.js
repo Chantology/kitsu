@@ -12,6 +12,8 @@ import tasksStore from '@/store/modules/tasks'
 import taskStatusStore from '@/store/modules/taskstatus'
 import taskTypesStore from '@/store/modules/tasktypes'
 
+import { getExportDescriptors } from '@/lib/descriptors'
+import { isEpisodeInLoadedScope } from '@/lib/episodes'
 import { getTaskTypePriorityOfProd } from '@/lib/productions'
 import { minutesToDays } from '@/lib/time'
 import { PAGE_SIZE } from '@/lib/pagination'
@@ -45,6 +47,7 @@ import {
   CLEAR_ASSETS,
   LOAD_ASSETS_START,
   LOAD_ASSETS_ERROR,
+  MARK_ASSETS_PARTIAL,
   LOAD_ASSETS_END,
   SORT_VALIDATION_COLUMNS,
   EDIT_ASSET_END,
@@ -278,7 +281,10 @@ const helpers = {
 }
 
 const cache = {
+  // Assets deleted while a list load runs: its response may still hold them.
+  removedAssetIds: new Set(),
   assets: [],
+  assetsLoadingPromise: null,
   assetMap: new Map(),
   assetIndex: {},
   assetTypeIndex: {},
@@ -311,6 +317,7 @@ const initialState = {
 
   isAssetsLoading: false,
   isAssetsLoadingError: false,
+  assetsLoadingKey: null,
   isAssetDescription: false,
   isAssetEstimation: false,
   isAssetResolution: false,
@@ -344,6 +351,7 @@ const getters = {
 
   isAssetsLoading: state => state.isAssetsLoading,
   isAssetsLoadingError: state => state.isAssetsLoadingError,
+  assetsLoadingKey: state => state.assetsLoadingKey,
 
   displayedAssets: state => state.displayedAssets,
   displayedAssetsCount: state => state.displayedAssetsCount,
@@ -405,8 +413,8 @@ const actions = {
     const assetTypeMap = rootGetters.assetTypeMap
     const production = rootGetters.currentProduction
     if (!production) return []
-    let episode = rootGetters.currentEpisode
     const isTVShow = rootGetters.isTVShow
+    let episode = isTVShow ? rootGetters.currentEpisode : null
     const userFilters = rootGetters.userFilters
     const userFilterGroups = rootGetters.userFilterGroups
     const personMap = rootGetters.personMap
@@ -418,6 +426,9 @@ const actions = {
       // first, then pick the first one.
       if (rootGetters.episodes.length === 0) {
         await dispatch('loadEpisodes')
+        // A production switched during the fetch: the load would start for
+        // the production left, over the stores of the new one.
+        if (rootGetters.currentProduction?.id !== production.id) return []
         // loadEpisodes may resolve currentEpisode from the route (e.g. "all").
         episode = rootGetters.currentEpisode
       }
@@ -431,15 +442,40 @@ const actions = {
       }
     }
 
+    // Scope of the dataset about to be loaded. The rows cannot tell one scope
+    // from another (an episode load legitimately holds assets cast in from
+    // other episodes, and 'all' / 'main' are pseudo-episodes), so the store
+    // records it for the pages that decide whether their cache is stale.
+    // A load without tasks or shared assets (schedule) cannot stand in for
+    // the dataset the list pages display, nor can the production-wide one
+    // (breakdown, concepts), which fetches the shared assets of the whole
+    // instance where the Assets page under all fetches the ones the
+    // production uses: mark those scopes so the pages refetch instead of
+    // adopting them.
+    const isPartial = !withTasks || !withShared
+    const marker = isPartial ? '#partial' : all ? '#shared' : ''
+    const scope = all ? 'all' : (episode?.id ?? '')
+    const loadingKey = `${production.id}/${scope}${marker}`
+
     if (state.isAssetsLoading) {
-      return cache.assetsLoadingPromise || cache.assets
+      if (state.assetsLoadingKey === loadingKey) {
+        return cache.assetsLoadingPromise || cache.assets
+      }
+      // Another scope is in flight (the user switched episode mid-load): wait
+      // for it, then fetch the requested one instead of adopting its result.
+      // Re-dispatching unconditionally is what terminates: the second pass
+      // either joins the load a previous waiter started for the same scope or
+      // queues once more.
+      return (cache.assetsLoadingPromise || Promise.resolve(cache.assets)).then(
+        () => dispatch('loadAssets', { all, withShared, withTasks })
+      )
     }
 
     if (all || episode?.id === 'all') {
       episode = null // Do not filter by episode
     }
 
-    commit(LOAD_ASSETS_START)
+    commit(LOAD_ASSETS_START, { loadingKey })
     const loadingPromise = assetsApi
       .getAssets(production, episode, withTasks)
       .then(async assets => {
@@ -465,9 +501,11 @@ const actions = {
             asset.asset_type_name = assetType?.name || ''
           }
         })
-        // Ignore a response for a production the user already switched away
-        // from; committing would overwrite the current production's assets.
-        if (production.id !== rootGetters.currentProduction?.id) {
+        // Ignore a response for a scope the user already left: a production
+        // switch (CLEAR_ASSETS forgets the key) or a newer load of another
+        // episode (LOAD_ASSETS_START records its own). Committing would put
+        // the old scope's assets under the newer key.
+        if (state.assetsLoadingKey !== loadingKey) {
           return assets
         }
         commit(LOAD_ASSETS_END, {
@@ -483,7 +521,11 @@ const actions = {
       })
       .catch(err => {
         console.error('an error occurred while loading assets', err)
-        commit(LOAD_ASSETS_ERROR)
+        // Same guard as the success path: a rejection for a scope the user
+        // already left would forget the scope of the load running now.
+        if (state.assetsLoadingKey === loadingKey) {
+          commit(LOAD_ASSETS_ERROR)
+        }
         return []
       })
     cache.assetsLoadingPromise = loadingPromise
@@ -494,13 +536,16 @@ const actions = {
     return assetsApi.getAsset(assetId)
   },
 
-  /*
-   * Function used mainly to reload asset information when a remote change
-   * occurs.
-   */
-  loadAsset({ commit, state, rootGetters }, assetId) {
-    const asset = cache.assetMap.get(assetId)
-    if (asset?.lock) return
+  // Reloads an asset after a remote change. A socket event passes
+  // { assetId, onlyInScope: true }: a freshly created asset is cast nowhere
+  // yet, so its episode alone says whether the loaded dataset should hold
+  // it. The single-asset payload carries `episode_id` (empty for the main
+  // pack) and no `source_id`. A load by id (detail page) always adds.
+  loadAsset({ commit, state, rootGetters }, payload) {
+    const { assetId, onlyInScope = false } =
+      typeof payload === 'string' ? { assetId: payload } : payload
+    const displayedAsset = cache.assetMap.get(assetId)
+    if (displayedAsset?.lock) return
 
     const personMap = rootGetters.personMap
     const production = rootGetters.currentProduction
@@ -509,12 +554,32 @@ const actions = {
     const taskStatusMap = rootGetters.taskStatusMap
     const persons = rootGetters.people
 
-    return assetsApi
-      .getAsset(assetId)
+    // A list load in flight replaces the whole dataset: fetch once it has
+    // settled, so the payload is younger than its response and an asset
+    // deleted meanwhile is not re-inserted (the fetch fails instead). A
+    // displayed asset is refreshed now: waiting would apply this payload
+    // after a younger response and undo it.
+    const listSettled =
+      (!displayedAsset &&
+        state.isAssetsLoading &&
+        cache.assetsLoadingPromise) ||
+      Promise.resolve()
+    return listSettled
+      .then(() => assetsApi.getAsset(assetId))
       .then(asset => {
         if (cache.assetMap.get(asset.id)) {
           commit(UPDATE_ASSET, asset)
-        } else {
+          return
+        }
+        // Displayed when its refresh started and gone since: deleted, or
+        // dropped by a list load whose own response decides.
+        if (displayedAsset) return
+        const isInLoadedScope = isEpisodeInLoadedScope(
+          state.assetsLoadingKey,
+          asset.episode_id || asset.source_id || null,
+          asset.project_id
+        )
+        if (!onlyInScope || isInLoadedScope) {
           asset.tasks.forEach(task => {
             commit(NEW_TASK_END, { task })
           })
@@ -527,6 +592,9 @@ const actions = {
             personMap,
             production
           })
+          // A detail page loads its asset whatever the list holds: holding more
+          // than its recorded scope, the list must be refetched by its pages.
+          if (!isInLoadedScope) commit(MARK_ASSETS_PARTIAL)
         }
         return asset
       })
@@ -735,6 +803,7 @@ const actions = {
     if (cache.result && cache.result.length > 0) {
       assets = cache.result
     }
+    const sortedDescriptors = getExportDescriptors(production, 'Asset')
     const lines = assets.map(asset => {
       if (asset.shared) {
         return [asset.asset_type_name, asset.name]
@@ -756,20 +825,18 @@ const actions = {
         taskTypeMap.get(asset.ready_for)?.name || ''
       ])
       asset.data = asset.data || {}
-      sortByName([...production.descriptors])
-        .filter(d => d.entity_type === 'Asset')
-        .forEach(descriptor => {
-          if (descriptor.data_type === 'boolean') {
-            assetLine.push(
-              asset.data[descriptor.field_name]?.toLowerCase() === 'true'
-            )
-          } else if (descriptor.data_type === 'person') {
-            const person = personMap.get(asset.data[descriptor.field_name])
-            assetLine.push(person ? person.full_name : '')
-          } else {
-            assetLine.push(asset.data[descriptor.field_name])
-          }
-        })
+      sortedDescriptors.forEach(descriptor => {
+        if (descriptor.data_type === 'boolean') {
+          assetLine.push(
+            asset.data[descriptor.field_name]?.toLowerCase() === 'true'
+          )
+        } else if (descriptor.data_type === 'person') {
+          const person = personMap.get(asset.data[descriptor.field_name])
+          assetLine.push(person ? person.full_name : '')
+        } else {
+          assetLine.push(asset.data[descriptor.field_name])
+        }
+      })
       if (state.isAssetTime) {
         assetLine.push(minutesToDays(organisation, asset.timeSpent).toFixed(2))
       }
@@ -937,14 +1004,17 @@ const mutations = {
     state.selectedAssets = new Map()
     state.isAssetsLoading = false
     state.isAssetsLoadingError = false
+    state.assetsLoadingKey = null
   },
 
-  [LOAD_ASSETS_START](state) {
+  [LOAD_ASSETS_START](state, { loadingKey } = {}) {
     cache.assets = []
     cache.result = []
     cache.assetMap.clear()
+    cache.removedAssetIds.clear()
     state.isAssetsLoading = true
     state.isAssetsLoadingError = false
+    state.assetsLoadingKey = loadingKey ?? null
     state.assetValidationColumns = []
 
     cache.assetIndex = {}
@@ -957,9 +1027,16 @@ const mutations = {
     state.selectedAssets = new Map()
   },
 
+  [MARK_ASSETS_PARTIAL](state) {
+    if (state.assetsLoadingKey && !state.assetsLoadingKey.includes('#')) {
+      state.assetsLoadingKey = `${state.assetsLoadingKey}#partial`
+    }
+  },
+
   [LOAD_ASSETS_ERROR](state) {
     state.isAssetsLoading = false
     state.isAssetsLoadingError = true
+    state.assetsLoadingKey = null
   },
 
   [LOAD_ASSETS_END](
@@ -974,6 +1051,9 @@ const mutations = {
       taskTypeMap
     }
   ) {
+    // Deleted during the load, after the response was built.
+    assets = assets.filter(({ id }) => !cache.removedAssetIds.has(id))
+    cache.removedAssetIds.clear()
     const validationColumns = {}
     const assetTypeMap = new Map()
     let isTime = false
@@ -1080,7 +1160,7 @@ const mutations = {
     asset.tasks = sortTasks(asset.tasks, taskTypeMap)
     asset.validations = new Map()
     asset.production_id = asset.project_id
-    asset.episode_id = asset.source_id
+    asset.episode_id = asset.source_id || asset.episode_id || null
     helpers.populateAndRegisterAsset(
       new Map(),
       taskMap,
@@ -1129,9 +1209,13 @@ const mutations = {
   },
 
   [UPDATE_ASSET](state, asset) {
+    // A refetched asset lists task objects where the cache keeps the ids the
+    // task columns and the detail page resolve: tasks have their own events.
+    const fields = { ...asset }
+    delete fields.tasks
     const cachedAsset = cache.assetMap.get(asset.id)
     if (cachedAsset) {
-      Object.assign(cachedAsset, asset)
+      Object.assign(cachedAsset, fields)
       updateEntryInIndex(
         cache.assetIndex,
         cachedAsset,
@@ -1140,12 +1224,13 @@ const mutations = {
     }
     const displayedAsset = state.displayedAssets.find(a => a.id === asset.id)
     if (displayedAsset) {
-      Object.assign(displayedAsset, asset)
+      Object.assign(displayedAsset, fields)
     }
     state.displayedAssets = [...state.displayedAssets]
   },
 
   [REMOVE_ASSET](state, assetToDelete) {
+    if (state.isAssetsLoading) cache.removedAssetIds.add(assetToDelete.id)
     if (cache.assetMap.get(assetToDelete.id)) {
       cache.assetMap.delete(assetToDelete.id)
       cache.assets = removeModelFromList(cache.assets, assetToDelete)

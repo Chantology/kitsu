@@ -94,7 +94,7 @@
                     ? `${offsets['validation-' + columnIndexInGrid]}px`
                     : '0'
                 "
-                type="editor"
+                type="episodes"
                 is-stick
                 @show-header-menu="
                   event => showHeaderMenu(columnId, columnIndexInGrid, event)
@@ -326,8 +326,8 @@
                   :row-x="i"
                   :selected="isSelected(i, j)"
                   :sticked="true"
-                  :task-href="taskHref(episode.validations.get(columnId))"
-                  :task-test="taskMap.get(episode.validations.get(columnId))"
+                  :task-href="taskHref(episode.validations?.get(columnId))"
+                  :task-test="taskMap.get(episode.validations?.get(columnId))"
                   @select="infos => onTaskSelected(infos, true)"
                   @unselect="infos => onTaskUnselected(infos, true)"
                   v-for="(columnId, j) in stickedDisplayedValidationColumns"

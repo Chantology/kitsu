@@ -28,7 +28,6 @@
       class="video-viewer"
       :fps="fps"
       :name="name"
-      :big="isBig"
       :default-height="defaultHeight"
       :full-screen="isFullScreen"
       :is-comparing="isComparing"
@@ -55,13 +54,13 @@
 
     <picture-viewer
       ref="pictureViewer"
+      :background-color="pictureBackgroundColor"
       :big="isBig"
       :default-height="defaultHeight"
       :full-screen="isFullScreen"
       :is-comparing="isComparing"
       :light="isLight"
       :margin-bottom="marginBottom"
-      :panzoom="true"
       :preview="preview"
       @loaded="$emit('picture-loaded')"
       @panzoom-changed="onPicturePanzoomChanged"
@@ -141,6 +140,10 @@ import VideoViewer from '@/components/players/viewers/VideoViewer.vue'
 /* eslint-enable no-unused-vars */
 
 const props = defineProps({
+  pictureBackgroundColor: {
+    type: String,
+    default: '#000000'
+  },
   currentFrame: {
     type: Number,
     default: 0

@@ -55,6 +55,7 @@ import {
   ADD_PREVIEW_END,
   CHANGE_PREVIEW_END,
   UPDATE_PREVIEW_ANNOTATION,
+  UPDATE_PREVIEW_VALIDATION_STATUS,
   ADD_SELECTED_TASK,
   ADD_SELECTED_TASKS,
   REMOVE_SELECTED_TASK,
@@ -183,6 +184,10 @@ const actions = {
 
   loadOpenTasks({}, filters) {
     return tasksApi.getOpenTasks(filters)
+  },
+
+  loadOpenTasksBurndown({}, filters) {
+    return tasksApi.getOpenTasksBurndown(filters)
   },
 
   subscribeToTask({ commit }, taskId) {
@@ -932,11 +937,10 @@ const actions = {
     return reply
   },
 
-  deleteReply({ commit }, { comment, reply }) {
+  async deleteReply({ commit }, { comment, reply }) {
+    await tasksApi.deleteReply(comment, reply)
     commit(REMOVE_REPLY_FROM_COMMENT, { comment, reply })
-    return tasksApi.deleteReply(comment, reply).then(() => {
-      return reply
-    })
+    return reply
   },
 
   pinComment({ commit }, comment) {
@@ -1042,7 +1046,8 @@ const mutations = {
               revision: p.revision,
               position: p.position,
               duration: p.duration,
-              original_name: p.original_name
+              original_name: p.original_name,
+              validation_status: p.validation_status
             }
             return prev
           })
@@ -1098,12 +1103,18 @@ const mutations = {
     state.taskComments[task.id] = undefined
     state.taskPreviews[task.id] = undefined
     state.taskMap.delete(task.id)
-    const validationKey = `${task.entity_id}-${task.task_type_id}`
-    state.selectedValidations.set(validationKey, {
-      entity: { id: task.entity_id },
-      column: { id: task.task_type_id }
-    })
-    state.selectedTasks.delete(task.id)
+    // A selected task leaves its empty cell selected in its place. Any other
+    // deletion, a colleague's included, must not plant a selection: the next
+    // task creation would recreate the deleted task from it.
+    if (state.selectedTasks.delete(task.id)) {
+      const validationKey = `${task.entity_id}-${task.task_type_id}`
+      state.selectedValidations.set(validationKey, {
+        entity: { id: task.entity_id },
+        column: { id: task.task_type_id }
+      })
+      state.nbSelectedTasks = state.selectedTasks.size
+      state.nbSelectedValidations = state.selectedValidations.size
+    }
   },
 
   [DELETE_COMMENT_END](
@@ -1235,6 +1246,19 @@ const mutations = {
         p.previews.splice(index, 1)
       }
     })
+  },
+
+  // The player works on copies of the comment previews (see
+  // LOAD_TASK_COMMENTS_END), so both sides must be updated.
+  [UPDATE_PREVIEW_VALIDATION_STATUS](state, { previewFile, status }) {
+    const taskId = previewFile.task_id
+    const subPreviews = [
+      ...(state.taskComments[taskId] || []).flatMap(c => c.previews || []),
+      ...(state.taskPreviews[taskId] || []).flatMap(p => p.previews || [])
+    ]
+    subPreviews
+      .filter(p => p.id === previewFile.id)
+      .forEach(p => (p.validation_status = status))
   },
 
   [UPDATE_PREVIEW_ANNOTATION](state, { taskId, preview, annotations }) {

@@ -86,6 +86,7 @@
               name="main"
               :nb-frames="nbFrames"
               :object-background-url="objectBackgroundUrl"
+              :picture-background-color="pictureBackgroundColor"
               :preview="currentPreview"
               :style="{
                 position: isComparisonOverlay ? 'absolute' : 'static'
@@ -116,6 +117,7 @@
               :is-muted="true"
               :is-repeating="isRepeating"
               :margin-bottom="marginBottom"
+              :picture-background-color="pictureBackgroundColor"
               :preview="comparisonPreview"
               :style="{
                 opacity: overlayOpacity
@@ -158,7 +160,7 @@
           @comment-added="$emit('comment-added')"
           @time-code-clicked="timeCodeClicked"
           v-show="!isCommentsHidden"
-          v-if="!readOnly"
+          v-if="!readOnly && task.id"
         />
       </div>
     </div>
@@ -218,8 +220,6 @@
           :is-comparing="isComparing"
           :is-comparison-enabled="isComparisonEnabled"
           :is-concept="isConcept"
-          :is-movie="isMovie"
-          :is-sound="isSound"
           :light="light"
           :preview-file-options="previewFileOptions"
           :show-panel="fullScreen"
@@ -252,6 +252,7 @@
             :is-movie="isMovie"
             :is-object-background="isObjectBackground"
             :is-picture="isPicture"
+            :is-transparent-picture="isTransparentPicture"
             :is-typing="isTyping"
             :is-zoom-pan="false"
             :light="light"
@@ -263,12 +264,14 @@
             :read-only="readOnly"
             :show-comments-button="showCommentsButton"
             :text-color="textColor"
+            :text-size="textSize"
             v-model:current-background="currentBackground"
             v-model:current-shape="currentShape"
             v-model:is-environment-skybox="isEnvironmentSkybox"
             v-model:is-eraser-mode-on="isEraserModeOn"
             v-model:is-onion-skin-on="isOnionSkinOn"
             v-model:onion-skin-frames="onionSkinFrames"
+            v-model:picture-background-color="pictureBackgroundColor"
             v-model:is-shape-mode="isShapeMode"
             v-model:is-wireframe="isWireframe"
             @annotation-displayed-clicked="onAnnotationDisplayedClicked"
@@ -276,6 +279,7 @@
             @change-pencil-width="onChangePencilWidth"
             @change-shape="setShapeTool"
             @change-text-color="onChangeTextColor"
+            @change-text-size="onChangeTextSize"
             @comment-clicked="onCommentClicked"
             @delete-clicked="onDeleteClicked"
             @erase-clicked="onEraseClicked"
@@ -390,8 +394,6 @@
             :is-comparing="isComparing"
             :is-comparison-enabled="isComparisonEnabled"
             :is-concept="isConcept"
-            :is-movie="isMovie"
-            :is-sound="isSound"
             :light="light"
             :preview-file-options="previewFileOptions"
             :show-toggle="false"
@@ -435,7 +437,9 @@
           :preview-file="preview"
           :index="index"
           :is-selected="currentPreview.id === preview.id"
+          :can-validate="canValidatePreviews"
           @selected="onRevisionPreviewSelected(index + 1)"
+          @validation-status-clicked="onValidationStatusClicked(preview)"
           @preview-dropped="onRevisionPreviewDropped"
         />
       </div>
@@ -483,7 +487,8 @@ import {
   isModelPreview,
   isMoviePreview,
   isPicturePreview,
-  isSoundPreview
+  isSoundPreview,
+  isTransparentPicturePreview
 } from '@/lib/preview'
 import {
   DEFAULT_FPS,
@@ -654,6 +659,7 @@ const maxDuration = ref('00:00:00:00')
 const movieDimensions = ref({ width: 1920, height: 1080 })
 const objectBackgroundUrl = ref(null)
 const pencilPalette = ref(['huge', 'big', 'medium', 'small', 'tiny'])
+const pictureBackgroundColor = ref('#000000')
 const videoDuration = ref(0)
 const width = ref(0)
 
@@ -663,6 +669,9 @@ const width = ref(0)
 
 const assetMap = computed(() => store.getters.assetMap)
 const isCurrentUserArtist = computed(() => store.getters.isCurrentUserArtist)
+const canValidatePreviews = computed(() =>
+  store.getters.canValidatePreviewFiles(props.task)
+)
 const isTVShow = computed(() => store.getters.isTVShow)
 const organisation = computed(() => store.getters.organisation)
 const productionMap = computed(() => store.getters.productionMap)
@@ -712,6 +721,7 @@ const {
   pencilColor,
   pencilWidth,
   textColor,
+  textSize,
   addText,
   addTypeArea,
   removeTypeArea,
@@ -726,6 +736,7 @@ const {
   onChangePencilColor,
   onChangePencilWidth,
   onChangeTextColor,
+  onChangeTextSize,
   _resetColor,
   _resetPencil,
   resetPencilConfiguration,
@@ -910,6 +921,9 @@ const isReady = computed(
   () => !currentPreview.value?.status || currentPreview.value.status === 'ready'
 )
 const isPicture = computed(() => isPicturePreview(extension.value))
+const isTransparentPicture = computed(() =>
+  isTransparentPicturePreview(extension.value)
+)
 const isMovie = computed(() => isMoviePreview(extension.value))
 const is3DModel = computed(() => isModelPreview(extension.value))
 const isSound = computed(() => isSoundPreview(extension.value))
@@ -2026,6 +2040,14 @@ const changeCurrentPreview = previewFile => {
 
 const onRemovePreviewClicked = () => {
   emit('remove-extra-preview', currentPreview.value)
+}
+
+const onValidationStatusClicked = previewFile => {
+  const next = { neutral: 'validated', validated: 'rejected' }
+  store.dispatch('updatePreviewFileValidationStatus', {
+    previewFile,
+    status: next[previewFile.validation_status] || 'neutral'
+  })
 }
 
 const onPreviousClicked = () => {

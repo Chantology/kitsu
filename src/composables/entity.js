@@ -37,10 +37,8 @@ export const getEntityMap = entityType => {
 
 /**
  * Composable mirroring src/components/mixins/entity.js for pages that use
- * `<script setup>`. Intentionally narrow — only the parts Edit.vue needs.
- *
- * Other pages (Asset, Concept, Episode, Sequence, Shot) still use the
- * legacy mixin until they are migrated.
+ * `<script setup>`. Intentionally narrow: only the parts the entity pages
+ * (Edit, Asset, Shot, Sequence, Episode) need.
  *
  * @param {Object} options
  * @param {string} options.type - lowercase entity type (e.g. 'edit').
@@ -65,10 +63,10 @@ export const useEntity = ({ type, currentEntity, entityList, init }) => {
   const currentProduction = computed(() => store.getters.currentProduction)
   const organisation = computed(() => store.getters.organisation)
   const isCurrentUserManager = computed(
-    () => store.getters.isCurrentUserManager
+    () => store.getters.isCurrentUserProductionManager
   )
   const isCurrentUserSupervisor = computed(
-    () => store.getters.isCurrentUserSupervisor
+    () => store.getters.isCurrentUserProductionSupervisor
   )
   const user = computed(() => store.getters.user)
 
@@ -83,6 +81,7 @@ export const useEntity = ({ type, currentEntity, entityList, init }) => {
 
   // Local state (mirrors the mixin's `data()` fields used by Edit.vue).
   const currentSection = ref('infos')
+  const currentTask = ref(null)
   const zoomLevel = ref(1)
   const scheduleItems = ref([])
   let scheduleItemsSignature = null
@@ -268,6 +267,16 @@ export const useEntity = ({ type, currentEntity, entityList, init }) => {
     scheduleItems.value = [rootElement]
   }
 
+  const onTaskSelected = task => {
+    store.dispatch('clearSelectedTasks')
+    if (!currentTask.value || currentTask.value.id !== task.id) {
+      store.dispatch('addSelectedTask', task)
+      currentTask.value = task
+    } else {
+      currentTask.value = null
+    }
+  }
+
   const saveTaskScheduleItem = item => {
     if (item.estimation) {
       item.endDate = addBusinessDays(
@@ -292,13 +301,16 @@ export const useEntity = ({ type, currentEntity, entityList, init }) => {
     }
   }
 
-  // Watch route params and re-init when the entity id in the URL changes.
-  // Mirrors the mixin's `$route` watcher.
+  // Re-init when the entity id in the URL changes. Compared with the id of
+  // the last init, not with the entity shown: that one is still the previous
+  // entity while a load runs, and null after a failed load.
+  let initEntityId = route.params[`${type}_id`]
   watch(
     () => route.params,
     () => {
       const entityId = route.params[`${type}_id`]
-      if (currentEntity.value && currentEntity.value.id !== entityId) {
+      if (entityId && entityId !== initEntityId) {
+        initEntityId = entityId
         init?.()
       }
       currentSection.value = route.query.section || 'infos'
@@ -309,8 +321,17 @@ export const useEntity = ({ type, currentEntity, entityList, init }) => {
   // mixin's `currentTasks` watcher with `immediate: true`).
   watch(currentTasks, () => initScheduleItems(), { immediate: true })
 
+  // the action panel clears the selection from its own close button
+  watch(
+    () => store.getters.nbSelectedTasks,
+    nbSelectedTasks => {
+      if (nbSelectedTasks === 0) currentTask.value = null
+    }
+  )
+
   return {
     currentSection,
+    currentTask,
     zoomLevel,
     zoomOptions,
     scheduleItems,
@@ -319,6 +340,7 @@ export const useEntity = ({ type, currentEntity, entityList, init }) => {
     currentTasks,
     tasksStartDate,
     tasksEndDate,
+    onTaskSelected,
     saveTaskScheduleItem
   }
 }

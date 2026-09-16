@@ -43,7 +43,6 @@
             :full-screen="false"
             :light="false"
             :margin-bottom="0"
-            :panzoom="true"
             :preview="currentPreview"
             :url-prefix="sharedApiPrefix"
             high-quality
@@ -195,11 +194,8 @@
       :entity-list="entityListForProgress"
       :fps="fps"
       :frame-duration="frameDuration"
-      :is-full-mode="false"
       :is-full-screen="false"
-      :movie-dimensions="movieDimensions"
       :nb-frames="nbFrames"
-      :preview-id="currentPreview ? currentPreview.id : ''"
       :playlist-duration="playlistDuration"
       :playlist-progress="currentPlaylistProgress"
       :playlist-shot-position="playlistShotPosition"
@@ -220,7 +216,7 @@
       <div
         class="flexrow-item has-text-centered playlisted-wrapper"
         :data-entity-index="index"
-        :key="entity.id || index"
+        :key="entity.id ? `${entity.id}-${entity.preview_file_id}` : index"
         v-for="(entity, index) in entityList"
       >
         <playlisted-entity

@@ -164,6 +164,19 @@ const getters = {
     getters.currentUserEffectiveRole === 'manager',
   isCurrentUserProductionSupervisor: (state, getters) =>
     getters.currentUserEffectiveRole === 'supervisor',
+  // Mirrors zou: managers of the production, and supervisors of the task
+  // department (a supervisor without department supervises everything).
+  canValidatePreviewFiles: (state, getters, rootState, rootGetters) => task => {
+    if (!state.user) return false
+    const role = getters.currentUserRoleForProduction(task?.project_id)
+    if (state.user.role === 'admin' || role === 'manager') return true
+    if (role !== 'supervisor') return false
+    const departments = state.user.departments || []
+    const taskType = rootGetters.taskTypeMap.get(task?.task_type_id)
+    return (
+      departments.length === 0 || departments.includes(taskType?.department_id)
+    )
+  },
   use12HourClock: state => Boolean(state.user?.use_12_hour_clock),
   isSaveProfileLoading: state => state.isSaveProfileLoading,
   isSaveProfileLoadingError: state => state.isSaveProfileLoadingError,
@@ -332,10 +345,17 @@ const actions = {
     commit(USER_LOAD_TIME_SPENTS_END, timeSpents)
   },
 
-  async loadTasksToCheck({ commit }) {
-    const tasks = (await peopleApi.loadTasksToCheck()) || []
-    commit(REGISTER_USER_TASKS, { tasks })
-    return tasks
+  async loadTasksToCheck({ commit }, params = {}) {
+    const result = (await peopleApi.loadTasksToCheck({
+      ...params,
+      page: params.page || 1
+    })) || { data: [], stats: { total: 0 }, is_more: false }
+    commit(REGISTER_USER_TASKS, { tasks: result.data })
+    return result
+  },
+
+  loadTasksToCheckFilterValues() {
+    return peopleApi.loadTasksToCheckFilterValues()
   },
 
   async uploadAvatar({ commit, state }, formData) {
@@ -658,7 +678,6 @@ const mutations = {
         last_comment: comment
       })
       cache.todosIndex = buildTaskIndex(state.todos)
-      cache.doneIndex = buildTaskIndex(cache.doneTasks)
     }
   },
 

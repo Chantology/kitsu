@@ -16,6 +16,8 @@
     @click="$emit('click', $event)"
   >
     <bell-icon class="icon" v-if="icon === 'bell'" />
+    <chart-line-icon class="icon" v-else-if="icon === 'chart'" />
+    <chart-column-icon class="icon" v-else-if="icon === 'chart-column'" />
     <grid-icon class="icon" v-else-if="icon === 'grid'" />
     <send-icon class="icon" v-else-if="icon === 'send'" />
     <paperclip-icon class="icon" v-else-if="icon === 'attach'" />
@@ -52,6 +54,11 @@
     <clock-icon class="icon" v-else-if="icon === 'clock'" />
     <scissors-icon class="icon" v-else-if="icon === 'scissors'" />
     <rotate-ccw-icon class="icon" v-else-if="icon === 'refresh'" />
+    <funnel-icon
+      class="icon"
+      :stroke-width="1.5"
+      v-else-if="icon === 'funnel'"
+    />
     <file-down-icon
       class="icon"
       :stroke-width="1.5"
@@ -96,6 +103,8 @@ import {
   BellIcon,
   CalendarIcon,
   CalendarPlusIcon,
+  ChartColumnIcon,
+  ChartLineIcon,
   ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -112,6 +121,7 @@ import {
   GridIcon,
   FileDownIcon,
   FilmIcon,
+  FunnelIcon,
   ImageIcon,
   KeyIcon,
   LayersIcon,

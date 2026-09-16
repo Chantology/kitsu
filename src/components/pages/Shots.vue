@@ -58,6 +58,7 @@
                 :title="$t('main.edl.import_file')"
                 icon="import-edl"
                 @click="showEDLImportModal"
+                v-if="!isAllEpisodes"
               />
               <button-simple
                 class="flexrow-item"
@@ -76,6 +77,7 @@
                 :text="$t('shots.new_shots')"
                 icon="plus"
                 @click="showManageShots"
+                v-if="!isAllEpisodes"
               />
             </div>
           </div>
@@ -308,7 +310,7 @@ import { mapGetters, mapActions } from 'vuex'
 import shotStore from '@/store/modules/shots'
 
 import csv from '@/lib/csv'
-import { sortByName } from '@/lib/sorting'
+import { getExportDescriptors } from '@/lib/descriptors'
 import stringHelpers from '@/lib/string'
 
 import { searchMixin } from '@/components/mixins/search'
@@ -530,6 +532,7 @@ export default {
       'shotSearchQueries',
       'shotSearchText',
       'shotSearchFilterGroups',
+      'shotsLoadingKey',
       'shotsPath',
       'shotValidationColumns',
       'shotListScrollPosition',
@@ -541,6 +544,10 @@ export default {
     ...mapGetters({
       isCurrentUserManager: 'isCurrentUserProductionManager'
     }),
+
+    isAllEpisodes() {
+      return this.isTVShow && this.currentEpisode?.id === 'all'
+    },
 
     shotMap() {
       return shotStore.cache.shotMap
@@ -633,13 +640,18 @@ export default {
     },
 
     reloadEpisodeShotsIfNeeded() {
-      if (
-        ((this.isTVShow && this.displayedSequences.length === 0) ||
-          this.displayedSequences[0]?.episode_id !== this.currentEpisode?.id ||
-          this.displayedShots[0]?.episode_id !== this.currentEpisode?.id) &&
-        !this.isShotsLoading &&
-        !this.initialLoading
-      ) {
+      // The first rows say nothing about the loaded scope: a production-wide
+      // All dataset passes the per-episode checks whenever the first episode
+      // owns the first rows. Compare the scope of the last load first.
+      const scope = this.isTVShow ? (this.currentEpisode?.id ?? '') : ''
+      const isStale =
+        this.shotsLoadingKey !== `${this.currentProduction?.id}/${scope}` ||
+        (!this.isAllEpisodes &&
+          ((this.isTVShow && this.displayedSequences.length === 0) ||
+            this.displayedSequences[0]?.episode_id !==
+              this.currentEpisode?.id ||
+            this.displayedShots[0]?.episode_id !== this.currentEpisode?.id))
+      if (isStale && !this.isShotsLoading && !this.initialLoading) {
         this.$refs['shot-search-field']?.setValue('')
         this.$store.commit('SET_SHOT_LIST_SCROLL_POSITION', 0)
         this.initialLoading = true
@@ -838,7 +850,13 @@ export default {
           this.$t('shots.title')
         ]
         if (this.currentEpisode) {
-          nameData.splice(3, 0, this.currentEpisode.name)
+          nameData.splice(
+            3,
+            0,
+            this.isAllEpisodes
+              ? this.$t('main.all_shots')
+              : this.currentEpisode.name
+          )
         }
         const name = stringHelpers.slugify(nameData.join('_'))
         const headers = [
@@ -849,11 +867,11 @@ export default {
         if (this.currentEpisode) {
           headers.splice(0, 0, 'Episode')
         }
-        sortByName([...this.currentProduction.descriptors])
-          .filter(d => d.entity_type === 'Shot')
-          .forEach(descriptor => {
+        getExportDescriptors(this.currentProduction, 'Shot').forEach(
+          descriptor => {
             headers.push(descriptor.name)
-          })
+          }
+        )
         if (this.isShotTime) {
           headers.push(this.$t('shots.fields.time_spent'))
         }
@@ -963,7 +981,11 @@ export default {
         await this.setNbFramesFromTaskTypePreviews({
           taskTypeId,
           productionId: this.currentProduction.id,
-          episodeId: this.currentEpisode ? this.currentEpisode.id : null
+          // Whole production in All mode: zou rejects episode_id=all here.
+          episodeId:
+            this.currentEpisode && !this.isAllEpisodes
+              ? this.currentEpisode.id
+              : null
         })
         this.modals.isSetFramesDisplayed = false
       } catch (err) {
@@ -988,13 +1010,12 @@ export default {
 
     currentProduction() {
       this.setOptionalImportColumns()
-      if (!this.initialLoading) {
-        this.$refs['shot-search-field']?.setValue('')
-        this.$store.commit('SET_SHOT_LIST_SCROLL_POSITION', 0)
-
-        if (this.currentProduction && !this.isTVShow) {
-          this.loadShots()
-        }
+      this.$refs['shot-search-field']?.setValue('')
+      this.$store.commit('SET_SHOT_LIST_SCROLL_POSITION', 0)
+      // Even during the first load: the switch dropped its response. A TV
+      // show reloads from the episode watcher instead.
+      if (this.currentProduction && !this.isTVShow) {
+        this.loadShots()
       }
     },
 
@@ -1034,7 +1055,11 @@ export default {
       return {
         title:
           `${this.currentProduction?.name || ''}` +
-          ` - ${this.currentEpisode?.name || ''}` +
+          ` - ${
+            this.isAllEpisodes
+              ? this.$t('main.all_shots')
+              : this.currentEpisode?.name || ''
+          }` +
           ` | ${this.$t('shots.title')} - Kitsu`
       }
     }

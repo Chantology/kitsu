@@ -259,7 +259,7 @@ import moment from 'moment'
 import { mapGetters, mapActions } from 'vuex'
 
 import csv from '@/lib/csv'
-import { sortByName } from '@/lib/sorting'
+import { getExportDescriptors } from '@/lib/descriptors'
 import stringHelpers from '@/lib/string'
 
 import { searchMixin } from '@/components/mixins/search'
@@ -410,6 +410,7 @@ export default {
     } else {
       if (!this.isEditsLoading) this.initialLoading = false
       finalize()
+      this.reloadEpisodeEditsIfNeeded()
     }
   },
 
@@ -423,6 +424,7 @@ export default {
       'editMap',
       'editFilledColumns',
       'editsCsvFormData',
+      'editsLoadingKey',
       'editSearchQueries',
       'editSearchText',
       'editValidationColumns',
@@ -590,6 +592,22 @@ export default {
       })
     },
 
+    // The topbar sets the current episode before this page instance exists, so
+    // the currentEpisode watcher below cannot fire on a fresh mount: without
+    // this check the cache of the episode left behind is displayed as is.
+    reloadEpisodeEditsIfNeeded() {
+      const scope = this.isTVShow ? (this.currentEpisode?.id ?? '') : ''
+      if (
+        !this.currentProduction ||
+        this.editsLoadingKey === `${this.currentProduction.id}/${scope}`
+      ) {
+        return
+      }
+      this.$refs['edit-search-field']?.setValue('')
+      this.$store.commit('SET_EDIT_LIST_SCROLL_POSITION', 0)
+      this.reset()
+    },
+
     resetEditModal() {
       const form = { name: '' }
       if (this.openProductions.length > 0) {
@@ -699,11 +717,11 @@ export default {
         if (this.currentEpisode) {
           headers.splice(0, 0, 'Episode')
         }
-        sortByName([...this.currentProduction.descriptors])
-          .filter(d => d.entity_type === 'Edit')
-          .forEach(descriptor => {
+        getExportDescriptors(this.currentProduction, 'Edit').forEach(
+          descriptor => {
             headers.push(descriptor.name)
-          })
+          }
+        )
         if (this.isEditTime) {
           headers.push(this.$t('edits.fields.time_spent'))
         }
@@ -755,14 +773,7 @@ export default {
     },
 
     currentSection() {
-      if (
-        (this.isTVShow && this.edits.length === 0) ||
-        this.edits[0].episode_id !== this.currentEpisode.id
-      ) {
-        this.$refs['edit-search-field'].setValue('')
-        this.$store.commit('SET_EDIT_LIST_SCROLL_POSITION', 0)
-        this.reset()
-      }
+      this.reloadEpisodeEditsIfNeeded()
     },
 
     isEditsLoading() {

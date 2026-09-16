@@ -82,7 +82,7 @@ export default {
 
   board: {
     title: 'Board',
-    empty: 'Your kanban board is currently empty. This means no task statuses are configured for your users role in the production settings.',
+    empty: 'Nothing to show on the board: you have no ongoing tasks, your search returned no results, or no task statuses are enabled for your role in the production settings.',
     settings: {
       title: 'Board Status',
       visible: 'Displayed on kanban board of...',
@@ -121,11 +121,15 @@ export default {
     episode_casting: 'Episode casting',
     hide_library: 'Hide Library',
     label: 'Label',
+    occurrences: 'Occurrences',
     picture_mode: 'Switch to picture mode',
+    remove_from_casting: 'Remove from casting',
     save_error: 'Error while saving casting',
     show_library: 'Display Library',
     text_mode: 'Switch to text mode',
     title: 'Breakdown',
+    view_as_cards: 'View as cards',
+    view_as_list: 'View as list',
     options: {
       fixed: 'fixed',
       animate: 'animate'
@@ -209,14 +213,27 @@ export default {
     }
   },
 
+  burndown: {
+    estimations: 'Estimations',
+    ideal: 'Ideal',
+    projection: 'Projection',
+    remaining_days: 'Remaining man-days',
+    remaining_tasks: 'Remaining tasks',
+    title: 'Burndown Chart'
+  },
+
   chats: {
     delete_message: 'Are you sure you want to delete this message?',
     delete_message_confirm: 'Delete message',
     join: 'Join chat',
+    join_error: 'An error occurred while joining the chat.',
     leave: 'Leave chat',
+    leave_error: 'An error occurred while leaving the chat.',
+    loading_error: 'An error occurred while loading the chat.',
     no_message_yet: 'No message',
     no_chat: 'You aren\'t currently participating in any entity chats. Search for an entity and join a chat from its page.',
     search_entity: 'Search for entity',
+    send_error: 'An error occurred while sending the message.',
     title: 'Entity Chats',
   },
 
@@ -278,7 +295,7 @@ export default {
     validation_required: 'Validation Required',
     move_to_task: 'Move to',
     move_modal: {
-      title: 'Move comment to another task',
+      title: 'Move Comment to Another Task',
       intro: 'Pick a task of the same entity to move this comment to. Notifications will be sent on the destination task as for a new comment.',
       target_label: 'Destination task',
       no_target: 'No other task is available on this entity.',
@@ -570,6 +587,7 @@ export default {
     fields: {
       name: 'name',
       description: 'description',
+      time_spent: 'Time',
       placeholder: 'E01'
     },
     status: {
@@ -589,7 +607,7 @@ export default {
     create_error: 'An error occurred while saving the hardware item.',
     delete_error: 'An error occurred while deleting the hardware item.',
     delete_text: 'Are you sure you want to delete this hardware item?',
-    edit_title: 'Edit Hardware Item',
+    edit_title: 'Edit hardware item',
     new_hardware_item: 'New Hardware Item',
     number: 'hardware item | hardware items',
     title: 'Hardware Items',
@@ -657,7 +675,7 @@ export default {
     join_partner: 'Join our Partner Program',
     main: 'To make our project thrive, we need your support. Here are some simple ways you can help:',
     star_github: 'Star our repository on GitHub',
-    title: 'How to support Kitsu'
+    title: 'How to Support Kitsu'
   },
 
   login: {
@@ -697,7 +715,7 @@ export default {
     send_email_otp: 'Resend OTP by email',
     set_password_title: 'Welcome to Kitsu!',
     set_password: 'Set your password',
-    title: 'Log in to Kitsu',
+    title: 'Log In to Kitsu',
     too_many_failed_login_attemps: 'Too many failed login attempts, please wait one minute.',
     unable_to_verify_email_otp: 'Unable to verify with email?',
     unable_to_verify_recovery_code: 'Don\'t have a recovery code?',
@@ -736,10 +754,10 @@ export default {
     people_placeholder: 'All users',
     title: 'Logs',
     audit: {
-      title: 'Activity logs'
+      title: 'Activity Logs'
     },
     logins: {
-      title: 'Login logs'
+      title: 'Login Logs'
     },
     preview_files: {
       date: 'Creation date',
@@ -758,7 +776,7 @@ export default {
         processing: 'Server processing in progress'
       },
       task_type_id: 'Task type',
-      title: 'Preview files'
+      title: 'Preview Files'
     }
   },
 
@@ -800,8 +818,10 @@ export default {
     days: 'day | days',
     days_spent: 'day spent | days spent',
     days_estimated: 'day estimated | days estimated',
+    days_expected: 'day expected | days expected',
     hours_spent: 'hour spent | hours spent',
     hours_estimated: 'hour estimated | hours estimated',
+    hours_expected: 'hour expected | hours expected',
     delete: 'Delete',
     delete_all: 'Delete all',
     delete_text: 'Are you sure you want to remove {name} from your database?',
@@ -836,6 +856,7 @@ export default {
     frame_out: 'Frame Out',
     from: 'From',
     go_productions: 'Return To Production',
+    grouped_by: 'Grouped by',
     hour: 'Hour',
     hours: 'hour | hours',
     hide_support_chat: 'Hide support chat',
@@ -874,6 +895,7 @@ export default {
     no: 'No',
     no_estimation: 'No estimation',
     no_results: 'No results',
+    none: 'None',
     on: 'On',
     optional: 'optional',
     or: 'or',
@@ -920,6 +942,7 @@ export default {
     studio: 'Studio',
     status: 'Status',
     tasks: 'Tasks',
+    technical_details: 'Technical details:',
     total: 'Total',
     to: 'To',
     timeSpent: 'Time Spent',
@@ -945,6 +968,8 @@ export default {
     },
     csv: {
       choose: 'Choose',
+      error_imported_rows: '{count} row was imported before the error. | {count} rows were imported before the error.',
+      error_line: 'Line {line}',
       error_upload: 'An error occurred while uploading your CSV.',
       export_current_view: 'Export current view',
       export_file: 'Export data to CSV',
@@ -1013,7 +1038,9 @@ export default {
   },
 
   my_checks : {
-    title: 'Task to check | Tasks to check'
+    build_playlist_loaded_only:
+      'Only the tasks loaded in the list are included in the playlist',
+    title: 'Task to Check | Tasks to Check'
   },
 
   news: {
@@ -1035,7 +1062,7 @@ export default {
 
   not_found: {
     text: 'The link you clicked on is broken or the target was not found. Please return to the home page.',
-    title: 'Page not found...'
+    title: 'Page Not Found...'
   },
 
   notifications: {
@@ -1218,6 +1245,7 @@ export default {
     add_episode: 'Add entire episode',
     add_movie: 'Add entire movie',
     apply_task_type_change: 'This will set the last revision for the given task type on all entities.',
+    change_task_type_error: 'An error occurred while changing the task type.',
     update_versions_title: 'Update selected versions',
     update_to_latest_version: 'Update to latest version',
     update_to_latest_version_help:
@@ -1238,7 +1266,7 @@ export default {
     delete_error: 'An error occurred while deleting this playlist.',
     download_csv: 'Download .csv',
     download_zip: 'Download .zip',
-    edit_error: 'An error occurred while saving this playlist.',
+    edit_error: 'An error occurred while saving this playlist. Are you sure there is no playlist with a similar name?',
     edit_title: 'Edit playlist',
     failed: 'Failed',
     filter_task_type: 'Filtered by task type',
@@ -1252,7 +1280,7 @@ export default {
     notify_clients: 'Notify clients',
     share: 'Share',
     share_modal: {
-      title: 'Share playlist',
+      title: 'Share Playlist',
       description: 'Generate a link to share this playlist with external reviewers. Anyone with the link can view the playlist and post comments without needing a Kitsu account. You can set an expiration date and revoke access at any time.',
       active_links: 'Active links',
       create_new: 'Create a new link',
@@ -1298,6 +1326,7 @@ export default {
     unmute: 'Unmute',
     updated_at: 'Updated at:',
     remove: 'remove',
+    view_as_playlist: 'View as playlist',
     view_created: 'View playlist',
     volume_level: 'Volume: {level}%',
     fields: {
@@ -1385,12 +1414,14 @@ export default {
     delete_text: 'Are you sure you want to remove {name} from your database? Please, confirm by typing the name of the production you want to delete in the text field.',
     delete_error: 'An error occurred while deleting this production. There may be existing data currently linked to it. Are you sure this production has no task, shot, or asset linked to it? Kitsu doesn\'t allow production deletion. If you don\'t want to see the production anymore, you can close it instead.',
     edit_error: 'An error occurred while editing the production. Please contact our support team.',
-    edit_title: 'Edit',
-    load_stats: 'Load stats',
+    edit_title: 'Edit production',
+    hide_stats: 'Hide stats',
     new_production: 'Add a production',
     number: 'production | productions',
     open_productions: 'My Productions',
     picture: 'Change picture',
+    remove_picture: 'Remove picture',
+    show_stats: 'Show stats',
     title: 'Productions',
 
     creation: {
@@ -1501,7 +1532,7 @@ export default {
       tags: 'List of tags',
       url: 'Link',
       target_project: 'Project',
-      title: 'Add metadata column'
+      title: 'Add Metadata Column'
     },
 
     brief: {
@@ -1577,7 +1608,7 @@ export default {
     use_12_hour_clock: '12-hour clock (AM/PM)',
     webhook_error: 'the webhook mattermost does not correspond to a hook',
     avatar: {
-      title: 'Change avatar',
+      title: 'Change Avatar',
       error_upload: 'There was an error while uploading picture.',
       intro: 'Pick a photo, then drag and zoom to frame it.',
       drop_or_click: 'Click or drop a photo here',
@@ -1594,7 +1625,7 @@ export default {
       unvalid: 'Your new password confirmation doesn\'t match or your password is too short (8 chars, at least, is expected).'
     },
     two_factor_authentication: {
-      title: 'Two-factor authentication',
+      title: 'Two-Factor Authentication',
       description: 'Two-factor authentication (<abbr title="Two-Factor Authentication">2FA</abbr>) adds an extra layer of security to your account. When enabled, you will need to provide a second form of verification in addition to your password each time you log in. You can use an authenticator app (<abbr title="Time-based One-Time Password">TOTP</abbr>), email verification (<abbr title="One-Time Password">OTP</abbr>), or a hardware security key (<abbr title="Fast IDentity Online">FIDO</abbr>) as your second factor.',
       mandatory: 'Your organization requires two-factor authentication. Please enable at least one method to continue.',
       enabled: 'Two-factor authentication enabled',
@@ -1632,7 +1663,7 @@ export default {
         error_unregister: 'An error occurred while unregistering FIDO device.'
       },
       recovery_codes: {
-        title: 'Recovery codes',
+        title: 'Recovery Codes',
         button_new: 'Get new recovery codes',
         button_validate: 'Validate and get new recovery codes',
         warning: 'Keep your recovery codes in a safe place. These codes are your last resort for accessing your account if you lose your password and second factors. If you cannot find these codes, you will lose access to your account.',
@@ -1716,7 +1747,7 @@ export default {
     edit_title: 'Edit task status',
     library_title: 'Task Status Library',
     name: 'task status',
-    number: 'task status | task status',
+    number: 'task status | task statuses',
     new_task_status: 'Add a task status',
     title: 'Task Status',
     title_entities: 'Status for entities',
@@ -1745,6 +1776,9 @@ export default {
     add_task_type_to_library: 'Add a task type to the library',
     delete_text: 'Are you sure you want to remove {name} from your database?',
     delete_error: 'An error occurred while deleting this task type. There may be existing data currently linked to it. Are you sure this task type has no task linked to it?',
+    delete_blocked_by_links: 'This task type is still used in the schedule or in the workflow of some productions. Detaching it will drop its schedule dates in every production.',
+    delete_blocked_by_tasks: 'Tasks still use this task type. Delete or reassign them before removing it.',
+    delete_force: 'Detach and delete',
     edit_title: 'Edit task type',
     create_error: 'An error occurred while creating the task type. Please, check that there is no task type with a similar name.',
     library_title: 'Task Type Library',
@@ -1784,6 +1818,7 @@ export default {
       name: 'Name',
       description: 'description',
       person: 'Person',
+      time_spent: 'Time',
       placeholder: 'SQ01'
     }
   },
@@ -1816,21 +1851,47 @@ export default {
       name: 'Name',
       episode: 'Ep.',
       description: 'Description',
-      person: 'Modifier'
+      person: 'Modifier',
+      time_spent: 'Time'
     }
   },
 
   schedule: {
-    title: 'Schedule',
-    title_main: 'Main Schedule',
-    overall_man_days: 'Person-days',
-    md: 'md',
-    hours: 'h',
-    today: 'Today',
+    apply_to_prod: 'Apply to production',
+    apply_to_prod_confirm: 'Are you sure you want to apply this schedule version to the current production? This will override the current task values.',
+    apply_to_prod_error: 'An error occurred while applying the schedule version to the current production.',
+    assign: 'Assign to:',
+    confirm_move_children:
+      'Moving this bar will clip or snap {count} sub-item to fit the new bounds. Continue? | Moving this bar will clip or snap {count} sub-items to fit the new bounds. Continue?',
+    create_version: 'Create schedule version',
     cut_tool: 'Cut',
     cut_tool_description:
       'Click a bar to cut it in two, click a gap to close it again',
-    zoom_level: 'Zoom level',
+    delete_version: 'Delete schedule version',
+    delete_version_error: 'An error occurred while deleting this schedule version. Please contact our support team.',
+    delete_version_message: 'Are you sure you want to delete the schedule version {name}? Please confirm by typing the schedule version name below.',
+    drop_forbidden_department: 'Not part of the task department',
+    drop_forbidden_person: 'Person outside your departments',
+    drop_forbidden_role: 'No assignment right on this production',
+    drop_forbidden_task_type: 'Task type outside your departments',
+    drop_forbidden_team: 'Not part of the production team',
+    edit_task: 'Edit task',
+    edit_version: 'Edit schedule version',
+    edit_version_error: 'An error occurred while saving the schedule version. Please try again.',
+    edit_version_exist: 'A version with a similar name already exists.',
+    estimated_daily_quotas: 'Auto estimated daily quotas:',
+    export: 'Export schedule',
+    export_error: 'An error occurred while exporting data.',
+    fields: {
+      create_from_version: 'Create new or from a version',
+      new: 'new schedule',
+      name: 'version name',
+      locked: 'locked version'
+    },
+    force_unassign: 'Override previous assignments',
+    forced_daily_quotas: 'Forced daily quotas:',
+    hours: 'h',
+    md: 'md',
     milestone: {
       add_milestone: 'Add milestone for',
       delete_milestone: 'Delete milestone',
@@ -1841,51 +1902,36 @@ export default {
     mode: 'View Mode',
     mode_prev: 'Forecast',
     mode_real: 'Real',
-    version: 'Version',
-    apply_to_prod: 'Apply to production',
-    apply_to_prod_confirm: 'Are you sure you want to apply this schedule version to the current production? This will override the current task values.',
-    apply_to_prod_error: 'An error occurred while applying the schedule version to the current production.',
-    assign: 'Assign to:',
-    confirm_move_children:
-      'Moving this bar will clip or snap {count} sub-item to fit the new bounds. Continue? | Moving this bar will clip or snap {count} sub-items to fit the new bounds. Continue?',
-    export: 'Export schedule',
-    export_error: 'An error occurred while exporting data.',
-    reset_list: 'Reset list',
-    no_entity: 'No assignable entity',
+    new_version: 'New version',
     no_assignee: 'No assignable person',
+    no_entity: 'No assignable entity',
+    overall_man_days: 'Person-days',
+    reset_list: 'Reset list',
     select_task_type: 'Select a task type',
     show_assigned: 'Show assigned entities',
-    force_unassign: 'Override previous assignments',
-    forced_daily_quotas: 'Forced daily quotas:',
-    estimated_daily_quotas: 'Auto estimated daily quotas:',
-    edit_task: 'Edit task',
-    new_version: 'New version',
-    create_version: 'Create schedule version',
-    edit_version: 'Edit schedule version',
-    edit_version_error: 'An error occurred while saving the schedule version. Please try again.',
-    edit_version_exist: 'A version with a similar name already exists.',
-    delete_version: 'Delete schedule version',
-    delete_version_error: 'An error occurred while deleting this schedule version. Please contact our support team.',
-    delete_version_message: 'Are you sure you want to delete the schedule version {name}? Please confirm by typing the schedule version name below.',
+    title: 'Schedule',
+    title_main: 'Main Schedule',
+    today: 'Today',
+    version: 'Version',
     versions: {
       reference: 'Reference forecast',
       from: 'from',
       locked: 'locked',
       canceled: 'canceled'
     },
-    fields: {
-      create_from_version: 'Create new or from a version',
-      new: 'new schedule',
-      name: 'version name',
-      locked: 'locked version'
-    }
+    zoom_level: 'Zoom level'
   },
 
   team_schedule: {
     busy: 'Busy on another production',
+    empty:
+      'No person matches the current filters. Try widening the studio, department or production filters.',
+    no_assignment_role: 'You cannot assign tasks on this production.',
+    no_department_task_type:
+      'No task type of your departments matches the production filter.',
+    person_placeholder: 'Select a person...',
     title: 'Schedule',
-    title_main: 'Team Schedule',
-    person_placeholder: 'Select a person...'
+    title_main: 'Team Schedule'
   },
 
   quota: {
@@ -1903,8 +1949,8 @@ export default {
     feedback_date: 'Feedback date',
     explanation_feedback: 'The shot is considered complete on the first feedback request. Its number of frames is added to the quotas for that day.',
     explanation_done: 'The shot is considered complete on the last approval. Its number of frames is added to the quotas for that day.',
-    explanation_weighted: 'Shots are considered complete upon the first feedback request. Then, quotas are weighted based on the time spent on the task, as recorded in the artist\'s timesheet.\n\n If no time is recorded, it is assumed that:\n* The task started at the first status change to WIP.\n* The task was completed on the day the feedback request was made.\n * The completed frames are distributed evenly among all business days between the start and end dates.',
-    explanation_weighteddone: 'Shots are considered complete upon the last approval. Then, quotas are weighted based on the time spent on the task, as recorded in the artist\'s timesheet.\n\n If no time is recorded, it is assumed that:\n* The task started at the first status change to WIP.\n* The task was completed on the day it was approved.\n * The completed frames are distributed evenly among all business days between the start and end dates.',
+    explanation_weighted: 'Shots are considered complete upon the first feedback request. Then, quotas are weighted based on the time spent on the task, as recorded in the artist\'s timesheet.\n\nIf no time is recorded, it is assumed that:\n* The task started at the first status change to WIP.\n* The task was completed on the day the feedback request was made.\n* The completed frames are distributed evenly among all business days between the start and end dates.',
+    explanation_weighteddone: 'Shots are considered complete upon the last approval. Then, quotas are weighted based on the time spent on the task, as recorded in the artist\'s timesheet.\n\nIf no time is recorded, it is assumed that:\n* The task started at the first status change to WIP.\n* The task was completed on the day it was approved.\n* The completed frames are distributed evenly among all business days between the start and end dates.',
     export_quotas: 'Export quotas',
     frames: 'Frames',
     highlight_quotas: 'Highlight quotas below:',
@@ -1960,7 +2006,7 @@ export default {
     restore_error: 'An error occurred while restoring this shot.',
     sequences: 'Sequences',
     show_timecode: 'Show in and out as timecodes',
-    tasks: 'Shot Tasks',
+    tasks: 'Shot tasks',
     title: 'Shots',
     wrong_file_duration: 'One of the uploaded video file duration doesn\'t match the expected duration of the current shot.',
     fields: {
@@ -2013,7 +2059,7 @@ export default {
     add_revision_confirm: 'Add files to publish',
     all_tasks: 'All tasks',
     auto_revision: 'Restore automatic revision number',
-    assign: 'Assign to the selected task | Assign to the {nbSelectedTasks} selected tasks ',
+    assign: 'Assign to the selected task | Assign to the {nbSelectedTasks} selected tasks',
     assignation_disclaimer: 'If people are missing from the list, it means they are not listed in the team.',
     assign_explanation: 'Select a person to assign...',
     assignation_warning: 'Warning: you won\'t see the result because you are hiding assignments',
@@ -2027,7 +2073,7 @@ export default {
     change_status_to: 'Change task status to:',
     change_status: 'Post comment',
     change_preview: 'Change preview',
-    change_priority: 'Change priority of the selected task | Change priority of the {nbSelectedTasks} selected tasks ',
+    change_priority: 'Change priority of the selected task | Change priority of the {nbSelectedTasks} selected tasks',
     change_priority_to: 'New priority:',
     change_task_status: 'Change status for the selected task | Change status for the {nbSelectedTasks} selected tasks',
     clear_all_assignations: 'unassign all',
@@ -2059,7 +2105,7 @@ export default {
     data_display: 'Data Display',
     delete_all_text: 'Are you sure you want to delete all tasks for given {name}? Please, confirm by typing the task type name of the tasks you want to delete in the text field.',
     delete_all_error: 'Deleting all tasks for given task type failed.',
-    delete_error: 'An error occurred while deleting task.',
+    delete_error: 'An error occurred while deleting this task.',
     delete_comment: 'Are you sure you want to delete comments?',
     delete_comment_error: 'An error occurred while deleting comments.',
     delete_for_selection: 'Delete the selected task | Delete the {nbSelectedTasks} selected tasks',
@@ -2214,7 +2260,7 @@ export default {
     create_error: 'An error occurred while saving the software license.',
     delete_error: 'An error occurred while deleting the software license.',
     delete_text: 'Are you sure you want to delete this software license?',
-    edit_title: 'Edit Software License',
+    edit_title: 'Edit software license',
     new_software_license: 'New Software License',
     number: 'software license | software licenses',
     title: 'Software Licenses',
@@ -2231,6 +2277,7 @@ export default {
   },
 
   timesheets: {
+    chart: 'Time chart',
     confirm_day_off: 'Setting this day as a day off will erase all time logged for the current day. Are you sure you want to continue?',
     confirm_day_offs: 'Setting these days as days off will erase all time logged for the affected days. Are you sure you want to continue?',
     confirm_unset_day_offs: 'Days off are currently applied from {start} to {end}. Are you sure you want to remove this period?',
@@ -2238,15 +2285,20 @@ export default {
     day_off_no_logging: 'No time logging on a day off',
     detail_level: 'Detail level',
     done_tasks: 'Done tasks',
+    empty: 'No time logged for this period with the current filters.',
+    expected: 'expected',
     export_timesheet: 'Export Timesheet',
     export_timespents: 'Export time spent entries for open productions as a list',
     hours: 'hours',
     month: 'Month',
+    in_salary: 'in salary',
     off: 'Off',
+    salary: 'Salary',
     time_spents: 'Time Spent (hours)',
     timelog_title: 'Timelog',
     title: 'Timesheets',
     unit: 'Unit',
+    with_time_logged: 'With time logged',
     year: 'Year'
   },
 
@@ -2290,7 +2342,7 @@ export default {
   },
 
   wrong_browser: {
-    title: 'Your Browser is Not Supported by Kitsu',
+    title: 'Your Browser Is Not Supported by Kitsu',
     outdated:
       'Your browser ({browser}) is too old: please update it to its latest version, or install a modern, up-to-date browser (Chrome, Firefox, Safari, Edge or Opera).'
   },
