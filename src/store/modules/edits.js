@@ -10,6 +10,8 @@ import tasksStore from '@/store/modules/tasks'
 import taskTypesStore from '@/store/modules/tasktypes'
 import taskStatusStore from '@/store/modules/taskstatus'
 
+import { getExportDescriptors } from '@/lib/descriptors'
+import { isEpisodeInLoadedScope } from '@/lib/episodes'
 import { PAGE_SIZE } from '@/lib/pagination'
 import { getTaskTypePriorityOfProd } from '@/lib/productions'
 import {
@@ -46,6 +48,7 @@ import {
   NEW_TASK_END,
   CREATE_TASKS_END,
   SET_EDIT_SEARCH,
+  SET_CURRENT_EPISODE,
   SET_CURRENT_PRODUCTION,
   DISPLAY_MORE_EDITS,
   SET_EDIT_LIST_SCROLL_POSITION,
@@ -61,6 +64,7 @@ import {
   LOCK_EDIT,
   UNLOCK_EDIT,
   RESET_ALL,
+  CLEAR_EDITS,
   CLEAR_SELECTED_EDITS,
   SET_EDIT_SELECTION,
   CHANGE_EDIT_SORT,
@@ -68,10 +72,11 @@ import {
 } from '@/store/mutation-types'
 
 const cache = {
+  // Edits deleted while a list load runs: its response may still hold them.
+  removedEditIds: new Set(),
   edits: [],
   editIndex: [],
   editsLoadingPromise: null,
-  editsLoadingKey: null,
   editMap: new Map(),
   result: []
 }
@@ -274,6 +279,7 @@ const initialState = {
 
   isEditsLoading: false,
   isEditsLoadingError: false,
+  editsLoadingKey: null,
   editsCsvFormData: null,
 
   editListScrollPosition: 0,
@@ -312,6 +318,7 @@ const getters = {
 
   isEditsLoading: state => state.isEditsLoading,
   isEditsLoadingError: state => state.isEditsLoadingError,
+  editsLoadingKey: state => state.editsLoadingKey,
   editCreated: state => state.editCreated,
 
   isLongEditList: state => cache.editMap.size > 500,
@@ -331,46 +338,48 @@ const actions = {
     const isTVShow = rootGetters.isTVShow
     let episode = isTVShow ? rootGetters.currentEpisode : null
 
-    if (isTVShow) {
-      if (!episode) {
-        if (rootGetters.episodes.length > 0) {
-          episode =
-            rootGetters.episodes.length > 0 ? rootGetters.episodes[0] : null
-        } else {
-          return Promise.resolve([])
-        }
-      } else if (['all'].includes(episode.id)) {
-        episode = null
-      }
+    if (isTVShow && !episode) {
+      if (rootGetters.episodes.length === 0) return Promise.resolve([])
+      episode = rootGetters.episodes[0]
+      // Publish the fallback so the pages, which read currentEpisode to build
+      // the scope they compare against, agree with the key recorded below.
+      commit(SET_CURRENT_EPISODE, episode.id)
     }
 
-    if (!isTVShow && episode) {
-      episode = null
-    }
-
+    // Scope of the dataset about to be loaded, recorded for the pages that
+    // decide whether their cache is stale. 'all' is a pseudo-episode: it must
+    // be recorded as itself even though the request is not filtered by it.
     const loadingKey = `${production.id}/${episode?.id ?? ''}`
+
+    if (episode?.id === 'all') {
+      episode = null // Do not filter by episode
+    }
+
     if (state.isEditsLoading) {
-      if (cache.editsLoadingKey === loadingKey) {
+      if (state.editsLoadingKey === loadingKey) {
         // Same production+episode already loading: share the in-flight load
         // so concurrent callers (e.g. schedule expands) await the same edits.
         return cache.editsLoadingPromise || Promise.resolve([])
       }
       // A different production/episode is in flight (e.g. the user switched
       // episode mid-load): wait for it to settle, then run our own load so
-      // the newly selected episode's edits are actually fetched.
+      // the newly selected episode's edits are actually fetched. Re-dispatching
+      // unconditionally is what terminates: the second pass either joins the
+      // load a previous waiter started for the same scope or queues once more.
       return (cache.editsLoadingPromise || Promise.resolve([])).then(() =>
         dispatch('loadEdits')
       )
     }
 
-    commit(LOAD_EDITS_START)
-    cache.editsLoadingKey = loadingKey
+    commit(LOAD_EDITS_START, { loadingKey })
     const loadingPromise = editsApi
       .getEdits(production, episode)
       .then(edits => {
-        // Ignore a response for a production the user already switched away
-        // from; committing would overwrite the current production's edits.
-        if (production.id !== rootGetters.currentProduction?.id) {
+        // Ignore a response for a scope the user already left: a production
+        // switch (CLEAR_EDITS forgets the key) or a newer load of another
+        // episode (LOAD_EDITS_START records its own). Committing would put
+        // the old scope's edits under the newer key.
+        if (state.editsLoadingKey !== loadingKey) {
           return edits
         }
         commit(LOAD_EDITS_END, {
@@ -385,31 +394,56 @@ const actions = {
       })
       .catch(err => {
         console.error('an error occurred while loading edits', err)
-        commit(LOAD_EDITS_ERROR)
+        // Same guard as the success path: a rejection for a scope the user
+        // already left would forget the scope of the load running now.
+        if (state.editsLoadingKey === loadingKey) {
+          commit(LOAD_EDITS_ERROR)
+        }
         return []
       })
     cache.editsLoadingPromise = loadingPromise
     return loadingPromise
   },
 
-  /*
-   * Function useds mainly to reload edit data after an update or creation
-   * event. If the edit was updated a few times ago, it is not reloaded.
-   */
-  loadEdit({ commit, state, rootGetters }, editId) {
-    const edit = cache.editMap.get(editId)
-    if (edit?.lock) return
+  // Reloads an edit after a remote change, unless it is locked by a recent
+  // local update. A socket event passes { editId, onlyInScope: true } so an
+  // edit created in another episode stays out of the loaded dataset.
+  loadEdit({ commit, state, rootGetters }, payload) {
+    const { editId, onlyInScope = false } =
+      typeof payload === 'string' ? { editId: payload } : payload
+    const displayedEdit = cache.editMap.get(editId)
+    if (displayedEdit?.lock) return
 
     const personMap = rootGetters.personMap
     const production = rootGetters.currentProduction
     const taskMap = rootGetters.taskMap
     const taskTypeMap = rootGetters.taskTypeMap
-    return editsApi
-      .getEdit(editId)
+    // A list load in flight replaces the whole dataset: fetch once it has
+    // settled, so the payload is younger than its response and an edit
+    // deleted meanwhile is not re-inserted (the fetch fails instead). A
+    // displayed edit is refreshed now: waiting would apply this payload
+    // after a younger response and undo it.
+    const listSettled =
+      (!displayedEdit && state.isEditsLoading && cache.editsLoadingPromise) ||
+      Promise.resolve()
+    return listSettled
+      .then(() => editsApi.getEdit(editId))
       .then(edit => {
         if (cache.editMap.get(edit.id)) {
           commit(UPDATE_EDIT, edit)
-        } else {
+          return
+        }
+        // Displayed when its refresh started and gone since: deleted, or
+        // dropped by a list load whose own response decides.
+        if (displayedEdit) return
+        if (
+          !onlyInScope ||
+          isEpisodeInLoadedScope(
+            state.editsLoadingKey,
+            edit.parent_id,
+            edit.project_id
+          )
+        ) {
           commit(ADD_EDIT, {
             edit,
             taskTypeMap,
@@ -544,26 +578,25 @@ const actions = {
     if (cache.result && cache.result.length > 0) {
       edits = cache.result
     }
+    const sortedDescriptors = getExportDescriptors(production, 'Edit')
     const lines = edits.map(edit => {
       let editLine = []
       if (isTVShow) {
         editLine.push(edit.episode_name)
       }
       editLine = editLine.concat([edit.name, edit.description || ''])
-      sortByName([...production.descriptors])
-        .filter(d => d.entity_type === 'Edit')
-        .forEach(descriptor => {
-          if (descriptor.data_type === 'boolean') {
-            editLine.push(
-              edit.data[descriptor.field_name]?.toLowerCase() === 'true'
-            )
-          } else if (descriptor.data_type === 'person') {
-            const person = personMap.get(edit.data[descriptor.field_name])
-            editLine.push(person ? person.full_name : '')
-          } else {
-            editLine.push(edit.data[descriptor.field_name])
-          }
-        })
+      sortedDescriptors.forEach(descriptor => {
+        if (descriptor.data_type === 'boolean') {
+          editLine.push(
+            edit.data[descriptor.field_name]?.toLowerCase() === 'true'
+          )
+        } else if (descriptor.data_type === 'person') {
+          const person = personMap.get(edit.data[descriptor.field_name])
+          editLine.push(person ? person.full_name : '')
+        } else {
+          editLine.push(edit.data[descriptor.field_name])
+        }
+      })
       if (state.isEditTime) {
         editLine.push(minutesToDays(organisation, edit.timeSpent).toFixed(2))
       }
@@ -697,20 +730,23 @@ const actions = {
 }
 
 const mutations = {
-  [LOAD_EDITS_START](state) {
+  [LOAD_EDITS_START](state, { loadingKey } = {}) {
     cache.edits = []
     cache.result = []
     cache.editIndex = {}
     cache.editMap.clear()
+    cache.removedEditIds.clear()
     state.editValidationColumns = []
 
     state.isEditsLoading = true
     state.isEditsLoadingError = false
+    state.editsLoadingKey = loadingKey ?? null
 
     state.displayedEdits = []
     state.displayedEditsCount = 0
     state.displayedEditsLength = 0
-    state.displayedEstimation = 0
+    state.displayedEditsTimeSpent = 0
+    state.displayedEditsEstimation = 0
     state.editSearchQueries = []
 
     state.selectedEdits = new Map()
@@ -719,12 +755,25 @@ const mutations = {
   [LOAD_EDITS_ERROR](state) {
     state.isEditsLoading = false
     state.isEditsLoadingError = true
+    state.editsLoadingKey = null
+  },
+
+  // A production switch discards the response of a load in flight without
+  // any mutation: forget that load with the dataset, or the next loadEdits
+  // waits on it forever.
+  [CLEAR_EDITS](state) {
+    mutations[LOAD_EDITS_START](state)
+    state.isEditsLoading = false
+    cache.editsLoadingPromise = null
   },
 
   [LOAD_EDITS_END](
     state,
     { production, edits, userFilters, taskMap, taskTypeMap, personMap }
   ) {
+    // Deleted during the load, after the response was built.
+    edits = edits.filter(({ id }) => !cache.removedEditIds.has(id))
+    cache.removedEditIds.clear()
     const validationColumns = {}
     let isDescription = false
     let isTime = false
@@ -901,12 +950,20 @@ const mutations = {
     edit.validations = new Map()
     edit.data = {}
 
-    cache.edits.push(edit)
-    cache.edits = sortEdits(cache.edits)
+    // zou emits edit:new before this response lands, so the socket handler
+    // may already have inserted the edit through ADD_EDIT: merge into that
+    // copy instead of appending a second one.
+    const knownEdit = cache.editMap.get(edit.id)
+    if (knownEdit) {
+      Object.assign(knownEdit, edit)
+    } else {
+      cache.edits.push(edit)
+      cache.edits = sortEdits(cache.edits)
+      cache.editMap.set(edit.id, edit)
+    }
     state.displayedEdits = cache.edits.slice(0, PAGE_SIZE)
     helpers.setListStats(state, cache.edits)
     state.editFilledColumns = getFilledColumns(state.displayedEdits)
-    cache.editMap.set(edit.id, edit)
     cache.editIndex = buildEditIndex(cache.edits)
 
     state.editSelectionGrid = buildSelectionGrid()
@@ -1095,11 +1152,16 @@ const mutations = {
   },
 
   [UPDATE_EDIT](state, edit) {
-    Object.assign(cache.editMap.get(edit.id), edit)
+    // A refetched edit lists task objects where the cache keeps the ids the
+    // task columns resolve: tasks have their own events.
+    const fields = { ...edit }
+    delete fields.tasks
+    Object.assign(cache.editMap.get(edit.id), fields)
     cache.editIndex = buildEditIndex(cache.edits)
   },
 
   [REMOVE_EDIT](state, editToDelete) {
+    if (state.isEditsLoading) cache.removedEditIds.add(editToDelete.id)
     cache.editMap.delete(editToDelete.id)
     cache.edits = removeModelFromList(cache.edits, editToDelete)
     cache.result = removeModelFromList(cache.result, editToDelete)

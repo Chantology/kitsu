@@ -135,7 +135,6 @@
         :hierarchy="filteredScheduleItems"
         :zoom-level="zoomLevel"
         :is-loading="loading.schedule"
-        :is-error="errors.schedule"
         clip-children
         :cut-mode="cutMode"
         hide-man-days
@@ -699,7 +698,6 @@ export default {
         exportSchedule: false
       },
       errors: {
-        schedule: false,
         editScheduleVersion: false,
         deleteScheduleVersion: false,
         applyScheduleVersion: false
@@ -976,14 +974,16 @@ export default {
     },
 
     async loadData() {
+      const production = this.currentProduction
       this.loading.schedule = true
-      this.errors.schedule = false
       this.availableTaskTypes = []
 
       try {
-        await this.loadScheduleVersions(this.currentProduction)
+        await this.loadScheduleVersions(production)
 
-        const items = await this.loadScheduleItems(this.currentProduction)
+        const items = await this.loadScheduleItems(production)
+        // A production switched during the fetches runs its own load.
+        if (this.currentProduction?.id !== production.id) return
         const scheduleStartDate = parseDate(this.selectedStartDate)
         const scheduleEndDate = parseDate(this.selectedEndDate)
         const scheduleItems = items.map(item => {
@@ -1053,9 +1053,10 @@ export default {
         }))
       } catch (err) {
         console.error(err)
-        this.errors.schedule = true
       } finally {
-        this.loading.schedule = false
+        if (this.currentProduction?.id === production.id) {
+          this.loading.schedule = false
+        }
       }
     },
 
@@ -2728,8 +2729,8 @@ export default {
           }
         }
 
-        // ponytail: chunks of 5 keep the server load reasonable, a bulk
-        // endpoint in zou would replace this
+        // Chunks of 5 keep the server load reasonable; a bulk endpoint in
+        // zou would replace this.
         for (let i = 0; i < taskUpdates.length; i += 5) {
           await Promise.all(
             taskUpdates.slice(i, i + 5).map(update => this.updateTask(update))

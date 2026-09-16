@@ -4,7 +4,9 @@ import { populateTask, setTasksEntityPreview } from '@/lib/models'
 import { sortTasks, sortPeople, sortByName } from '@/lib/sorting'
 import { indexSearch, buildTaskIndex, buildPeopleIndex } from '@/lib/indexing'
 import { applyFilters, getFilters, getKeyWords } from '@/lib/filtering'
+import { getMonthsBetween } from '@/lib/time'
 import auth from '@/lib/auth'
+import { getDayOffRange } from '@/lib/time'
 
 import taskStatusStore from '@/store/modules/taskstatus'
 import taskStore from '@/store/modules/tasks'
@@ -191,6 +193,31 @@ const state = {
 
 const getters = {
   organisation: state => state.organisation,
+  // floor of the timesheet year selectors: nothing was tracked before the
+  // organisation existed, unless time was backfilled, which the year table
+  // (keyed by year, the other levels by month, week or day) then reveals
+  firstTimesheetYear: state =>
+    Math.min(
+      new Date(state.organisation.created_at).getFullYear() || 2018,
+      ...Object.keys(state.timesheet || {})
+        .map(Number)
+        .filter(key => key > 1000)
+    ),
+
+  // The topbar and the sidebar keep the same <img> src across a logo change,
+  // so the timestamp is what makes the browser refetch it. The upload stamps
+  // the store without reloading the organisation, hence the precedence: the
+  // update date the API sends only catches up on the next load, and it is the
+  // one that survives a reload, where the API asks the browser to cache the
+  // picture for a week.
+  organisationLogoPath: state => {
+    const organisation = state.organisation
+    if (!organisation.has_avatar) return null
+    const lastUpdate = organisation.updated_at || organisation.created_at
+    const timestamp = organisation.logoTimestamp || Date.parse(lastUpdate) || ''
+    const id = organisation.id
+    return `/api/pictures/thumbnails/organisations/${id}.png?t=${timestamp}`
+  },
 
   people: state => cache.people,
   peopleWithoutBot: state => cache.people.filter(person => !person.is_bot),
@@ -261,13 +288,13 @@ const actions = {
   async uploadOrganisationLogo({ commit, state }, formData) {
     const organisationId = state.organisation.id
     await peopleApi.postOrganisationLogo(organisationId, formData)
-    commit(SET_ORGANISATION, { has_avatar: true })
+    commit(SET_ORGANISATION, { has_avatar: true, logoTimestamp: Date.now() })
   },
 
   async deleteOrganisationLogo({ commit, state }) {
     const organisationId = state.organisation.id
     await peopleApi.deleteOrganisationLogo(organisationId)
-    commit(SET_ORGANISATION, { has_avatar: false })
+    commit(SET_ORGANISATION, { has_avatar: false, logoTimestamp: Date.now() })
   },
 
   async loadPeople({ commit, rootGetters }) {
@@ -562,17 +589,38 @@ const actions = {
         getTableFn = peopleApi.getMonthTable
     }
     const table = await getTableFn(year, monthString, productionId, studioId)
-    if (detailLevel === 'day') {
-      const dayOffs = await peopleApi.getDaysOff(year, monthString)
-      commit(PEOPLE_SET_DAY_OFFS, { dayOffs, month })
-    }
+    // ponytail: zou only lists day offs per month or in full; the full list
+    // is fetched for the other levels, add a range endpoint if it grows
+    const dayOffs = await peopleApi.getDaysOff(
+      detailLevel === 'day' ? year : undefined,
+      detailLevel === 'day' ? monthString : undefined
+    )
+    commit(PEOPLE_SET_DAY_OFFS, dayOffs)
     commit(PEOPLE_TIMESHEET_LOADED, table)
   },
 
-  async loadDaysOff({ commit }, { year, month } = {}) {
-    month = year && month ? String(month).padStart(2, '0') : undefined
-    const daysOff = await peopleApi.getDaysOff(year, month)
-    commit(PEOPLE_SET_DAYS_OFF, daysOff)
+  // Month by month: Zou keeps the studio-wide listing for the admins, the
+  // month route scopes the persons to the ones the caller may read. A
+  // failed month only loses its own days off.
+  async loadDaysOff({ commit }, { startDate, endDate }) {
+    const results = await Promise.allSettled(
+      getMonthsBetween(startDate, endDate).map(({ year, month }) =>
+        peopleApi.getDaysOff(year, String(month).padStart(2, '0'))
+      )
+    )
+    const failures = results.filter(({ status }) => status === 'rejected')
+    if (failures.length > 0 && failures.length === results.length) {
+      throw failures[0].reason
+    }
+    failures.forEach(({ reason }) => console.error(reason))
+    // a day off spanning two months comes back once per month
+    const daysOffById = new Map(
+      results
+        .filter(({ status }) => status === 'fulfilled')
+        .flatMap(({ value }) => value)
+        .map(dayOff => [dayOff.id, dayOff])
+    )
+    commit(PEOPLE_SET_DAYS_OFF, [...daysOffById.values()])
   },
 
   loadProductionDaysOff({ rootGetters }, { startDate, endDate }) {
@@ -883,7 +931,6 @@ const mutations = {
       })
 
       cache.personTasksIndex = buildTaskIndex(state.personTasks)
-      cache.personDoneTasksIndex = buildTaskIndex(cache.personDoneTasks)
     }
   },
 
@@ -939,25 +986,15 @@ const mutations = {
     state.daysOff = daysOff
   },
 
-  [PEOPLE_SET_DAY_OFFS](state, { dayOffs, month }) {
-    const dayOffMap = {}
-    // Build a map that tells if a day is off. It uses two keys: the person id
-    // and the day number.
-    dayOffs.forEach(({ person_id, date, end_date }) => {
-      if (!dayOffMap[person_id]) {
-        dayOffMap[person_id] = {}
-      }
-      const currentDate = new Date(date)
-      const endDate = new Date(end_date)
-      while (currentDate <= endDate) {
-        if (currentDate.getUTCMonth() + 1 === month) {
-          const day = currentDate.toISOString().substring(8, 10)
-          dayOffMap[person_id][day] = true
-        }
-        currentDate.setDate(currentDate.getDate() + 1)
-      }
-    })
-    state.dayOffMap = dayOffMap
+  // person id, then YYYY-MM-DD date, of every day off
+  [PEOPLE_SET_DAY_OFFS](state, dayOffs) {
+    state.dayOffMap = getDayOffRange(dayOffs).reduce(
+      (dayOffMap, { person_id, date }) => {
+        dayOffMap[person_id] = { ...dayOffMap[person_id], [date]: true }
+        return dayOffMap
+      },
+      {}
+    )
   },
 
   [SET_PERSON_TASKS_SCROLL_POSITION](state, scrollPosition) {

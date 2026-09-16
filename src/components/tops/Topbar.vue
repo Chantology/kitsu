@@ -13,7 +13,7 @@
         >
           <img
             class="studio-logo"
-            :src="logoPath"
+            :src="organisationLogoPath"
             :alt="organisation.name"
             v-if="organisation?.has_avatar"
           />
@@ -32,7 +32,7 @@
         >
           <img
             class="studio-logo"
-            :src="logoPath"
+            :src="organisationLogoPath"
             :alt="organisation.name"
             v-if="organisation?.has_avatar"
           />
@@ -77,12 +77,16 @@
           class="nav-item"
           v-else-if="lastProduction && $route.path !== '/open-productions'"
         >
-          <router-link :to="lastProductionRoute" class="flexrow">
+          <router-link
+            :to="lastProductionRoute"
+            :title="$t('main.go_productions')"
+            class="flexrow mr0"
+          >
             <chevron-left-icon />
-            <span class="go-productions-label">
-              {{ $t('main.go_productions') }}
-            </span>
           </router-link>
+        </div>
+        <div class="nav-item page-title pl0 ml0" v-if="pageTitle">
+          {{ pageTitle }}
         </div>
       </div>
 
@@ -119,8 +123,7 @@
           {{ $t('timesheets.timelog_title') }}
         </router-link>
         <global-search-field
-          class="flexrow-item mr0"
-          :class="{ 'hide-in-production': isProductionContext }"
+          class="flexrow-item mr0 global-search"
           v-if="mainConfig.indexer_configured && !isCurrentUserClient"
         />
         <div class="nav-item">
@@ -327,6 +330,13 @@ import TopbarSectionList from '@/components/tops/TopbarSectionList.vue'
 import NotificationBell from '@/components/widgets/NotificationBell.vue'
 import PeopleAvatar from '@/components/widgets/PeopleAvatar.vue'
 
+// Pages about one episode: no other episode can stand in for a missing one.
+const EPISODE_PAGE_ROUTES = [
+  'episode',
+  'episode-episode-task',
+  'episode-episode-task-preview'
+]
+
 export default {
   name: 'topbar',
 
@@ -382,7 +392,9 @@ export default {
 
   mounted() {
     this.currentProjectSection = this.getCurrentSectionFromRoute()
-    this.setProductionFromRoute()
+    // A page without production has nothing to configure: the fallback
+    // production of the store would get its episodes fetched for nothing.
+    if (this.$route.params.production_id) this.setProductionFromRoute()
   },
 
   computed: {
@@ -397,6 +409,7 @@ export default {
       'isCurrentUserSupervisor',
       'isCurrentUserVendor',
       'isDarkTheme',
+      'isEpisodeListLoaded',
       'isSupportChat',
       'isUserMenuHidden',
       'isTVShow',
@@ -406,17 +419,17 @@ export default {
       'notifications',
       'openProductions',
       'organisation',
+      'organisationLogoPath',
       'productionEditTaskTypes',
       'productionMap',
       'projectPlugins',
       'user'
     ]),
 
-    logoPath() {
-      return (
-        '/api/pictures/thumbnails/' +
-        `organisations/${this.organisation.id}.png`
-      )
+    // A video-game production has no main pack: its assets all belong to a
+    // chapter, so the selector never offers the pseudo-episode.
+    hasMainPack() {
+      return this.currentProduction?.production_style !== 'video-game'
     },
 
     assetSections() {
@@ -457,9 +470,14 @@ export default {
       }
       if (this.assetSections.includes(section)) {
         const episodeList = this.getBaseEpisodeOptionGroups('main.all_assets')
-        return [{ name: '', episodeList }].concat(this.episodeOptionGroups)
-      } else if (['playlists'].includes(section)) {
-        const episodeList = this.getBaseEpisodeOptionGroups('main.all_assets')
+        if (section === 'playlists') {
+          // Same all pseudo-episode, split by entity type through the query.
+          episodeList.splice(1, 0, {
+            label: this.$t('main.all_shots'),
+            value: 'all',
+            query: { for_entity: 'shot' }
+          })
+        }
         return [{ name: '', episodeList }].concat(this.episodeOptionGroups)
       } else if (['edits'].includes(section)) {
         return [
@@ -471,6 +489,15 @@ export default {
       } else if (['breakdown'].includes(section)) {
         const episodeList = this.getBaseEpisodeOptionGroups('shots.episodes')
         return [{ name: '', episodeList }].concat(this.episodeOptionGroups)
+      } else if (this.shotSections.includes(section)) {
+        // No main pack for shots: every shot of a TV show belongs to an
+        // episode, so the only pseudo-episode is "all".
+        return [
+          {
+            name: '',
+            episodeList: [{ label: this.$t('main.all_shots'), value: 'all' }]
+          }
+        ].concat(this.episodeOptionGroups)
       } else if (this.scheduleSections.includes(section)) {
         const episodeList = this.getBaseEpisodeOptionGroups(
           'episodes.all_episodes'
@@ -490,6 +517,12 @@ export default {
         this.$route.params.production_id !== undefined ||
         this.$route.path.indexOf('my-tasks') === 0
       )
+    },
+
+    pageTitle() {
+      if (this.isProductionContext) return ''
+      const titleKey = this.$route.meta?.title
+      return titleKey ? this.$t(titleKey) : ''
     },
 
     isEpisodeContext() {
@@ -674,6 +707,7 @@ export default {
       'clearSelectedTasks',
       'decrementNotificationCounter',
       'loadEpisodes',
+      'loadProduction',
       'incrementNotificationCounter',
       'markAllNotificationsAsReadLocal',
       'resetNotificationCounter',
@@ -703,7 +737,10 @@ export default {
     async toggleDesktopNotifications() {
       if (this.desktopNotificationsPermission === 'denied') return
       try {
-        const payload = buildTestNotificationPayload(this.$t, this.organisation)
+        const payload = buildTestNotificationPayload(
+          this.$t,
+          this.organisationLogoPath
+        )
         await this.setDesktopNotificationsEnabled(
           !this.desktopNotificationsPreferenceEnabled,
           {
@@ -733,7 +770,7 @@ export default {
             personMap: this.$store.getters.personMap,
             productionMap: this.$store.getters.productionMap,
             taskTypeMap: this.$store.getters.taskTypeMap,
-            organisation: this.organisation
+            organisationLogoPath: this.organisationLogoPath
           })
           this.showDesktopNotification({
             ...payload,
@@ -769,7 +806,7 @@ export default {
 
     getBaseEpisodeOptionGroups(allLabel) {
       const episodeList = [{ label: this.$t(allLabel), value: 'all' }]
-      if (this.currentProduction.production_style !== 'video-game') {
+      if (this.hasMainPack) {
         episodeList.push({ label: this.$t('main.main_pack'), value: 'main' })
       }
       return episodeList
@@ -797,19 +834,50 @@ export default {
       this.silent = false
     },
 
+    loadProductionFromRoute(productionId) {
+      const leave = () =>
+        this.$router.replace({ name: 'open-productions' }).catch(console.error)
+      this.loadProduction(productionId)
+        .then(() => {
+          if (this.$route.params.production_id !== productionId) return
+          if (this.productionMap.get(productionId)) {
+            this.setProductionFromRoute()
+          } else {
+            leave()
+          }
+        })
+        .catch(err => {
+          // Deleted, or not shared with the user.
+          console.error(err)
+          leave()
+        })
+    },
+
     setProductionFromRoute() {
       const routeProductionId = this.$route.params.production_id
       const routeEpisodeId = this.$route.params.episode_id
+      // A production outside the open ones, a closed one reached by a link or
+      // a reload, is missing from the map: the store would stand the first
+      // open production in for it.
+      if (routeProductionId && !this.productionMap.get(routeProductionId)) {
+        this.loadProductionFromRoute(routeProductionId)
+        return
+      }
       if (this.isProductionChanged(routeProductionId)) {
-        this.configureProduction(routeProductionId, routeEpisodeId)
-      } else if (this.isEpisodeChanged(routeEpisodeId)) {
+        this.configureProduction(routeProductionId)
+        return
+      }
+      // Already the production of the store, its fallback one on a first
+      // load: a later switch must not pass for a first load.
+      this.hasConfiguredProduction = true
+      if (this.isEpisodeChanged(routeEpisodeId)) {
         this.configureEpisode(routeEpisodeId)
       } else {
         this.updateCombosFromRoute()
       }
     },
 
-    configureProduction(routeProductionId, routeEpisodeId = undefined) {
+    configureProduction(routeProductionId) {
       // Initial app load (e.g. F5 / direct link) has no previous production:
       // honor the URL episode. Production switch defaults to 'all' for assets.
       const isInitialLoad = !this.hasConfiguredProduction
@@ -821,42 +889,82 @@ export default {
       if (this.isTVShow && this.currentProjectSection !== 'person') {
         this.loadEpisodes()
           .then(episodes => {
+            // The fetch may outlive a navigation: resolve from the route at
+            // response time, and give up if the production moved.
+            if (this.$route.params.production_id !== routeProductionId) return
+            const routeEpisodeId = this.$route.params.episode_id
             const query = this.$route.query
             this.currentProjectSection = this.getCurrentSectionFromRoute()
-            if (this.currentProjectSection === 'assets') {
-              const isValidEpisode =
-                ['all', 'main'].includes(routeEpisodeId) ||
-                this.episodes.some(({ id }) => id === routeEpisodeId)
-              this.currentEpisodeId =
-                isInitialLoad && routeEpisodeId && isValidEpisode
-                  ? routeEpisodeId
-                  : 'all'
-            } else if (
-              ['playlists', 'schedule'].includes(this.currentProjectSection) &&
-              ['all', 'main'].includes(routeEpisodeId)
+            if (
+              EPISODE_PAGE_ROUTES.includes(this.$route.name) &&
+              !this.isKnownEpisode(routeEpisodeId)
             ) {
-              this.currentEpisodeId = routeEpisodeId
+              this.redirectToKnownEpisode()
+              return
+            }
+            if (this.currentProjectSection === 'assets') {
+              // An episode of this production is kept on any load: a switch
+              // through the production list carries an episode of the one
+              // left. That switch carries pseudo-episodes too, which only a
+              // first load keeps.
+              const isOwnEpisode = this.episodes.some(
+                ({ id }) => id === routeEpisodeId
+              )
+              const isKeptPseudoEpisode =
+                isInitialLoad &&
+                this.keepsPseudoEpisode(
+                  'assets',
+                  routeEpisodeId,
+                  this.$route.params.plugin_id
+                )
+              this.currentEpisodeId =
+                isOwnEpisode || isKeptPseudoEpisode ? routeEpisodeId : 'all'
             } else if (
-              this.$route.params.plugin_id &&
-              ['all', 'main'].includes(routeEpisodeId)
+              this.keepsPseudoEpisode(
+                this.currentProjectSection,
+                routeEpisodeId,
+                this.$route.params.plugin_id
+              )
             ) {
               this.currentEpisodeId = routeEpisodeId
             } else {
-              let episode = episodes.find(({ id }) => id === routeEpisodeId)
-              if (!episode) {
-                episode = episodes.find(({ status }) => status === 'running')
-                query.search = ''
-              }
-              this.currentEpisodeId = episode?.id || 'all'
+              const episode = episodes.find(({ id }) => id === routeEpisodeId)
+              // Only a direct link with an id the production does not know
+              // resolves like a stale in-session link. A production switch
+              // carries the episode of the production left and a
+              // pseudo-episode the section does not keep needs an episode:
+              // both open the running one.
+              const isStaleLink =
+                isInitialLoad &&
+                routeEpisodeId &&
+                !['all', 'main'].includes(routeEpisodeId)
+              this.currentEpisodeId =
+                episode?.id ||
+                (isStaleLink
+                  ? this.fallbackEpisodeId(
+                      this.currentProjectSection,
+                      this.$route.params.plugin_id
+                    )
+                  : this.runningEpisodeId())
             }
-            this.$router.push({
-              params: {
-                production_id: routeProductionId,
-                episode_id: this.currentEpisodeId
-              },
-              query
-            })
-            this.updateCombosFromRoute()
+            // Replace: this corrects the landing URL, it is no navigation of
+            // the user's. A push would keep the rejected URL in the history
+            // and Back would land on it, to be corrected again. A page without
+            // episode param is left alone: the router keeps a param its route
+            // does not declare, and the episode selector would show there.
+            if (routeEpisodeId !== undefined) {
+              this.$router.replace({
+                params: {
+                  production_id: routeProductionId,
+                  episode_id: this.currentEpisodeId
+                },
+                query
+              })
+            }
+            // The navigation is confirmed asynchronously: pass the episode
+            // just resolved, or the route still names the one being left and
+            // the coercion navigates a second time, over this very one.
+            this.updateCombosFromRoute(this.currentEpisodeId)
           })
           .catch(console.error)
       } else {
@@ -865,9 +973,13 @@ export default {
     },
 
     configureEpisode(routeEpisodeId) {
-      if (this.episodes.length < 2) {
+      if (!this.isEpisodeListLoaded) {
+        // The fetch may outlive a production switch: its response must not
+        // resolve the route against the list of the production left.
+        const routeProductionId = this.$route.params.production_id
         this.loadEpisodes()
-          .then(episodes => {
+          .then(() => {
+            if (this.$route.params.production_id !== routeProductionId) return
             this.setEpisodeFromRoute()
             this.updateCombosFromRoute()
           })
@@ -891,7 +1003,12 @@ export default {
         this.isTVShow &&
         (!this.currentEpisode ||
           this.currentEpisodeId !== episodeId ||
-          this.currentEpisode.id !== episodeId)
+          this.currentEpisode.id !== episodeId ||
+          // Deleted while no page of the production was shown: the route and
+          // the store still name it, it must be resolved again.
+          (Boolean(episodeId) &&
+            this.isEpisodeListLoaded &&
+            !this.isKnownEpisode(episodeId)))
       )
     },
 
@@ -899,7 +1016,11 @@ export default {
       const routeEpisodeId = this.$route.params.episode_id
       if (this.isEpisodeChanged(routeEpisodeId)) {
         if (routeEpisodeId && this.isTVShow) {
-          this.setCurrentEpisode(routeEpisodeId)
+          if (this.isKnownEpisode(routeEpisodeId)) {
+            this.setCurrentEpisode(routeEpisodeId)
+          } else {
+            this.redirectToKnownEpisode()
+          }
         }
       } else if (!routeEpisodeId) {
         this.silent = true
@@ -909,42 +1030,124 @@ export default {
       }
     },
 
-    updateCombosFromRoute() {
+    isKnownEpisode(episodeId) {
+      return (
+        ['all', 'main'].includes(episodeId) ||
+        this.episodes.some(({ id }) => id === episodeId)
+      )
+    },
+
+    // A stale link (deleted episode, URL copied from another production)
+    // must not reach the store: SET_CURRENT_EPISODE cannot resolve the id,
+    // the combobox goes blank and a mounted page keeps the list it had.
+    redirectToKnownEpisode() {
+      // The pages of an episode the production lost, its detail page and its
+      // own tasks, have no stand-in: another episode under the same URL shape
+      // would mislead.
+      if (EPISODE_PAGE_ROUTES.includes(this.$route.name)) {
+        this.$router
+          .replace({
+            name: 'episodes',
+            params: { production_id: this.$route.params.production_id }
+          })
+          .catch(console.error)
+        return
+      }
+      const episodeId = this.fallbackEpisodeId(
+        this.getCurrentSectionFromRoute(),
+        this.$route.params.plugin_id
+      )
+      this.$router
+        .replace({
+          name: this.$route.name,
+          params: { ...this.$route.params, episode_id: episodeId },
+          query: this.$route.query
+        })
+        .catch(console.error)
+    },
+
+    runningEpisodeId() {
+      const episode =
+        this.episodes.find(({ status }) => status === 'running') ||
+        this.episodes[0]
+      return episode?.id || 'all'
+    },
+
+    // Episode shown instead of one the route names but the production does
+    // not have: 'all' where the section offers it, the running episode
+    // elsewhere. Shared by the direct link and the in-session paths.
+    fallbackEpisodeId(section, pluginId) {
+      return this.offersAllEpisodes(section, pluginId)
+        ? 'all'
+        : this.runningEpisodeId()
+    },
+
+    // Sections whose episode selector offers the all pseudo-episode. Plugin
+    // pages forward it to their iframe; the Shots page lists every shot of
+    // the production under it but has no main pack.
+    offersAllEpisodes(section, pluginId) {
+      return (
+        pluginId !== undefined ||
+        this.assetSections.includes(section) ||
+        this.editSections.includes(section) ||
+        this.breakdownSections.includes(section) ||
+        this.scheduleSections.includes(section) ||
+        this.shotSections.includes(section)
+      )
+    },
+
+    // Sections whose episode selector offers the main pack: the Edits and
+    // Shots pages list episode-bound entities only.
+    offersMainPack(section, pluginId) {
+      return (
+        this.hasMainPack &&
+        (pluginId !== undefined ||
+          this.assetSections.includes(section) ||
+          this.breakdownSections.includes(section) ||
+          this.scheduleSections.includes(section))
+      )
+    },
+
+    // Whether the route keeps the pseudo-episode it names: only where the
+    // selector of the section offers it.
+    keepsPseudoEpisode(section, episodeId, pluginId) {
+      if (episodeId === 'all') return this.offersAllEpisodes(section, pluginId)
+      if (episodeId === 'main') return this.offersMainPack(section, pluginId)
+      return false
+    },
+
+    updateCombosFromRoute(resolvedEpisodeId = null) {
       const productionId = this.$route.params.production_id
       const pluginId = this.$route.params.plugin_id
       const section = this.getCurrentSectionFromRoute()
-      let episodeId = this.$route.params.episode_id
+      const routeEpisodeId = resolvedEpisodeId ?? this.$route.params.episode_id
+      // A page without episode keeps the one of the store, which the section
+      // links reopen.
+      let episodeId = routeEpisodeId ?? this.currentEpisode?.id
       this.silent = true
       this.currentProductionId = productionId
       this.currentProjectSection = section
       this.currentPluginId = pluginId
-      const isAssetSection = this.assetSections.includes(section)
-      const isEditSection = this.editSections.includes(section)
-      const isBreakdownSection = this.breakdownSections.includes(section)
-      // The schedule keeps both pseudo-episodes: 'all' displays its
-      // production-wide planning, 'main' scopes it to the main pack.
-      const isScheduleSection = this.scheduleSections.includes(section)
-      // Plugin pages keep the all / main pseudo-episodes: coercing to the
-      // first episode desyncs the combobox from the episode_id actually
-      // forwarded to the plugin iframe.
+      // A pseudo-episode the section does not offer opens the running
+      // episode, the same fallback as a direct link: Back from a corrected
+      // link must not land on a third episode.
       if (
-        pluginId === undefined &&
-        !isAssetSection &&
-        !isEditSection &&
-        !isBreakdownSection &&
-        !isScheduleSection &&
+        routeEpisodeId &&
         ['all', 'main'].includes(episodeId) &&
+        !this.keepsPseudoEpisode(section, episodeId, pluginId) &&
         this.episodes.length > 0
       ) {
-        episodeId = this.episodes[0].id
+        episodeId = this.runningEpisodeId()
         this.currentEpisodeId = episodeId
-        this.pushContextRoute(section, pluginId)
+        // Replace: the URL just rejected must not stay in the history, or
+        // the back button lands on it and is coerced here again.
+        this.pushContextRoute(section, pluginId, true)
       } else {
         this.currentEpisodeId = episodeId
       }
     },
 
-    pushContextRoute(section, pluginId = null) {
+    pushContextRoute(section, pluginId = null, replace = false) {
       const isAssetSection = this.assetSections.includes(section)
       const production = this.productionMap.get(this.currentProductionId)
       const isTVShow = production?.production_type === 'tvshow'
@@ -958,19 +1161,28 @@ export default {
           episodeId = production?.first_episode_id
         }
       }
+      // The router names the asset types, news feed and plugin pages
+      // differently from the sections the topbar reads off the path: a
+      // plugin page is a section named after the plugin itself.
+      const routeSection = pluginId
+        ? 'production-plugin'
+        : { assetTypes: 'production-asset-types', newsFeed: 'news-feed' }[
+            section
+          ] || section
       let route = {
-        name: section,
+        name: routeSection,
         params: {
           production_id: this.currentProductionId,
           plugin_id: pluginId
         }
       }
-      route = this.episodifyRoute(route, section, episodeId, isTVShow)
+      route = this.episodifyRoute(route, routeSection, episodeId, isTVShow)
       if (['assets', 'shots'].includes(section)) {
         route.query = { search: '' }
       }
       if (route && route.params.production_id) {
-        this.$router.push(route).catch(err => {
+        const navigate = replace ? this.$router.replace : this.$router.push
+        navigate.call(this.$router, route).catch(err => {
           console.error(err)
         })
       }
@@ -1017,6 +1229,19 @@ export default {
       this.$nextTick(() => {
         this.silent = false
       })
+    },
+
+    // A live deletion of the displayed episode leaves the route, the store
+    // and the selector on an id the production no longer has: move to the
+    // same fallback as a stale link. A production switch also rewrites the
+    // list, but the store resolves another episode from the new list then.
+    episodes() {
+      const routeEpisodeId = this.$route.params.episode_id
+      const isDisplayedEpisodeGone =
+        routeEpisodeId &&
+        this.currentEpisode?.id === routeEpisodeId &&
+        !this.isKnownEpisode(routeEpisodeId)
+      if (isDisplayedEpisodeGone) this.redirectToKnownEpisode()
     },
 
     currentSectionOption() {
@@ -1212,6 +1437,13 @@ export default {
   overflow: hidden;
 }
 
+.page-title {
+  color: var(--text);
+  font-size: 1.4em;
+  font-weight: 800;
+  margin-top: -2px;
+}
+
 .version {
   color: $grey;
 }
@@ -1252,7 +1484,7 @@ export default {
     padding-left: 0;
   }
 
-  .hide-in-production {
+  .global-search {
     display: none;
   }
 

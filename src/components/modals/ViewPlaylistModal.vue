@@ -73,7 +73,12 @@ const store = useStore()
 const props = defineProps({
   active: { type: Boolean, default: false },
   sort: { type: Boolean, default: false },
-  taskIds: { type: Array, default: null }
+  taskIds: { type: Array, default: null },
+  // one entry per entity instead of one per task
+  entityIds: { type: Array, default: null },
+  // the entities' type when it is not the one of the current page, as for
+  // the assets cast in a shot
+  entityType: { type: String, default: null }
 })
 
 const emit = defineEmits(['cancel'])
@@ -121,6 +126,7 @@ const successText = computed(() =>
 )
 
 const currentEntityType = computed(() => {
+  if (props.entityType) return props.entityType
   if (route.path.includes('asset')) return 'asset'
   if (route.path.includes('shot')) return 'shot'
   if (route.path.includes('sequence')) return 'sequence'
@@ -279,13 +285,19 @@ const onViewCreatedPlaylist = () => {
   if (!createdPlaylist.value) return
   modals.value.edit = false
   emit('cancel')
-  router.push(
-    getPlaylistPath(
-      currentProduction.value.id,
-      currentEpisode.value?.id,
-      createdPlaylist.value.id
-    )
+  const route = getPlaylistPath(
+    currentProduction.value.id,
+    currentEpisode.value?.id,
+    createdPlaylist.value.id
   )
+  if (
+    currentEpisode.value?.id === 'all' &&
+    currentEntityType.value === 'shot'
+  ) {
+    // The playlists page splits the all pseudo-episode by entity type.
+    route.query = { for_entity: 'shot' }
+  }
+  router.push(route)
 }
 
 const savePlaylist = async form => {
@@ -340,11 +352,16 @@ watch(
       createdPlaylist.value = null
       modals.value.edit = false
       isLoading.value = true
-      store
-        .dispatch('loadTempPlaylist', {
-          taskIds: currentTaskIds.value,
-          sort: props.sort
-        })
+      const load = props.entityIds
+        ? store.dispatch('loadTempPlaylistFromEntities', {
+            entityIds: props.entityIds,
+            sort: props.sort
+          })
+        : store.dispatch('loadTempPlaylist', {
+            taskIds: currentTaskIds.value,
+            sort: props.sort
+          })
+      load
         .then(entities => {
           currentPlaylist.value.for_entity = currentEntityType.value
           setupEntities(entities)

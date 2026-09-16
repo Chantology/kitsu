@@ -12,6 +12,8 @@ import tasksStore from '@/store/modules/tasks'
 import taskStatusStore from '@/store/modules/taskstatus'
 import taskTypesStore from '@/store/modules/tasktypes'
 
+import { getExportDescriptors } from '@/lib/descriptors'
+import { isEpisodeInLoadedScope } from '@/lib/episodes'
 import { PAGE_SIZE } from '@/lib/pagination'
 import { getTaskTypePriorityOfProd } from '@/lib/productions'
 import {
@@ -45,6 +47,7 @@ import {
   LOAD_SHOTS_ERROR,
   LOAD_SHOTS_END,
   END_SHOTS_LOADING,
+  MARK_SHOTS_PARTIAL,
   SORT_VALIDATION_COLUMNS,
   SET_CURRENT_EPISODE,
   LOAD_SHOT_END,
@@ -87,6 +90,8 @@ import {
 
 const cache = {
   shots: [],
+  // Shots deleted while a list load runs: its response may still hold them.
+  removedShotIds: new Set(),
   shotsLoadingPromise: null,
   shotsLoadingKey: null,
   shotMap: new Map(),
@@ -295,6 +300,7 @@ const initialState = {
 
   isShotsLoading: false,
   isShotsLoadingError: false,
+  shotsLoadingKey: null,
   shotsCsvFormData: null,
 
   shotListScrollPosition: 0,
@@ -340,8 +346,12 @@ const getters = {
   shotFilledColumns: state => state.shotFilledColumns,
 
   displayedShotsBySequence: state => {
-    return groupEntitiesByParents(state.displayedShots, 'sequence_name')
+    // Sequence names repeat across episodes (All shots view): group on id.
+    return groupEntitiesByParents(state.displayedShots, 'sequence_id')
   },
+  // Scope ("<productionId>/<episodeId>") of the last started load, so the
+  // page can tell whether the store holds the shots of the current context.
+  shotsLoadingKey: state => state.shotsLoadingKey,
 
   isShotsLoading: state => state.isShotsLoading,
   isShotsLoadingError: state => state.isShotsLoadingError,
@@ -413,12 +423,14 @@ const actions = {
 
     if (!production) return Promise.resolve()
 
-    if (episode && ['all', 'main'].includes(episode.id)) {
-      // If it's a wide episode, we just store it. There isn't anything to
-      // load because we don't have episode defined.
+    if (episode?.id === 'main') {
+      // No main pack for shots: nothing to load.
       commit(SET_CURRENT_EPISODE, episode.id)
       return Promise.resolve()
     }
+    // 'all' is the cross-episode pseudo-episode: query the whole production
+    // (no episode_id on the wire) and keep 'all' as the loading scope.
+    const isAllEpisodes = episode?.id === 'all'
     if (isTVShow && !episode) {
       // If it's tv show and if we don't have any episode set, we use the first
       // one.
@@ -449,23 +461,27 @@ const actions = {
       )
     }
 
-    commit(LOAD_SHOTS_START)
+    commit(LOAD_SHOTS_START, { loadingKey })
     cache.shotsLoadingKey = loadingKey
     const loadingPromise = dispatch('loadSequencesWithTasks')
       .then(() => {
-        return shotsApi.getShots(production, episode)
+        return shotsApi.getShots(production, isAllEpisodes ? null : episode)
       })
       .then(shots => {
-        // Ignore a response for a production the user already switched away
-        // from; the loading flag is owned by the newer load (reset via
-        // CLEAR_SHOTS on switch).
-        if (production.id !== rootGetters.currentProduction?.id) {
+        // Ignore a response for a scope the user already left: a production
+        // switch (CLEAR_SHOTS forgets the key) or a newer load started after
+        // it. The loading flag and the key belong to that newer load.
+        if (state.shotsLoadingKey !== loadingKey) {
           return
         }
+        // Discard a response whose scope is not the one displayed any more
+        // (the user switched episode mid-load).
         if (
           !isTVShow ||
           shots.length === 0 ||
-          shots[0].episode_id === rootGetters.currentEpisode?.id
+          (isAllEpisodes
+            ? rootGetters.currentEpisode?.id === 'all'
+            : shots[0].episode_id === rootGetters.currentEpisode?.id)
         ) {
           const sequenceMap = sequenceStore.cache.sequenceMap
           const taskMap = rootGetters.taskMap
@@ -485,20 +501,26 @@ const actions = {
         }
       })
       .catch(err => {
-        commit(LOAD_SHOTS_ERROR)
+        // Same guard as the success path: a rejection for a scope the user
+        // already left would forget the scope of the load running now.
+        if (state.shotsLoadingKey === loadingKey) {
+          commit(LOAD_SHOTS_ERROR)
+        }
         console.error(err)
       })
     cache.shotsLoadingPromise = loadingPromise
     return loadingPromise
   },
 
-  /*
-   * Function useds mainly to reload shot data after an update or creation
-   * event. If the shot was updated a few times ago, it is not reloaded.
-   */
-  loadShot({ commit, state, rootGetters }, shotId) {
-    const shot = cache.shotMap.get(shotId)
-    if (shot?.lock) return
+  // Reloads a shot after a remote change, unless it is locked by a recent
+  // local update. A socket event passes { shotId, onlyInScope: true } so a
+  // shot created in another episode stays out of the loaded dataset. A load
+  // by id (detail page) always adds.
+  loadShot({ commit, state, rootGetters }, payload) {
+    const { shotId, onlyInScope = false } =
+      typeof payload === 'string' ? { shotId: payload } : payload
+    const displayedShot = cache.shotMap.get(shotId)
+    if (displayedShot?.lock) return
 
     const personMap = rootGetters.personMap
     const production = rootGetters.currentProduction
@@ -507,12 +529,30 @@ const actions = {
     const persons = rootGetters.people
     const taskStatusMap = rootGetters.taskStatusMap
 
-    return shotsApi
-      .getShot(shotId)
+    // A list load in flight replaces the whole dataset: fetch once it has
+    // settled, so the payload is younger than its response and a shot
+    // deleted meanwhile is not re-inserted (the fetch fails instead). A
+    // displayed shot is refreshed now: waiting would apply this payload
+    // after a younger response and undo it.
+    const listSettled =
+      (!displayedShot && state.isShotsLoading && cache.shotsLoadingPromise) ||
+      Promise.resolve()
+    return listSettled
+      .then(() => shotsApi.getShot(shotId))
       .then(shot => {
         if (cache.shotMap.get(shot.id)) {
           commit(UPDATE_SHOT, shot)
-        } else {
+          return
+        }
+        // Displayed when its refresh started and gone since: deleted, or
+        // dropped by a list load whose own response decides.
+        if (displayedShot) return
+        const isInLoadedScope = isEpisodeInLoadedScope(
+          state.shotsLoadingKey,
+          shot.episode_id,
+          shot.project_id
+        )
+        if (!onlyInScope || isInLoadedScope) {
           shot.tasks.forEach(task => {
             commit(NEW_TASK_END, { task })
           })
@@ -525,6 +565,9 @@ const actions = {
             production,
             shot
           })
+          // A detail page loads its shot whatever the list holds: holding more
+          // than its recorded scope, the list must be refetched by its pages.
+          if (!isInLoadedScope) commit(MARK_SHOTS_PARTIAL)
         }
       })
       .catch(err => console.error(err))
@@ -704,9 +747,7 @@ const actions = {
     if (cache.result && cache.result.length > 0) {
       shots = cache.result
     }
-    const sortedDescriptors = sortByName([...production.descriptors]).filter(
-      d => d.entity_type === 'Shot'
-    )
+    const sortedDescriptors = getExportDescriptors(production, 'Shot')
     const lines = shots.map(shot => {
       let shotLine = []
       if (isTVShow) {
@@ -877,6 +918,7 @@ const mutations = {
 
     state.isShotsLoading = false
     state.isShotsLoadingError = false
+    state.shotsLoadingKey = null
     state.displayedShots = []
     state.displayedShotsCount = 0
     state.displayedShotsLength = 0
@@ -889,16 +931,18 @@ const mutations = {
     state.selectedShots = new Map()
   },
 
-  [LOAD_SHOTS_START](state) {
+  [LOAD_SHOTS_START](state, { loadingKey } = {}) {
     cache.shots = []
     cache.result = []
     cache.shotIndex = {}
     // Same as CLEAR_SHOTS: keep the map identity, the getter is memoized.
     cache.shotMap.clear()
+    cache.removedShotIds.clear()
     state.shotValidationColumns = []
 
     state.isShotsLoading = true
     state.isShotsLoadingError = false
+    state.shotsLoadingKey = loadingKey ?? null
 
     state.displayedShots = []
     state.displayedShotsCount = 0
@@ -914,6 +958,7 @@ const mutations = {
   [LOAD_SHOTS_ERROR](state) {
     state.isShotsLoading = false
     state.isShotsLoadingError = true
+    state.shotsLoadingKey = null
   },
 
   [LOAD_SHOTS_END](
@@ -930,6 +975,9 @@ const mutations = {
       sequenceMap
     }
   ) {
+    // Deleted during the load, after the response was built.
+    shots = shots.filter(({ id }) => !cache.removedShotIds.has(id))
+    cache.removedShotIds.clear()
     const validationColumns = {}
     let isFps = false
     let isFrames = false
@@ -1029,6 +1077,13 @@ const mutations = {
 
   [END_SHOTS_LOADING](state) {
     state.isShotsLoading = false
+    state.shotsLoadingKey = null
+  },
+
+  [MARK_SHOTS_PARTIAL](state) {
+    if (state.shotsLoadingKey && !state.shotsLoadingKey.includes('#')) {
+      state.shotsLoadingKey = `${state.shotsLoadingKey}#partial`
+    }
   },
 
   [SAVE_SHOT_SEARCH_END](state, { searchQuery }) {
@@ -1161,12 +1216,25 @@ const mutations = {
     shot.validations = new Map()
     shot.data = {}
 
-    insertSortedShot(cache.shots, shot)
+    // zou emits shot:new before this response lands, so the socket handler
+    // may already have inserted the shot through ADD_SHOT: merge into that
+    // copy instead of appending a second one.
+    const knownShot = cache.shotMap.get(shot.id)
+    const listedShot = knownShot || shot
+    if (knownShot) {
+      Object.assign(knownShot, shot)
+    } else {
+      insertSortedShot(cache.shots, shot)
+      cache.shotMap.set(shot.id, shot)
+    }
     state.displayedShots = cache.shots.slice(0, PAGE_SIZE)
     helpers.setListStats(state, cache.shots)
     state.shotFilledColumns = getFilledColumns(state.displayedShots)
-    cache.shotMap.set(shot.id, shot)
-    updateEntryInIndex(cache.shotIndex, shot, getShotIndexWords(shot))
+    updateEntryInIndex(
+      cache.shotIndex,
+      listedShot,
+      getShotIndexWords(listedShot)
+    )
 
     state.shotSelectionGrid = buildSelectionGrid()
 
@@ -1400,7 +1468,11 @@ const mutations = {
   [UPDATE_SHOT](state, shot) {
     const cachedShot = cache.shotMap.get(shot.id)
     if (cachedShot) {
-      Object.assign(cachedShot, shot)
+      // A refetched shot lists task objects where the cache keeps the ids the
+      // task columns and the detail page resolve: tasks have their own events.
+      const fields = { ...shot }
+      delete fields.tasks
+      Object.assign(cachedShot, fields)
       updateEntryInIndex(
         cache.shotIndex,
         cachedShot,
@@ -1410,6 +1482,7 @@ const mutations = {
   },
 
   [REMOVE_SHOT](state, shotToDelete) {
+    if (state.isShotsLoading) cache.removedShotIds.add(shotToDelete.id)
     cache.shotMap.delete(shotToDelete.id)
     cache.shots = removeModelFromList(cache.shots, shotToDelete)
     cache.result = removeModelFromList(cache.result, shotToDelete)

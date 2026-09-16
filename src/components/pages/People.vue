@@ -1,8 +1,6 @@
 <template>
   <div class="people page fixed-page">
     <div class="flexrow page-header">
-      <page-title class="flexrow-item filler" :text="$t('people.title')" />
-
       <button-simple
         class="flexrow-item"
         :title="$t('main.csv.import_file')"
@@ -87,6 +85,7 @@
       active
       :is-loading="isImportPeopleLoading"
       :is-error="isImportPeopleLoadingError"
+      :import-error="errors.importingError"
       :parsed-csv="parsedCSV"
       :form-data="personCsvFormData"
       :columns="[...dataMatchers, ...csvColumns, ...optionalCsvColumns]"
@@ -208,7 +207,6 @@ import HardDeleteModal from '@/components/modals/HardDeleteModal.vue'
 import ImportModal from '@/components/modals/ImportModal.vue'
 import ImportRenderModal from '@/components/modals/ImportRenderModal.vue'
 import PeopleList from '@/components/lists/PeopleList.vue'
-import PageTitle from '@/components/widgets/PageTitle.vue'
 import RouteTabs from '@/components/widgets/RouteTabs.vue'
 import SearchField from '@/components/widgets/SearchField.vue'
 import SearchQueryList from '@/components/widgets/SearchQueryList.vue'
@@ -231,7 +229,6 @@ export default {
     HardDeleteModal,
     ImportModal,
     ImportRenderModal,
-    PageTitle,
     PeopleList,
     RouteTabs,
     SearchField,
@@ -270,6 +267,8 @@ export default {
         avatar: false,
         del: false,
         edit: false,
+        importing: false,
+        importingError: null,
         invite: false,
         inviteLink: false,
         invalidEmailDomain: false,
@@ -547,6 +546,7 @@ export default {
 
       this.loading.importing = true
       this.errors.importing = false
+      this.errors.importingError = null
       try {
         await this.uploadPersonFile(toUpdate)
         this.hideImportRenderModal()
@@ -554,6 +554,7 @@ export default {
       } catch (err) {
         console.error(err)
         this.errors.importing = true
+        this.errors.importingError = err
       } finally {
         this.loading.importing = false
       }
@@ -561,6 +562,7 @@ export default {
 
     resetImport() {
       this.errors.importing = false
+      this.errors.importingError = null
       this.hideImportRenderModal()
       this.$store.commit('PERSON_CSV_FILE_SELECTED', null)
       this.$refs['import-modal']?.reset()

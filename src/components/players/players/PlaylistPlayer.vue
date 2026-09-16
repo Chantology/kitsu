@@ -131,7 +131,6 @@
             position: isComparisonOverlay ? 'absolute' : 'relative'
           }"
           :entities="entityListToCompare"
-          :full-screen="fullScreen"
           :is-hd="isHd"
           :is-repeating="isRepeating"
           :muted="true"
@@ -213,12 +212,12 @@
           <picture-viewer
             ref="picture-player-comparison"
             class="picture-preview"
+            :background-color="pictureBackgroundColor"
             :big="true"
             :default-height="pictureDefaultHeight"
             :full-screen="fullScreen"
             :light="false"
             :margin-bottom="0"
-            :panzoom="true"
             :preview="currentPreviewToCompare"
             :is-comparing="isComparing"
             @panzoom-changed="onComparisonPanZoomChanged"
@@ -254,7 +253,6 @@
             opacity: overlayOpacity
           }"
           :entities="entityList"
-          :full-screen="fullScreen"
           :handle-in="handleIn"
           :handle-out="handleOut"
           :is-hd="isHd"
@@ -352,13 +350,14 @@
         >
           <multi-picture-viewer
             ref="picture-player"
+            :background-color="pictureBackgroundColor"
             :default-height="pictureDefaultHeight"
             :full-screen="fullScreen"
             :light="false"
             :margin-bottom="0"
-            :panzoom="true"
             :current-preview="{
               ...currentPreview,
+              entry: playingEntityIndex,
               position: currentPreviewIndex + 1
             }"
             :previews="picturePreviews"
@@ -617,8 +616,6 @@
           :comparison-preview-length="currentComparisonPreviewLength"
           :is-comparing="isComparing"
           :is-comparison-enabled="true"
-          :is-movie="isCurrentPreviewMovie"
-          :is-sound="isCurrentPreviewSound"
           :preview-file-options="revisionOptions"
           :task-type-options="taskTypeOptions"
           v-model:comparison-mode="comparisonMode"
@@ -669,6 +666,7 @@
         :is-movie="isCurrentPreviewMovie"
         :is-object-background="isObjectBackground"
         :is-picture="isCurrentPreviewPicture"
+        :is-transparent-picture="isCurrentPreviewTransparentPicture"
         :is-typing="isTyping"
         :is-zoom-pan="false"
         :object-background-url="objectBackgroundUrl"
@@ -679,6 +677,7 @@
         :read-only="readOnly"
         :show-comments-button="true"
         :text-color="textColor"
+        :text-size="textSize"
         v-model:current-background="currentBackground"
         v-model:current-shape="currentShape"
         v-model:is-environment-skybox="isEnvironmentSkybox"
@@ -686,6 +685,7 @@
         v-model:is-laser-mode-on="isLaserModeOn"
         v-model:is-onion-skin-on="isOnionSkinOn"
         v-model:onion-skin-frames="onionSkinFrames"
+        v-model:picture-background-color="pictureBackgroundColor"
         v-model:is-shape-mode="isShapeMode"
         v-model:is-wireframe="isWireframe"
         @annotation-displayed-clicked="
@@ -695,6 +695,7 @@
         @change-pencil-width="onChangePencilWidth"
         @change-shape="setShapeTool"
         @change-text-color="onChangeTextColor"
+        @change-text-size="onChangeTextSize"
         @comment-clicked="onCommentClicked"
         @delete-clicked="onDeleteClicked"
         @erase-clicked="onEraseClicked"
@@ -825,10 +826,8 @@
       :entity-list="entityList"
       :fps="fps"
       :frame-duration="frameDuration"
-      :is-full-mode="isFullMode"
       :is-full-screen="fullScreen || isEntitiesHidden"
       :nb-frames="isCurrentPreviewMovie ? nbFrames : 0"
-      :preview-id="currentPreview ? currentPreview.id : ''"
       :playlist-duration="playlistDuration"
       :playlist-progress="playlistProgress"
       :playlist-shot-position="playlistShotPosition"
@@ -852,7 +851,7 @@
       <template v-else>
         <div
           class="flexrow-item has-text-centered playlisted-wrapper"
-          :key="entity.id"
+          :key="`${entity.id}-${entity.preview_file_id}`"
           v-for="(entity, index) in renderedEntities"
         >
           <playlisted-entity
@@ -951,6 +950,7 @@ import { usePlayerTransport } from '@/composables/players/transport'
 import { usePreviewRoom } from '@/composables/previewRoom'
 import { isValidRoomId } from '@/lib/players/events'
 import { scrubFrame } from '@/lib/players/scrub'
+import { warmPlaylistMovies } from '@/lib/playlist'
 import preferences from '@/lib/preferences'
 import {
   buildAnnotationSnapshotFilename,
@@ -1154,6 +1154,7 @@ const objectModel = ref({
 })
 const onNextTimeUpdateActions = ref([])
 const pencilPalette = ref(['huge', 'big', 'medium', 'small', 'tiny'])
+const pictureBackgroundColor = ref('#000000')
 const pictureDefaultHeight = ref(0)
 const playingEntityIndex = ref(0)
 const playlistDuration = ref(0)
@@ -1242,7 +1243,8 @@ const {
   isMovie: isCurrentPreviewMovie,
   isPdf: isCurrentPreviewPdf,
   isPicture: isCurrentPreviewPicture,
-  isSound: isCurrentPreviewSound
+  isSound: isCurrentPreviewSound,
+  isTransparentPicture: isCurrentPreviewTransparentPicture
 } = useMediaKind(extension)
 
 // Computed — entity & preview state
@@ -1340,14 +1342,18 @@ const nextEntityHandleIn = computed(
   () => getEntityHandles(entityList.value[nextEntityIndex.value]).handleIn
 )
 
+// `entry` is the rank of the playlist entry, `position` the rank of the
+// preview inside it. The couple identifies a viewer: the preview file id
+// can't, the same entity repeated in a playlist may point at the same one.
 const picturePreviews = computed(() =>
-  entityList.value.flatMap(e => [
+  entityList.value.flatMap((e, entry) => [
     {
       id: e.preview_file_id,
       height: e.preview_file_height,
       width: e.preview_file_width,
       extension: e.preview_file_extension,
       revision: e.preview_file_revision,
+      entry,
       position: 1
     },
     ...(e.preview_file_previews || []).map((p, index) => ({
@@ -1356,6 +1362,7 @@ const picturePreviews = computed(() =>
       width: p.width,
       extension: p.extension,
       revision: p.revision,
+      entry,
       position: index + 2
     }))
   ])
@@ -1679,6 +1686,7 @@ const {
   pencilColor,
   pencilWidth,
   textColor,
+  textSize,
   getObjectById,
   addText,
   addTypeArea,
@@ -1700,6 +1708,7 @@ const {
   onChangePencilColor,
   onChangePencilWidth,
   onChangeTextColor,
+  onChangeTextSize,
   _resetColor,
   _resetPencil,
   resetPencilConfiguration,
@@ -4621,6 +4630,7 @@ watch(
     const currentId = currentEntity.value?.id
     if (currentId) entityIdBeforeRebuild = currentId
     resetPlaylist()
+    warmMovies()
     if (newEntities?.length) {
       const index = newEntities.findIndex(
         entity => entity.id === entityIdBeforeRebuild
@@ -4782,12 +4792,23 @@ watch(speed, () => {
 
 // Lifecycle
 
+// The server fills its movie cache on first read: ask it for the first
+// clips as soon as the list is known, so playback never starts cold.
+let stopMovieWarmup = null
+const warmMovies = () => {
+  if (stopMovieWarmup) stopMovieWarmup()
+  stopMovieWarmup = warmPlaylistMovies(entityList.value, {
+    isHd: isHd.value
+  })
+}
+
 onMounted(() => {
   if (isMounted) return
   isScrubbing.value = false
   if (isCurrentUserClient.value) isCommentsHidden.value = false
   isHd.value = Boolean(organisation.value?.hd_by_default)
   entityList.value = props.entities ? props.entities : []
+  warmMovies()
   startProgressiveRender()
   resetPlaylistFrameData()
   room.value.id = props.playlist?.id
@@ -4834,6 +4855,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  if (stopMovieWarmup) stopMovieWarmup()
   endAnnotationSaving()
   cancelProgressiveRender()
   _stopPlaylistProgressUpdateLoop()

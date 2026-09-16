@@ -1,10 +1,23 @@
+// @vitest-environment node
+
 import { vi } from 'vitest'
 
 // Importing the people module transitively pulls in the root store
 // (lib/models → timezone → @/store); stub it so no Vuex store is built.
 vi.mock('@/store', () => ({ default: {} }))
 
+vi.mock('@/store/api/people', () => ({
+  default: {
+    deleteOrganisationLogo: vi.fn(),
+    getDaysOff: vi.fn(),
+    postOrganisationLogo: vi.fn()
+  }
+}))
+
 import store from '@/store/modules/people'
+import taskStatusStore from '@/store/modules/taskstatus'
+import peopleApi from '@/store/api/people'
+import { buildTaskIndex } from '@/lib/indexing'
 
 describe('People store', () => {
   describe('Mutations', () => {
@@ -101,5 +114,226 @@ describe('People store', () => {
       expect(done.entity_preview_file_id).toEqual('preview-1')
       expect(other.entity_preview_file_id).toBeUndefined()
     })
+
+    // NEW_TASK_COMMENT_END no longer rebuilds personDoneTasksIndex. That
+    // rebuild is dead only because the done list comes from its own fetch:
+    // the same task sits in both lists as two distinct objects, so commenting
+    // the todo one cannot make the done index stale.
+    test('NEW_TASK_COMMENT_END leaves the done list and its index alone', () => {
+      const statuses = {
+        wip: { id: 'status-wip', name: 'Work in progress', short_name: 'wip' },
+        done: { id: 'status-done', name: 'Done', short_name: 'done' },
+        retake: { id: 'status-retake', name: 'Retake', short_name: 'retake' }
+      }
+      Object.values(statuses).forEach(status =>
+        taskStatusStore.cache.taskStatusMap.set(status.id, status)
+      )
+      const buildTask = status => ({
+        id: 'task-1',
+        full_entity_name: 'Asset / Tree',
+        project_name: 'Big Buck Bunny',
+        task_type_name: 'Modeling',
+        task_status_id: status.id,
+        task_status_short_name: status.short_name
+      })
+
+      const doneTask = buildTask(statuses.done)
+      store.cache.personDoneTasks = [doneTask]
+      store.cache.personDoneTasksIndex = buildTaskIndex([doneTask])
+      state.personTasks = [buildTask(statuses.wip)]
+      state.displayedPersonTasks = []
+      state.displayedPersonDoneTasks = []
+
+      store.mutations.NEW_TASK_COMMENT_END(state, {
+        taskId: 'task-1',
+        comment: { id: 'comment-1', task_status_id: statuses.retake.id }
+      })
+
+      expect(state.personTasks[0].task_status_short_name).toEqual('retake')
+      expect(doneTask.task_status_short_name).toEqual('done')
+      store.mutations.SET_PERSON_TASKS_SEARCH(state, 'done')
+      expect(state.displayedPersonDoneTasks).toEqual([doneTask])
+    })
+  })
+
+  describe('Organisation logo', () => {
+    const stateWith = organisation => ({ organisation })
+
+    afterEach(() => {
+      vi.restoreAllMocks()
+    })
+
+    const updatedAt = '2026-09-08T10:00:00'
+
+    test('organisationLogoPath targets the organisation thumbnail', () => {
+      expect(
+        store.getters.organisationLogoPath(
+          stateWith({ id: 'org-1', has_avatar: true, updated_at: updatedAt })
+        )
+      ).toEqual(
+        `/api/pictures/thumbnails/organisations/org-1.png?t=${Date.parse(updatedAt)}`
+      )
+    })
+
+    test('organisationLogoPath is null while there is no logo', () => {
+      expect(
+        store.getters.organisationLogoPath(
+          stateWith({ id: 'org-1', has_avatar: false })
+        )
+      ).toBeNull()
+    })
+
+    // The topbar keeps the same <img> src across an upload, so without a fresh
+    // token the browser serves the logo it already has in cache. The upload
+    // stamps the store without reloading the organisation, so the timestamp
+    // has to win over the update date it has not caught up with yet.
+    test('organisationLogoPath carries the logo timestamp when there is one', () => {
+      expect(
+        store.getters.organisationLogoPath(
+          stateWith({
+            id: 'org-1',
+            has_avatar: true,
+            logoTimestamp: 1234,
+            updated_at: updatedAt
+          })
+        )
+      ).toEqual('/api/pictures/thumbnails/organisations/org-1.png?t=1234')
+    })
+
+    // The logo timestamp only lives in memory, so after a reload the update
+    // date is the only thing left to bust the week-long browser cache the API
+    // asks for.
+    test('organisationLogoPath survives a reload without a logo timestamp', () => {
+      expect(
+        store.getters.organisationLogoPath(
+          stateWith({
+            id: 'org-1',
+            has_avatar: true,
+            created_at: '2026-01-01T08:00:00',
+            updated_at: updatedAt
+          })
+        )
+      ).toEqual(
+        `/api/pictures/thumbnails/organisations/org-1.png?t=${Date.parse(updatedAt)}`
+      )
+    })
+
+    test('organisationLogoPath falls back to the creation date', () => {
+      const createdAt = '2026-01-01T08:00:00'
+      expect(
+        store.getters.organisationLogoPath(
+          stateWith({ id: 'org-1', has_avatar: true, created_at: createdAt })
+        )
+      ).toEqual(
+        `/api/pictures/thumbnails/organisations/org-1.png?t=${Date.parse(createdAt)}`
+      )
+    })
+
+    test('uploadOrganisationLogo stamps the organisation', async () => {
+      vi.spyOn(Date, 'now').mockReturnValue(1234)
+      const commit = vi.fn()
+
+      await store.actions.uploadOrganisationLogo(
+        { commit, state: stateWith({ id: 'org-1' }) },
+        'form-data'
+      )
+
+      expect(peopleApi.postOrganisationLogo).toHaveBeenCalledWith(
+        'org-1',
+        'form-data'
+      )
+      expect(commit).toHaveBeenCalledWith('SET_ORGANISATION', {
+        has_avatar: true,
+        logoTimestamp: 1234
+      })
+    })
+
+    test('deleteOrganisationLogo stamps the organisation too', async () => {
+      vi.spyOn(Date, 'now').mockReturnValue(5678)
+      const commit = vi.fn()
+
+      await store.actions.deleteOrganisationLogo({
+        commit,
+        state: stateWith({ id: 'org-1' })
+      })
+
+      expect(commit).toHaveBeenCalledWith('SET_ORGANISATION', {
+        has_avatar: false,
+        logoTimestamp: 5678
+      })
+    })
+  })
+})
+
+describe('People store loadDaysOff action', () => {
+  // The studio-wide listing stays admin-only on Zou: the action reads the
+  // scoped month route once per month of the window.
+  test('reads every month of the window and merges the days off', async () => {
+    const spanning = { id: 'off-2', date: '2026-09-28', end_date: '2026-10-02' }
+    peopleApi.getDaysOff.mockImplementation((year, month) =>
+      Promise.resolve(
+        {
+          '08': [{ id: 'off-1', date: '2026-08-12', end_date: '2026-08-12' }],
+          '09': [spanning],
+          10: [spanning, { id: 'off-3', date: '2026-10-20', end_date: '2026-10-21' }]
+        }[month] || []
+      )
+    )
+    const commit = vi.fn()
+
+    await store.actions.loadDaysOff(
+      { commit },
+      { startDate: '2026-08-20', endDate: '2026-10-03' }
+    )
+
+    expect(peopleApi.getDaysOff.mock.calls).toEqual([
+      [2026, '08'],
+      [2026, '09'],
+      [2026, '10']
+    ])
+    expect(commit).toHaveBeenCalledWith('PEOPLE_SET_DAYS_OFF', [
+      { id: 'off-1', date: '2026-08-12', end_date: '2026-08-12' },
+      spanning,
+      { id: 'off-3', date: '2026-10-20', end_date: '2026-10-21' }
+    ])
+  })
+
+  test('keeps the months that answered when one fails', async () => {
+    const error = new Error('500')
+    const dayOff = month => ({
+      id: `off-${month}`,
+      date: `2026-${month}-12`,
+      end_date: `2026-${month}-12`
+    })
+    peopleApi.getDaysOff.mockImplementation((year, month) =>
+      month === '09' ? Promise.reject(error) : Promise.resolve([dayOff(month)])
+    )
+    const commit = vi.fn()
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await store.actions.loadDaysOff(
+      { commit },
+      { startDate: '2026-08-20', endDate: '2026-10-03' }
+    )
+
+    expect(commit).toHaveBeenCalledWith('PEOPLE_SET_DAYS_OFF', [
+      dayOff('08'),
+      dayOff('10')
+    ])
+    expect(consoleError).toHaveBeenCalledWith(error)
+    consoleError.mockRestore()
+  })
+
+  test('rejects when every month fails', async () => {
+    peopleApi.getDaysOff.mockRejectedValue(new Error('403'))
+    const commit = vi.fn()
+
+    await expect(
+      store.actions.loadDaysOff(
+        { commit },
+        { startDate: '2026-08-20', endDate: '2026-10-03' }
+      )
+    ).rejects.toThrow('403')
+    expect(commit).not.toHaveBeenCalled()
   })
 })

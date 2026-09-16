@@ -1,3 +1,5 @@
+// @vitest-environment node
+
 import { vi } from 'vitest'
 
 vi.mock('@/store', () => ({ default: {} }))
@@ -12,6 +14,7 @@ vi.mock('@/store/api/people', () => ({
 
 import peopleApi from '@/store/api/people'
 import store from '@/store/modules/user'
+import taskStatusStore from '@/store/modules/taskstatus'
 
 describe('User store', () => {
   describe('Getters', () => {
@@ -118,6 +121,36 @@ describe('User store', () => {
     })
   })
 
+  describe('canValidatePreviewFiles', () => {
+    const task = { project_id: 'production-1', task_type_id: 'tt-1' }
+    const call = (role, departments, projectRoles = {}) => {
+      const state = { user: { id: 'person-1', role, departments }, projectRoles }
+      return store.getters.canValidatePreviewFiles(
+        state,
+        {
+          currentUserRoleForProduction:
+            store.getters.currentUserRoleForProduction(state)
+        },
+        {},
+        { taskTypeMap: new Map([['tt-1', { department_id: 'dep-1' }]]) }
+      )(task)
+    }
+
+    test('managers and admins validate', () => {
+      expect(call('manager', [])).toBe(true)
+      expect(call('admin', ['dep-2'])).toBe(true)
+    })
+
+    test('supervisors are held to their departments', () => {
+      expect(call('supervisor', [])).toBe(true)
+      expect(call('supervisor', ['dep-1'])).toBe(true)
+      expect(call('supervisor', ['dep-2'])).toBe(false)
+      expect(call('user', ['dep-1'], { 'production-1': 'supervisor' })).toBe(
+        true
+      )
+    })
+  })
+
   describe('Mutations', () => {
     test('SET_USER_PROJECT_ROLES', () => {
       const state = { projectRoles: {} }
@@ -151,6 +184,51 @@ describe('User store', () => {
       }
       store.mutations.USER_LOGOUT(state)
       expect(state.projectRoles).toEqual({})
+    })
+
+    // NEW_TASK_COMMENT_END no longer rebuilds cache.doneIndex. That rebuild
+    // is dead only because the done list comes from its own fetch: the same
+    // task sits in both lists as two distinct objects, so commenting the todo
+    // one cannot make the done index stale.
+    test('NEW_TASK_COMMENT_END leaves the done list and its index alone', () => {
+      const statuses = {
+        wip: { id: 'status-wip', name: 'Work in progress', short_name: 'wip' },
+        done: { id: 'status-done', name: 'Done', short_name: 'done' },
+        retake: { id: 'status-retake', name: 'Retake', short_name: 'retake' }
+      }
+      Object.values(statuses).forEach(status =>
+        taskStatusStore.cache.taskStatusMap.set(status.id, status)
+      )
+      const buildTask = status => ({
+        id: 'task-1',
+        entity_type_name: 'Asset',
+        entity_name: 'Tree',
+        entity_id: 'entity-1',
+        project_id: 'production-1',
+        project_name: 'Big Buck Bunny',
+        full_entity_name: 'Asset / Tree',
+        task_type_name: 'Modeling',
+        task_status_id: status.id,
+        task_status_short_name: status.short_name
+      })
+
+      const doneTask = buildTask(statuses.done)
+      const state = {
+        todos: [buildTask(statuses.wip)],
+        displayedTodos: [],
+        displayedDoneTasks: []
+      }
+      store.mutations.USER_LOAD_DONE_TASKS_END(state, [doneTask])
+
+      store.mutations.NEW_TASK_COMMENT_END(state, {
+        taskId: 'task-1',
+        comment: { id: 'comment-1', task_status_id: statuses.retake.id }
+      })
+
+      expect(state.todos[0].task_status_short_name).toEqual('retake')
+      expect(doneTask.task_status_short_name).toEqual('done')
+      store.mutations.SET_TODOS_SEARCH(state, 'done')
+      expect(state.displayedDoneTasks).toEqual([doneTask])
     })
   })
 
@@ -203,13 +281,40 @@ describe('User store', () => {
     })
 
     describe('loadTasksToCheck', () => {
-      test('commits an empty list when the API resolves null', async () => {
+      test('requests page 1 by default and commits the page data', async () => {
+        const result = {
+          data: [{ id: 'task-1' }],
+          stats: { total: 1 },
+          page: 1,
+          limit: 100,
+          is_more: false
+        }
+        peopleApi.loadTasksToCheck.mockResolvedValue(result)
+        const commit = vi.fn()
+
+        const returned = await store.actions.loadTasksToCheck(
+          { commit },
+          { project_id: 'project-1' }
+        )
+
+        expect(peopleApi.loadTasksToCheck).toHaveBeenCalledWith({
+          project_id: 'project-1',
+          page: 1
+        })
+        expect(returned).toBe(result)
+        expect(commit).toHaveBeenCalledWith('REGISTER_USER_TASKS', {
+          tasks: result.data
+        })
+      })
+
+      test('commits an empty page when the API resolves null', async () => {
         peopleApi.loadTasksToCheck.mockResolvedValue(null)
         const commit = vi.fn()
 
-        const tasks = await store.actions.loadTasksToCheck({ commit })
+        const result = await store.actions.loadTasksToCheck({ commit })
 
-        expect(tasks).toEqual([])
+        expect(result.data).toEqual([])
+        expect(result.is_more).toBe(false)
         expect(commit).toHaveBeenCalledWith('REGISTER_USER_TASKS', {
           tasks: []
         })

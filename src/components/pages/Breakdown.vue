@@ -483,8 +483,10 @@ export default {
       episodeId: '',
       importCsvFormData: {},
       isBigMode: false,
-      isLocked: false,
       isLoading: false,
+      isUnmounted: false,
+      hasScopeMoved: false,
+      wasDisconnected: false,
       isOnlyCurrentEpisode: false,
       isTextMode: false,
       libraryDisplayed: false,
@@ -549,6 +551,7 @@ export default {
   },
 
   beforeUnmount() {
+    this.isUnmounted = true
     window.removeEventListener('keydown', this.onKeyDown)
   },
 
@@ -775,7 +778,7 @@ export default {
       'saveBreakdownSearch',
       'loadSequences',
       'saveBreakdownSearchFilterGroup',
-      'saveCasting',
+      'castAsset',
       'saveCastings',
       'setAssetLinkLabel',
       'setAssetSearch',
@@ -807,11 +810,36 @@ export default {
     },
 
     async reloadEntities() {
+      if (this.isUnmounted) return
       this.isLoading = true
+      const production = this.currentProduction
+      let episode = this.currentEpisode
+      this.hasScopeMoved = false
       try {
-        if (!this.isTVShow || this.currentEpisode?.id !== 'main') {
+        // Resolve the episode first: starting on a direct link before the
+        // topbar has it costs a full production-wide second pass. Inside the
+        // try, so a failed fetch releases the loading flag like any other.
+        // Only the episode is rebound: a production switched during the
+        // fetch must still reset the column widths in the finally block.
+        if (this.isTVShow && !this.currentEpisode) {
+          await this.loadEpisodes()
+          if (this.isUnmounted) return
+          episode = this.currentEpisode
+          // The watcher flagged the episode this run just resolved: nothing
+          // was loaded under another scope yet, the loads start from it.
+          this.hasScopeMoved = false
+        }
+        // 'all' is episode casting here: it reads neither sequences nor shots.
+        if (
+          !this.isTVShow ||
+          !['main', 'all'].includes(this.currentEpisode?.id)
+        ) {
           await this.loadSequences()
+          if (this.isUnmounted) return
           await this.loadShots()
+          // Leaving the page during a load must stop the chain: the
+          // production-wide assets load would land under the page shown next.
+          if (this.isUnmounted) return
         }
         if (this.isTVShow) {
           if (this.currentEpisode) {
@@ -823,6 +851,7 @@ export default {
           this.setCastingEpisode(null)
         }
         await this.loadAssets({ all: true, withTasks: true })
+        if (this.isUnmounted) return
         this.displayMoreAssets()
         this.fillAssetList()
         this.setCastingAssetTypes()
@@ -846,6 +875,21 @@ export default {
         console.error(err)
       } finally {
         this.isLoading = false
+        // The production and episode watchers ignore a change made while
+        // the page loads: pick it up here or the casting of the scope left
+        // behind stays displayed under a topbar that shows the new one. Not
+        // after unmount: the ghost reload would push a production-wide
+        // dataset under the page displayed next.
+        // hasScopeMoved catches a switch that came back to the scope the run
+        // started with: the loads in between served the other one.
+        const isScopeChanged =
+          this.hasScopeMoved ||
+          this.currentProduction !== production ||
+          this.currentEpisode?.id !== episode?.id
+        if (isScopeChanged && !this.isUnmounted) {
+          this.reset()
+          if (this.currentProduction !== production) this.resetColumnWidth()
+        }
       }
     },
 
@@ -943,17 +987,17 @@ export default {
       })
     },
 
-    setLock() {
-      if (!this.$options.lockTimeout) {
-        this.$options.lockTimeout = setTimeout(() => {
-          this.isLocked = false
-          this.$options.lockTimeout = null
-        }, 3000)
+    reloadCasting() {
+      if (this.isEpisodeCasting) {
+        this.setCastingForProductionEpisodes()
+      } else if (this.assetTypeId) {
+        this.setCastingAssetType(this.assetTypeId)
+      } else {
+        this.setCastingSequence(this.sequenceId || 'all')
       }
     },
 
     async addOneAsset(assetId, amount = 1) {
-      this.isLocked = true
       const entityIds = Object.keys(this.selection).filter(
         key => this.selection[key]
       )
@@ -969,8 +1013,7 @@ export default {
       })
 
       try {
-        await this.saveCastings(entityIds)
-        this.setLock()
+        await this.castAsset({ entityIds, assetId })
       } catch (err) {
         entityIds.forEach(entityId => {
           this.saveErrors[entityId] = true
@@ -995,9 +1038,8 @@ export default {
       this.loading.remove = true
       this.removeAssetFromCasting({ entityId, assetId, nbOccurences })
       delete this.saveErrors[entityId]
-      return this.saveCasting(entityId)
+      return this.castAsset({ entityIds: [entityId], assetId })
         .then(() => {
-          this.setLock()
           this.modals.isRemoveConfirmationDisplayed = false
         })
         .catch(err => {
@@ -1016,7 +1058,7 @@ export default {
       )
       const removals = []
       for (const entityId of entityIds) {
-        const asset = this.casting[entityId].find(
+        const asset = this.casting[entityId]?.find(
           asset => asset.asset_id === assetId
         )
         if (asset) {
@@ -1029,15 +1071,13 @@ export default {
         }
       }
       if (removals.length === 0) return
-      this.isLocked = true
       this.loading.remove = true
       removals.forEach(entityId => {
         this.removeAssetFromCasting({ entityId, assetId, nbOccurences: 1 })
         delete this.saveErrors[entityId]
       })
       try {
-        await this.saveCastings(removals)
-        this.setLock()
+        await this.castAsset({ entityIds: removals, assetId })
       } catch (err) {
         removals.forEach(entityId => {
           this.saveErrors[entityId] = true
@@ -1050,7 +1090,6 @@ export default {
     },
 
     removeOneAsset(assetId, entityId, nbOccurences) {
-      this.isLocked = true
       if (this.isEpisodeCasting && nbOccurences === 1) {
         this.removalData = { assetId, entityId, nbOccurences }
         this.modals.isRemoveConfirmationDisplayed = true
@@ -1324,7 +1363,6 @@ export default {
       })
       try {
         await this.saveCastings(selectedElements)
-        this.setLock()
       } catch (err) {
         selectedElements.forEach(entityId => {
           this.saveErrors[entityId] = true
@@ -1371,7 +1409,7 @@ export default {
 
     getEntityName(entity) {
       return this.sequenceId === 'all' &&
-        (!this.isTVShow || (this.isTVShow && this.currentEpisode.id !== 'all'))
+        (!this.isTVShow || this.currentEpisode?.id !== 'all')
         ? entity.sequence_name + ' / ' + entity.name
         : entity.name
     },
@@ -1697,19 +1735,19 @@ export default {
     },
 
     currentProduction() {
-      if (!this.isLoading) {
+      if (this.isLoading) {
+        this.hasScopeMoved = true
+      } else {
         this.reset()
         this.resetColumnWidth()
       }
     },
 
     currentEpisode() {
-      if (
-        this.currentEpisode &&
-        this.episodeId !== this.currentEpisode.id &&
-        !this.isLoading
-      ) {
-        if (this.currentEpisode.id === 'all') {
+      if (this.currentEpisode && this.episodeId !== this.currentEpisode.id) {
+        if (this.isLoading) {
+          this.hasScopeMoved = true
+        } else if (this.currentEpisode.id === 'all') {
           this.episodeId = 'all'
         } else {
           this.reset()
@@ -1731,26 +1769,37 @@ export default {
     events: {
       'episode:casting-update'(eventData) {
         const episode = this.episodeMap.get(eventData.episode_id)
-        if (episode && !this.isLocked) {
+        if (episode) {
           this.loadEpisodeCasting(episode)
         }
       },
 
       'shot:casting-update'(eventData) {
         const shot = this.shotMap.get(eventData.shot_id)
-        if (shot && shot.sequence_id === this.sequenceId && !this.isLocked) {
+        if (shot && shot.sequence_id === this.sequenceId) {
           this.loadShotCasting(shot)
         }
       },
 
       'asset:casting-update'(eventData) {
         const asset = this.assetMap.get(eventData.asset_id)
-        if (
-          asset &&
-          asset.asset_type_id === this.assetTypeId &&
-          !this.isLocked
-        ) {
+        if (asset && asset.asset_type_id === this.assetTypeId) {
           this.loadAssetCasting(asset)
+        }
+      },
+
+      // socket.io replays nothing emitted while the connection was down,
+      // so the casting on screen may miss changes made in the meantime:
+      // reload it once the connection is back, and only then (the first
+      // connect of the page brings nothing new).
+      disconnect() {
+        this.wasDisconnected = true
+      },
+
+      connect() {
+        if (this.wasDisconnected) {
+          this.wasDisconnected = false
+          this.reloadCasting()
         }
       }
     }

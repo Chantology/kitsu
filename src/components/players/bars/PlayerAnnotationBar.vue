@@ -33,6 +33,13 @@
       v-if="(!light || fullScreen) && !isConcept"
     />
 
+    <color-picker
+      v-bind="pickerState('picture-background')"
+      :color="pictureBackgroundColor"
+      @change="pictureBackgroundColor = $event"
+      v-if="isTransparentPicture"
+    />
+
     <onion-skin-picker
       v-bind="pickerState('onion')"
       :is-on="isOnionSkinOn"
@@ -43,6 +50,12 @@
 
     <transition name="slide">
       <div class="annotation-tools" v-show="isTyping && (!light || fullScreen)">
+        <pencil-picker
+          v-bind="pickerState('text-size')"
+          :pencil="textSize"
+          :sizes="pencilPalette"
+          @change="$emit('change-text-size', $event)"
+        />
         <color-picker
           v-bind="pickerState('text-color')"
           :color="textColor"
@@ -275,6 +288,11 @@ defineProps({
     type: Boolean,
     default: false
   },
+  // only alpha-capable pictures show the background color picker
+  isTransparentPicture: {
+    type: Boolean,
+    default: false
+  },
   isTyping: {
     type: Boolean,
     default: false
@@ -318,6 +336,10 @@ defineProps({
   textColor: {
     type: String,
     default: '#ff3860'
+  },
+  textSize: {
+    type: String,
+    default: 'medium'
   }
 })
 
@@ -327,6 +349,7 @@ defineEmits([
   'change-pencil-width',
   'change-shape',
   'change-text-color',
+  'change-text-size',
   'comment-clicked',
   'delete-clicked',
   'erase-clicked',
@@ -350,6 +373,9 @@ const isShapeMode = defineModel('isShapeMode', { default: undefined })
 const currentShape = defineModel('currentShape', { default: undefined })
 const isOnionSkinOn = defineModel('isOnionSkinOn', { default: false })
 const onionSkinFrames = defineModel('onionSkinFrames', { default: 2 })
+const pictureBackgroundColor = defineModel('pictureBackgroundColor', {
+  default: '#000000'
+})
 
 // The picker emits a combined { enabled, frames } so the on/off state and
 // the span stay in sync (picking a number turns it on, "Off" disables it).

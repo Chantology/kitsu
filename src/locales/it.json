@@ -66,7 +66,11 @@
       "edit_label": "Cambia l'etichetta dell'asset",
       "empty": "Casting vuoto",
       "label": "Etichetta",
+      "occurrences": "Occorrenze",
       "picture_mode": "Passa alla modalità immagini",
+      "remove_from_casting": "Rimuovi dal casting",
+      "view_as_cards": "Visualizza come schede",
+      "view_as_list": "Visualizza come elenco",
       "text_mode": "Passa alla modalità testo",
       "title": "Breakdown",
       "options": {
@@ -123,7 +127,7 @@
       "attachments": "Allegati",
       "attachments_to_add": "Aggiungi allegati",
       "max_retakes_error": "Non puoi più aggiungere retake su questo task.",
-      "unknown_status_error": "Lo stato attività selezionato non è più disponibile. Ricarica la pagina e riprova.",
+      "unknown_status_error": "Lo stato del task selezionato non è più disponibile. Ricarica la pagina e riprova.",
       "previews": "File di anteprima da pubblicare come nuova revisione",
       "selected_files": "File selezionati",
       "no_attachments": "Non ci sono allegati per questo commento.",
@@ -149,12 +153,15 @@
       "title": "Commenti",
       "toggle_for_client": "Visibilità cliente",
       "player": {
+        "audio_unavailable": "Audio non disponibile",
+        "image_unavailable": "Immagine non disponibile",
         "play": "Riproduci",
         "pause": "Pausa",
-        "mute": "Disattiva l'audio",
-        "unmute": "Riattiva l'audio",
+        "mute": "Disattiva audio",
+        "unmute": "Riattiva audio",
         "fullscreen": "Schermo intero",
-        "download": "Scarica"
+        "download": "Scarica",
+        "video_unavailable": "Video non disponibile"
       }
     },
     "custom_actions": {
@@ -276,6 +283,7 @@
       "fields": {
         "name": "nome",
         "description": "descrizione",
+        "time_spent": "Tempo",
         "placeholder": "E01"
       },
       "no_casting": "Il casting dell'episodio è vuoto.",
@@ -399,6 +407,7 @@
       "reset_change_password_token_failed": "Il link per la reimpostazione della password non è valido o è scaduto. Ricomincia la procedura."
     },
     "main": {
+      "technical_details": "Dettagli tecnici:",
       "about": "Informazioni",
       "add": "aggiungi",
       "all": "Tutti",
@@ -412,10 +421,11 @@
       "date": "Data",
       "dark_theme": "Tema scuro",
       "days_spent": "giorno impiegato | giorni impiegati",
+      "days_expected": "giorno previsto | giorni previsti",
       "days_estimated": "giorno stimato | giorni stimati",
       "delete": "Elimina",
       "delete_all": "Elimina tutto",
-      "delete_text": "Sei sicuro di voler eliminare {name} dal database?",
+      "delete_text": "Sei sicuro di voler rimuovere {name} dal database?",
       "disable_desktop_notifications": "Disattiva le notifiche desktop",
       "documentation": "Documentazione",
       "edit": "Modifica",
@@ -445,6 +455,8 @@
       "remove": "Rimuovi",
       "save": "Salva",
       "sort_by": "Ordina per",
+      "grouped_by": "Raggruppato per",
+      "none": "Nessuno",
       "sorted_by": "Ordinato per",
       "start_date": "Data di inizio",
       "studio": "Studio",
@@ -454,6 +466,8 @@
       "yes": "Sì",
       "csv": {
         "choose": "Scegli",
+        "error_imported_rows": "{count} riga è stata importata prima dell'errore. | {count} righe sono state importate prima dell'errore.",
+        "error_line": "Riga {line}",
         "error_upload": "Si è verificato un errore durante il caricamento del file CSV.",
         "export_file": "Esporta dati in CSV",
         "import_file": "Importa dati da CSV",
@@ -569,11 +583,12 @@
       "clear_sorting": "Rimuovi l'ordinamento corrente",
       "days": "giorno | giorni",
       "drop_files_here": "Trascina qui i file",
-      "import": "Importazione",
+      "import": "Importa",
       "is_shared": "Condiviso con tutto il team",
       "no_results": "Nessun risultato",
       "link": "Link",
       "hours_spent": "ora impiegata | ore impiegate",
+      "hours_expected": "ora prevista | ore previste",
       "hours_estimated": "ora stimata | ore stimate",
       "created_by": "Creato da",
       "day": "Giorno",
@@ -667,7 +682,7 @@
     },
     "notifications": {
       "desktop": {
-        "assignation_title": "{name} ti ha assegnato",
+        "assignation_title": "{name} ti ha assegnato un task",
         "banner_blocked_text": "Le notifiche desktop sono bloccate. Per attivarle, consentile nelle impostazioni del sito del tuo browser.",
         "banner_dismiss": "Non ora",
         "banner_enable": "Attiva",
@@ -835,6 +850,7 @@
       "add_episode": "Aggiungi l'intero episodio",
       "add_movie": "Aggiungi l'intero film",
       "apply_task_type_change": "Questa operazione imposta l'ultima revisione per il tipo di task indicato su tutte le entità.",
+      "change_task_type_error": "Si è verificato un errore durante la modifica del tipo di task.",
       "available_build": "Build disponibili",
       "build_daily": "In attesa (daily)",
       "build_weekly": "Tutte in attesa",
@@ -844,7 +860,7 @@
       "create_for_selection": "Genera una playlist dai task selezionati",
       "create_title": "Crea playlist",
       "created_at": "Creata il:",
-      "delete_text": "Sei sicuro di voler eliminare {name} dal database?",
+      "delete_text": "Sei sicuro di voler rimuovere {name} dal database?",
       "delete_error": "Si è verificato un errore durante l'eliminazione della playlist.",
       "edit_error": "Si è verificato un errore durante il salvataggio della playlist.",
       "download_zip": "Scarica .zip",
@@ -996,6 +1012,7 @@
       "update_to_latest_version_help": "Imposta l'ultima revisione per ogni entità, mantenendo il tipo di task corrente.",
       "update_versions_title": "Aggiorna le versioni selezionate",
       "created": "Playlist “{name}” creata.",
+      "view_as_playlist": "Vedi come playlist",
       "view_created": "Visualizza playlist"
     },
     "productions": {
@@ -1007,6 +1024,7 @@
       "number": "produzione | produzioni",
       "open_productions": "Le mie produzioni",
       "picture": "Cambia immagine",
+      "remove_picture": "Rimuovi immagine",
       "title": "Produzioni",
       "home": {
         "create_new": "Crea una nuova produzione",
@@ -1018,6 +1036,7 @@
       },
       "fields": {
         "fps": "FPS",
+        "is_frame_in_numbering": "Avvia il contatore dei fotogrammi del player dal fotogramma in",
         "name": "Nome",
         "ratio": "Proporzioni",
         "resolution": "Risoluzione",
@@ -1158,10 +1177,12 @@
         "shots": "Shot",
         "sequences": "Sequenze"
       },
-      "load_stats": "Carica le statistiche"
+      "hide_stats": "Nascondi statistiche",
+      "show_stats": "Mostra statistiche"
     },
     "profile": {
       "change_avatar": "Cambia avatar",
+      "date_format": "Formato data",
       "info_title": "Informazioni",
       "language": "Lingua",
       "notifications_title": "Notifiche",
@@ -1194,6 +1215,7 @@
       },
       "notifications_mattermost_enabled": "Notifiche Mattermost attivate",
       "notifications_mattermost_user": "Nome utente Mattermost",
+      "use_12_hour_clock": "Orologio a 12 ore (AM/PM)",
       "webhook_error": "Il webhook Mattermost non corrisponde a un hook valido",
       "notifications_discord_enabled": "Notifiche Discord attivate",
       "notifications_discord_user": "Nome utente Discord",
@@ -1242,7 +1264,7 @@
         },
         "enabled": "Autenticazione a due fattori attivata",
         "mandatory": "La tua organizzazione richiede l'autenticazione a due fattori. Attiva almeno un metodo per continuare.",
-        "description": "L'autenticazione a due fattori (<abbr title=\"Two-Factor Authentication\">2FA</abbr>) aggiunge un ulteriore livello di sicurezza al tuo account. Quando è attivata, a ogni accesso dovrai fornire una seconda forma di verifica oltre alla password. Come secondo fattore puoi usare un'app di autenticazione (<abbr title=\"Time-based One-Time Password\">TOTP</abbr>), una verifica via email (<abbr title=\"One-Time Password\">OTP</abbr>) o una chiave di sicurezza hardware (<abbr title=\"Fast IDentity Online\">FIDO</abbr>)."
+        "description": "L'autenticazione a due fattori (<abbr title=\"Two-Factor Authentication (Autenticazione a due fattori)\">2FA</abbr>) aggiunge un ulteriore livello di sicurezza al tuo account. Quando è attivata, a ogni accesso dovrai fornire una seconda forma di verifica oltre alla password. Come secondo fattore puoi usare un'app di autenticazione (<abbr title=\"Time-based One-Time Password (Password monouso basata sul tempo)\">TOTP</abbr>), una verifica via email (<abbr title=\"One-Time Password (Password monouso)\">OTP</abbr>) o una chiave di sicurezza hardware (<abbr title=\"Fast IDentity Online (Identità rapida online)\">FIDO</abbr>)."
       }
     },
     "settings": {
@@ -1299,7 +1321,7 @@
         "name": "Nome",
         "short_name": "Nome breve",
         "is_feedback_request": "È una richiesta di feedback",
-        "is_default": "È predefinito",
+        "is_default": "Predefinito",
         "for_concept": "Per i concept",
         "description": "Descrizione",
         "is_wip": "È WIP"
@@ -1317,6 +1339,9 @@
     "task_types": {
       "delete_text": "Sei sicuro di voler rimuovere {name} dal database?",
       "delete_error": "Si è verificato un errore durante l'eliminazione di questo tipo di task. Potrebbero esserci dei dati ancora collegati. Sei sicuro che nessun task sia collegato a questo tipo di task?",
+      "delete_blocked_by_links": "Questo tipo di task è ancora usato nella pianificazione o nel flusso di lavoro di alcune produzioni. Scollegarlo eliminerà le sue date di pianificazione in tutte le produzioni.",
+      "delete_blocked_by_tasks": "Alcuni task usano ancora questo tipo di task. Eliminali o riassegnali prima di rimuoverlo.",
+      "delete_force": "Scollega ed elimina",
       "edit_title": "Modifica tipo di task",
       "create_error": "Si è verificato un errore durante la creazione del tipo di task. Verifica che non esista già un tipo di task con un nome simile.",
       "new_task_type": "Aggiungi un tipo di task",
@@ -1354,6 +1379,7 @@
         "name": "Nome",
         "description": "Descrizione",
         "person": "Persona",
+        "time_spent": "Tempo",
         "placeholder": "SQ01"
       },
       "no_casting": "Il casting della sequenza è vuoto.",
@@ -1361,11 +1387,39 @@
       "tasks": "Task"
     },
     "schedule": {
-      "title": "Pianificazione",
-      "title_main": "Pianificazione principale",
-      "overall_man_days": "Giorni-persona",
+      "apply_to_prod": "Applica alla produzione",
+      "apply_to_prod_confirm": "Sei sicuro di voler applicare questa versione della pianificazione alla produzione corrente? I valori attuali dei task verranno sovrascritti.",
+      "apply_to_prod_error": "Si è verificato un errore durante l'applicazione della versione della pianificazione alla produzione corrente.",
+      "assign": "Assegna a:",
+      "confirm_move_children": "Spostare questa barra ritaglierà o sposterà {count} sotto-elemento per adattarlo ai nuovi limiti. Vuoi continuare? | Spostare questa barra ritaglierà o sposterà {count} sotto-elementi per adattarli ai nuovi limiti. Vuoi continuare?",
+      "create_version": "Crea una versione della pianificazione",
+      "cut_tool": "Taglia",
+      "cut_tool_description": "Clicca su una barra per tagliarla in due, clicca su uno spazio per richiuderlo",
+      "delete_version": "Elimina la versione della pianificazione",
+      "delete_version_error": "Si è verificato un errore durante l'eliminazione di questa versione della pianificazione. Contatta il nostro team di supporto.",
+      "delete_version_message": "Sei sicuro di voler eliminare la versione della pianificazione {name}? Conferma digitando qui sotto il nome della versione della pianificazione.",
+      "drop_forbidden_department": "Non fa parte del reparto del task",
+      "drop_forbidden_person": "Persona al di fuori dei tuoi reparti",
+      "drop_forbidden_role": "Nessun diritto di assegnazione su questa produzione",
+      "drop_forbidden_task_type": "Tipo di task al di fuori dei tuoi reparti",
+      "drop_forbidden_team": "Non fa parte del team della produzione",
+      "edit_task": "Modifica task",
+      "edit_version": "Modifica la versione della pianificazione",
+      "edit_version_error": "Si è verificato un errore durante il salvataggio della versione della pianificazione. Riprova.",
+      "edit_version_exist": "Esiste già una versione con un nome simile.",
+      "estimated_daily_quotas": "Quote giornaliere stimate automaticamente:",
+      "export": "Esporta pianificazione",
+      "export_error": "Si è verificato un errore durante l'esportazione dei dati.",
+      "fields": {
+        "create_from_version": "Crea nuova o a partire da una versione",
+        "new": "nuova pianificazione",
+        "name": "nome della versione",
+        "locked": "versione bloccata"
+      },
+      "force_unassign": "Sovrascrivi le assegnazioni precedenti",
+      "forced_daily_quotas": "Quote giornaliere forzate:",
+      "hours": "h",
       "md": "gp",
-      "zoom_level": "Livello di zoom",
       "milestone": {
         "add_milestone": "Aggiungi milestone per",
         "edit_milestone": "Modifica milestone per",
@@ -1373,46 +1427,29 @@
         "error": "Si è verificato un errore durante l'aggiunta o la modifica della milestone. Riprova.",
         "delete_milestone": "Elimina milestone"
       },
-      "today": "Oggi",
       "mode": "Modalità di visualizzazione",
       "mode_prev": "Previsioni",
       "mode_real": "Reale",
-      "version": "Versione",
-      "apply_to_prod": "Applica alla produzione",
-      "apply_to_prod_confirm": "Sei sicuro di voler applicare questa versione della pianificazione alla produzione corrente? I valori attuali dei task verranno sovrascritti.",
-      "apply_to_prod_error": "Si è verificato un errore durante l'applicazione della versione della pianificazione alla produzione corrente.",
-      "assign": "Assegna a:",
-      "export": "Esporta pianificazione",
-      "export_error": "Si è verificato un errore durante l'esportazione dei dati.",
-      "reset_list": "Reimposta la lista",
-      "no_entity": "Nessuna entità assegnabile",
+      "new_version": "Nuova versione",
       "no_assignee": "Nessuna persona assegnabile",
+      "no_entity": "Nessuna entità assegnabile",
+      "overall_man_days": "Giorni-persona",
+      "reset_list": "Reimposta la lista",
       "select_task_type": "Seleziona un tipo di task",
       "show_assigned": "Mostra le entità assegnate",
-      "force_unassign": "Sovrascrivi le assegnazioni precedenti",
-      "forced_daily_quotas": "Quote giornaliere forzate:",
-      "estimated_daily_quotas": "Quote giornaliere stimate automaticamente:",
-      "edit_task": "Modifica task",
-      "new_version": "Nuova versione",
-      "create_version": "Crea una versione della pianificazione",
-      "edit_version": "Modifica la versione della pianificazione",
-      "edit_version_error": "Si è verificato un errore durante il salvataggio della versione della pianificazione. Riprova.",
-      "edit_version_exist": "Esiste già una versione con un nome simile.",
-      "delete_version": "Elimina la versione della pianificazione",
-      "delete_version_error": "Si è verificato un errore durante l'eliminazione di questa versione della pianificazione. Contatta il nostro team di supporto.",
-      "delete_version_message": "Sei sicuro di voler eliminare la versione della pianificazione {name}? Conferma digitando qui sotto il nome della versione della pianificazione.",
+      "task_types_filter": "Filtra task",
+      "task_types_filter_select": "Seleziona task",
+      "title": "Pianificazione",
+      "title_main": "Pianificazione principale",
+      "today": "Oggi",
+      "version": "Versione",
       "versions": {
         "reference": "Previsioni di riferimento",
-        "from": "dal",
+        "from": "da",
         "locked": "bloccata",
         "canceled": "annullata"
       },
-      "fields": {
-        "create_from_version": "Crea nuova o a partire da una versione",
-        "new": "nuova pianificazione",
-        "name": "nome della versione",
-        "locked": "versione bloccata"
-      }
+      "zoom_level": "Livello di zoom"
     },
     "quota": {
       "average": "Media",
@@ -1451,6 +1488,10 @@
       "drawings": "Disegni"
     },
     "shots": {
+      "bulk_error": "La creazione in blocco non è riuscita. Riprova.",
+      "bulk_generate": "Genera",
+      "bulk_invalid_start": "Il nome iniziale deve terminare con un numero.",
+      "bulk_tab": "In blocco",
       "casting": "Casting degli shot",
       "delete_text": "Sei sicuro di voler rimuovere {name} dal database?",
       "delete_error": "Si è verificato un errore durante l'eliminazione di questo shot. Potrebbero esserci dei dati attualmente collegati allo shot. Sei sicuro che nessun task sia collegato a questo shot?",
@@ -1470,9 +1511,11 @@
       "restore_text": "Sei sicuro di voler ripristinare {name} dall'archivio?",
       "restore_error": "Si è verificato un errore durante il ripristino di questo shot.",
       "sequences": "Sequenze",
+      "single_tab": "Singolo",
       "tasks": "Task degli shot",
       "title": "Shot",
       "fields": {
+        "count": "Quantità",
         "description": "Descrizione",
         "nb_frames": "Fotogrammi",
         "episode": "Episodio",
@@ -1482,6 +1525,8 @@
         "name": "Nome",
         "production": "Prod",
         "sequence": "Sequenza",
+        "start": "Inizio",
+        "step": "Passo",
         "time_spent": "Tempo",
         "person": "Modificato da",
         "max_retakes": "Max retake",
@@ -1592,7 +1637,7 @@
         "estimation": "Stima",
         "frames": "Fotogr.",
         "last_comment": "Ultimo commento",
-        "last_comment_date": "Ultimo comm.",
+        "last_comment_date": "Ultimo commento",
         "priority": "Priorità",
         "production": "Prod",
         "real_end_date": "Data di feedback",
@@ -1712,6 +1757,12 @@
       "retake_filter_with_retakes": "Con retake"
     },
     "timesheets": {
+      "chart": "Grafico del tempo",
+      "empty": "Nessun tempo registrato per questo periodo con i filtri attuali.",
+      "expected": "previsto",
+      "in_salary": "in stipendio",
+      "salary": "Stipendio",
+      "with_time_logged": "Con tempo registrato",
       "detail_level": "Livello di dettaglio",
       "done_tasks": "Task completati",
       "export_timesheet": "Esporta il timesheet",
@@ -1814,7 +1865,8 @@
         "name": "Nome",
         "episode": "Ep.",
         "description": "Descrizione",
-        "person": "Modificato da"
+        "person": "Modificato da",
+        "time_spent": "Tempo"
       },
       "tasks": "Task",
       "cancel_text": "Sei sicuro di voler archiviare {name}?",
@@ -1871,9 +1923,12 @@
     },
     "team_schedule": {
       "busy": "Occupato su un'altra produzione",
+      "empty": "Nessuna persona corrisponde ai filtri attuali. Prova ad ampliare i filtri studio, reparto o produzione.",
+      "no_assignment_role": "Non puoi assegnare task su questa produzione.",
+      "no_department_task_type": "Nessun tipo di task dei tuoi reparti corrisponde al filtro produzione.",
+      "person_placeholder": "Seleziona una persona...",
       "title": "Pianificazione",
-      "title_main": "Pianificazione del team",
-      "person_placeholder": "Seleziona una persona..."
+      "title_main": "Pianificazione del team"
     },
     "search": {
       "limit": "Numero massimo di risultati:",
@@ -1899,7 +1954,7 @@
     },
     "board": {
       "title": "Bacheca",
-      "empty": "La tua bacheca kanban è attualmente vuota. Significa che nessuno stato dei task è configurato per il tuo ruolo utente nelle impostazioni della produzione.",
+      "empty": "Niente da mostrare nella bacheca: non hai task in corso, la ricerca non ha dato risultati oppure nessuno stato dei task è attivato per il tuo ruolo nelle impostazioni della produzione.",
       "settings": {
         "title": "Stati della bacheca",
         "visible": "Visualizzato sulla bacheca kanban di...",
@@ -1937,7 +1992,11 @@
       "title": "Chat delle entità",
       "delete_message": "Sei sicuro di voler eliminare questo messaggio?",
       "delete_message_confirm": "Elimina messaggio",
-      "search_entity": "Cerca un'entità"
+      "search_entity": "Cerca un'entità",
+      "join_error": "Si è verificato un errore durante l'accesso alla chat.",
+      "leave_error": "Si è verificato un errore durante l'uscita dalla chat.",
+      "loading_error": "Si è verificato un errore durante il caricamento della chat.",
+      "send_error": "Si è verificato un errore durante l'invio del messaggio."
     },
     "concepts": {
       "add_links": "Aggiungi link agli asset",
@@ -1972,6 +2031,7 @@
       "title": "Come supportare Kitsu"
     },
     "my_checks": {
+      "build_playlist_loaded_only": "Solo i task caricati nella lista sono inclusi nella playlist",
       "title": "Task da verificare | Task da verificare"
     },
     "preview": {
@@ -1980,7 +2040,7 @@
     },
     "studios": {
       "create_error": "Si è verificato un errore durante il salvataggio di questo studio. Sei sicuro che non esista già uno studio con un nome simile?",
-      "delete_text": "Sei sicuro di voler rimuovere {name} dal tuo database?",
+      "delete_text": "Sei sicuro di voler rimuovere {name} dal database?",
       "delete_error": "Si è verificato un errore durante l'eliminazione di questo studio.",
       "edit_title": "Modifica studio",
       "new_studios": "Aggiungi uno studio",
@@ -2097,6 +2157,14 @@
         "senior": "Senior"
       },
       "clear_exception": "Rimuovi la modifica dello stipendio per questo mese"
+    },
+    "burndown": {
+      "estimations": "Stime",
+      "ideal": "Ideale",
+      "projection": "Proiezione",
+      "remaining_days": "Giorni-persona rimanenti",
+      "remaining_tasks": "Task rimanenti",
+      "title": "Grafico burndown"
     },
     "hard_delete": {
       "delete_for_selection_hard_text": "Sei sicuro di voler rimuovere definitivamente gli elementi selezionati? Conferma digitando \"ELIMINA\" qui sotto.",

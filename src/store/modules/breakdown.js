@@ -59,6 +59,10 @@ const initialState = {
 }
 const state = { ...initialState }
 
+// Casting responses land in selection order only by chance: the request
+// started last owns the rows on screen.
+let castingRequest = 0
+
 const getters = {
   breakdownSearchFilterGroups: state => state.breakdownSearchFilterGroups,
   breakdownSearchQueries: state => state.breakdownSearchQueries,
@@ -86,10 +90,13 @@ const actions = {
       (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })
     )
     commit(CASTING_SET_FOR_EPISODES, episodes)
+    const request = ++castingRequest
     return breakdownApi
       .getProductionEpisodesCasting(production.id)
       .then(casting => {
-        commit(CASTING_SET_CASTING, { casting, production })
+        if (request === castingRequest) {
+          commit(CASTING_SET_CASTING, { casting, production })
+        }
       })
   },
 
@@ -107,10 +114,13 @@ const actions = {
     )
     commit(CASTING_SET_SEQUENCE, sequenceId)
     commit(CASTING_SET_SHOTS, shots)
+    const request = ++castingRequest
     return breakdownApi
       .getSequenceCasting(production.id, sequenceId, episodeId)
       .then(casting => {
-        commit(CASTING_SET_CASTING, { casting, production })
+        if (request === castingRequest) {
+          commit(CASTING_SET_CASTING, { casting, production })
+        }
       })
   },
 
@@ -131,10 +141,13 @@ const actions = {
       )
     commit(CASTING_SET_ASSET_TYPE, assetTypeId)
     commit(CASTING_SET_ASSETS, assets)
+    const request = ++castingRequest
     return breakdownApi
       .getAssetTypeCasting(production.id, assetTypeId)
       .then(casting => {
-        commit(CASTING_SET_CASTING, { casting, production })
+        if (request === castingRequest) {
+          commit(CASTING_SET_CASTING, { casting, production })
+        }
       })
   },
 
@@ -175,22 +188,6 @@ const actions = {
     commit(CASTING_SET_ENTITY_CASTING, { entityId, casting })
   },
 
-  saveCasting({ commit, rootGetters }, entityId) {
-    if (!entityId) {
-      return console.error('ShotId is undefined, no casting can be saved.')
-    }
-    const production = rootGetters.currentProduction
-    const casting = []
-    Object.values(state.casting[entityId]).forEach(asset => {
-      casting.push({
-        asset_id: asset.asset_id,
-        nb_occurences: asset.nb_occurences || 1,
-        label: asset.label
-      })
-    })
-    return breakdownApi.updateCasting(production.id, entityId, casting)
-  },
-
   saveCastings({ rootGetters }, entityIds) {
     if (!entityIds?.length) return Promise.resolve()
     const production = rootGetters.currentProduction
@@ -207,6 +204,39 @@ const actions = {
     return breakdownApi.updateCastings(production.id, castings)
   },
 
+  // The per-asset route leaves the other assets of the entity untouched,
+  // so a stale page cannot erase a colleague's work. It sets one count and
+  // label per call: one request per distinct pair, in series.
+  async castAsset({ state, rootGetters }, { entityIds, assetId }) {
+    const production = rootGetters.currentProduction
+    const requests = new Map()
+    entityIds.forEach(entityId => {
+      const link = state.casting[entityId]?.find(
+        asset => asset.asset_id === assetId
+      )
+      const key = link ? `${link.nb_occurences}|${link.label}` : 'removed'
+      if (!requests.has(key)) {
+        requests.set(key, {
+          entity_ids: [],
+          nb_occurences: link ? link.nb_occurences : 0,
+          label: link?.label
+        })
+      }
+      requests.get(key).entity_ids.push(entityId)
+    })
+    for (const data of requests.values()) {
+      await breakdownApi.castAsset(production.id, assetId, data)
+    }
+  },
+
+  uncastAsset({ rootGetters }, { entityId, assetId }) {
+    const production = rootGetters.currentProduction
+    return breakdownApi.castAsset(production.id, assetId, {
+      entity_ids: [entityId],
+      nb_occurences: 0
+    })
+  },
+
   uploadCastingFile({ commit, state, rootGetters }, formData) {
     const currentProduction = rootGetters.currentProduction
     return breakdownApi.postCastingCsv(currentProduction, formData)
@@ -217,7 +247,10 @@ const actions = {
     { label, asset, targetEntityId }
   ) {
     commit(CASTING_SET_LINK_LABEL, { label, asset, targetEntityId })
-    return dispatch('saveCasting', targetEntityId)
+    return dispatch('castAsset', {
+      entityIds: [targetEntityId],
+      assetId: asset.asset_id
+    })
   },
 
   loadEpisodeCasting({ commit, rootGetters }, episode) {
@@ -528,7 +561,7 @@ const mutations = {
   },
 
   [CASTING_REMOVE_FROM_CASTING](state, { entityId, asset, nbOccurences }) {
-    const previousAsset = state.casting[entityId].find(
+    const previousAsset = state.casting[entityId]?.find(
       a => a.asset_id === asset.id
     )
     if (previousAsset) {
@@ -627,10 +660,10 @@ const mutations = {
   },
 
   [CASTING_SET_LINK_LABEL](state, { label, asset, targetEntityId }) {
-    const link = state.casting[targetEntityId].find(
+    const link = state.casting[targetEntityId]?.find(
       link => link.asset_id === asset.asset_id
     )
-    link.label = label
+    if (link) link.label = label
   },
 
   [SAVE_BREAKDOWN_SEARCH_END](state, { searchQuery }) {

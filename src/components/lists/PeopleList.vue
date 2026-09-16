@@ -1,17 +1,11 @@
 <template>
   <div class="data-list">
     <div ref="body" class="datatable-wrapper">
-      <table class="datatable" v-if="!isLoading">
+      <table class="datatable datatable--cards" v-if="!isLoading">
         <thead class="datatable-head">
           <tr>
             <th scope="col" class="user datatable-row-header">
-              {{
-                isBots
-                  ? $t('bots.bots')
-                  : isGuests
-                    ? $t('people.guests')
-                    : $t('people.persons')
-              }}
+              {{ $t(usersLabelKey) }}
             </th>
             <th scope="col" class="phone" v-if="!isBots && !isGuests">
               {{ $t('people.list.phone') }}
@@ -54,7 +48,7 @@
         >
           <tr :key="person.id" class="datatable-row" v-for="person in entries">
             <people-user-cell
-              class="user datatable-row-header"
+              class="user datatable-row-header card-head"
               :person="person"
             />
             <td class="phone" v-if="!isBots && !isGuests">
@@ -66,16 +60,28 @@
                 error: isExpired(person.expiration_date),
                 warning: isSoonExpired(person.expiration_date)
               }"
+              :data-label="
+                person.expiration_date ? $t('people.list.expiration') : null
+              "
               v-if="isBots"
             >
               {{ person.expiration_date }}
               <alert-triangle-icon class="icon mr05" />
             </td>
-            <td class="role" v-if="!isGuests">
+            <td
+              class="role"
+              :data-label="$t('people.list.role')"
+              v-if="!isGuests"
+            >
               {{ $t(`people.role.${person.role}`) }}
             </td>
             <department-names-cell
               class="departments"
+              :data-label="
+                person.departments?.length
+                  ? $t('people.list.departments')
+                  : null
+              "
               :departments="person.departments"
               v-if="!isGuests"
             />
@@ -138,15 +144,17 @@
   </div>
 </template>
 
-<script>
+<script setup>
+// Imports
+// --------------------------------------------------------------------------
 import { AlertTriangleIcon } from 'lucide-vue-next'
-import { mapGetters } from 'vuex'
+import { computed, useTemplateRef } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useStore } from 'vuex'
 
+import { useGrabList } from '@/composables/grabList'
 import { getCountryName } from '@/lib/countries'
 import { localeCode } from '@/lib/lang'
-
-import { grabListMixin } from '@/components/mixins/grablist'
-import { domMixin } from '@/components/mixins/dom'
 
 import DepartmentNamesCell from '@/components/cells/DepartmentNamesCell.vue'
 import PeopleUserCell from '@/components/cells/PeopleUserCell.vue'
@@ -154,129 +162,72 @@ import RowActionsCell from '@/components/cells/RowActionsCell.vue'
 import StudioName from '@/components/widgets/StudioName.vue'
 import TableInfo from '@/components/widgets/TableInfo.vue'
 
-export default {
-  name: 'people-list',
+const { t } = useI18n()
+const store = useStore()
+const bodyRef = useTemplateRef('body')
+const { startBrowsing } = useGrabList(bodyRef)
 
-  mixins: [domMixin, grabListMixin],
+// Props / Emits
+// --------------------------------------------------------------------------
+const props = defineProps({
+  entries: { type: Array, default: () => [] },
+  isArchivedGuests: { type: Boolean, default: false },
+  isBots: { type: Boolean, default: false },
+  isError: { type: Boolean, default: false },
+  isGuests: { type: Boolean, default: false },
+  isLoading: { type: Boolean, default: false },
+  seatsRemaining: { type: Number, default: null }
+})
 
-  components: {
-    AlertTriangleIcon,
-    DepartmentNamesCell,
-    PeopleUserCell,
-    RowActionsCell,
-    StudioName,
-    TableInfo
-  },
+defineEmits([
+  'archive-clicked',
+  'avatar-clicked',
+  'change-password-clicked',
+  'delete-clicked',
+  'edit-clicked',
+  'refresh-clicked',
+  'restore-clicked'
+])
 
-  props: {
-    entries: {
-      type: Array,
-      default: () => []
-    },
-    isArchivedGuests: {
-      type: Boolean,
-      default: false
-    },
-    isBots: {
-      type: Boolean,
-      default: false
-    },
-    isError: {
-      type: Boolean,
-      default: false
-    },
-    isGuests: {
-      type: Boolean,
-      default: false
-    },
-    isLoading: {
-      type: Boolean,
-      default: false
-    },
-    seatsRemaining: {
-      type: Number,
-      default: null
-    }
-  },
+// State
+// --------------------------------------------------------------------------
+const today = new Date().toJSON().slice(0, 10)
+const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+  .toJSON()
+  .slice(0, 10)
 
-  emits: [
-    'archive-clicked',
-    'avatar-clicked',
-    'change-password-clicked',
-    'delete-clicked',
-    'edit-clicked',
-    'refresh-clicked',
-    'restore-clicked'
-  ],
+// Computed
+// --------------------------------------------------------------------------
+const isCurrentUserAdmin = computed(() => store.getters.isCurrentUserAdmin)
 
-  data() {
-    return {
-      domEvents: [
-        ['mousemove', this.onMouseMove],
-        ['touchmove', this.onMouseMove],
-        ['mouseup', this.stopBrowsing],
-        ['mouseleave', this.stopBrowsing],
-        ['touchend', this.stopBrowsing],
-        ['touchcancel', this.stopBrowsing],
-        ['keyup', this.stopBrowsing]
-      ]
-    }
-  },
+const usersLabelKey = computed(() =>
+  props.isBots
+    ? 'bots.bots'
+    : props.isGuests
+      ? 'people.guests'
+      : 'people.persons'
+)
 
-  mounted() {
-    this.addEvents(this.domEvents)
-  },
-
-  beforeUnmount() {
-    this.removeEvents(this.domEvents)
-    document.body.style.cursor = 'default'
-  },
-
-  computed: {
-    ...mapGetters(['isCurrentUserAdmin']),
-
-    today() {
-      return new Date().toJSON().slice(0, 10)
-    },
-
-    nextWeek() {
-      const date = new Date()
-      date.setDate(date.getDate() + 7)
-      return date.toJSON().slice(0, 10)
-    },
-
-    nbUsersDetails() {
-      const nbUsers = this.entries.length
-      const key = this.isBots
-        ? 'bots.bots'
-        : this.isGuests
-          ? 'people.guests'
-          : 'people.persons'
-      const labelUsers = this.$t(key, { count: nbUsers })
-      if (!this.isBots && !this.isGuests && this.seatsRemaining !== null) {
-        const labelRemaining = this.$t('people.seats_remaining', {
-          count: this.seatsRemaining
-        })
-        return `${nbUsers} ${labelUsers} (${labelRemaining})`
-      }
-      return `${nbUsers} ${labelUsers}`
-    }
-  },
-
-  methods: {
-    countryName(country) {
-      return getCountryName(country, localeCode.value)
-    },
-
-    isExpired(expirationDate) {
-      return expirationDate < this.today
-    },
-
-    isSoonExpired(expirationDate) {
-      return !this.isExpired(expirationDate) && expirationDate < this.nextWeek
-    }
+const nbUsersDetails = computed(() => {
+  const nbUsers = props.entries.length
+  const details = `${nbUsers} ${t(usersLabelKey.value, { count: nbUsers })}`
+  if (props.isBots || props.isGuests || props.seatsRemaining === null) {
+    return details
   }
-}
+  const labelRemaining = t('people.seats_remaining', {
+    count: props.seatsRemaining
+  })
+  return `${details} (${labelRemaining})`
+})
+
+// Functions
+// --------------------------------------------------------------------------
+const countryName = country => getCountryName(country, localeCode.value)
+
+const isExpired = expirationDate => expirationDate < today
+
+const isSoonExpired = expirationDate =>
+  !isExpired(expirationDate) && expirationDate < nextWeek
 </script>
 
 <style lang="scss" scoped>
@@ -367,116 +318,9 @@ export default {
 
 @media screen and (max-width: 768px) {
   .datatable-wrapper {
+    background: transparent;
+    border: 0;
     overflow-x: visible;
-    border: 0;
-    background: transparent;
-  }
-
-  table.datatable {
-    display: block;
-    background: transparent;
-  }
-
-  .datatable-head {
-    display: none;
-  }
-
-  .datatable-body {
-    display: block;
-  }
-
-  .data-list .datatable .datatable-row,
-  .data-list .datatable .datatable-row:nth-child(even),
-  .data-list .datatable .datatable-row:hover,
-  .data-list .datatable .datatable-row:last-child {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    grid-template-areas:
-      'user role'
-      'departments departments'
-      'expiration expiration';
-    align-items: center;
-    column-gap: 0.5em;
-    row-gap: 0.25em;
-    padding: 0.5em;
-    margin-bottom: 0.5em;
-    background-color: var(--background) !important;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-  }
-
-  .data-list .datatable .datatable-row td,
-  .data-list .datatable .datatable-row :deep(td),
-  .data-list .datatable .datatable-row:last-child td,
-  .data-list .datatable .datatable-row:last-child:nth-child(even) td,
-  .data-list .datatable .datatable-row:last-child:hover td {
-    display: block;
-    width: auto;
-    min-width: 0;
-    padding: 0;
-    border: 0;
-    background-color: transparent !important;
-  }
-
-  .user {
-    grid-area: user;
-    width: auto;
-    min-width: 0;
-  }
-
-  .role {
-    grid-area: role;
-    width: auto;
-    min-width: 0;
-    color: var(--text-alt);
-    font-size: 0.9em;
-  }
-
-  .departments {
-    grid-area: departments;
-    width: auto;
-    min-width: 0;
-  }
-
-  .expiration {
-    grid-area: expiration;
-    width: auto;
-    min-width: 0;
-    font-size: 0.9em;
-  }
-
-  :deep(.actions) {
-    display: none !important;
-  }
-
-  :deep(.entity-thumbnail) {
-    box-shadow: none;
-  }
-
-  :deep(.datatable-row-footer) {
-    border-left: 0;
-
-    &::before {
-      display: none;
-    }
-  }
-
-  :deep(.datatable-row-header) {
-    border-right: 0;
-
-    &::after {
-      display: none;
-    }
-  }
-
-  .phone,
-  .studio,
-  .country,
-  .contract,
-  .position,
-  .seniority,
-  .salary {
-    display: none;
   }
 
   .footer-info {

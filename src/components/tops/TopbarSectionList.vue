@@ -35,7 +35,7 @@
             :stroke-width="1.5"
             v-else-if="currentSection.value === 'budget'"
           />
-          {{ currentSection.label }}
+          <span class="section-label">{{ currentSection.label }}</span>
         </div>
         <chevron-down-icon class="down-icon flexrow-item" />
       </div>
@@ -87,10 +87,13 @@
   </div>
 </template>
 
-<script>
+<script setup>
+// Imports
+// --------------------------------------------------------------------------
 import { ChevronDownIcon, HandCoinsIcon } from 'lucide-vue-next'
-import { defineAsyncComponent } from 'vue'
-import { mapActions, mapGetters } from 'vuex'
+import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { useStore } from 'vuex'
 
 import { getProductionPath } from '@/lib/path'
 
@@ -99,108 +102,92 @@ import KitsuIcon from '@/components/widgets/KitsuIcon.vue'
 
 const Icon = defineAsyncComponent(() => import('@/components/widgets/Icon.vue'))
 
-export default {
-  name: 'topbar-section-list',
+const route = useRoute()
+const store = useStore()
 
-  components: {
-    ChevronDownIcon,
-    ComboboxMask,
-    HandCoinsIcon,
-    Icon,
-    KitsuIcon
-  },
+// Props
+// --------------------------------------------------------------------------
+const props = defineProps({
+  sectionList: { type: Array, required: true },
+  section: { type: String, default: 'assets' },
+  episodeId: { type: String, default: '' }
+})
 
-  emits: ['input'],
+// State
+// --------------------------------------------------------------------------
+const localSection = ref(null)
+const showSectionList = ref(false)
 
-  data() {
-    return {
-      localSection: null,
-      showSectionList: false
-    }
-  },
+// Computed
+// --------------------------------------------------------------------------
+const currentProduction = computed(() => store.getters.currentProduction)
 
-  props: {
-    sectionList: {
-      required: true,
-      type: Array
-    },
-    section: {
-      default: 'assets',
-      type: String
-    },
-    episodeId: {
-      default: '',
-      type: String
-    }
-  },
+const currentSection = computed(() =>
+  props.sectionList.find(section => section.value === localSection.value)
+)
 
-  mounted() {
-    this.localSection = this.section
-  },
-
-  computed: {
-    ...mapGetters(['currentProduction', 'projectPlugins']),
-
-    currentSection() {
-      return this.sectionList.find(
-        section => section.value === this.localSection
-      )
-    }
-  },
-
-  methods: {
-    ...mapActions(['setCurrentSection', 'setLastProductionScreen']),
-
-    selectSection(section) {
-      if (section.value !== 'separator') {
-        this.$emit('input', section.value)
-        this.localSection = section.value
-        this.showSectionList = false
-      }
-    },
-
-    toggleSectionList() {
-      this.showSectionList = !this.showSectionList
-    },
-
-    getSectionPath(section) {
-      const result = getProductionPath(
-        this.currentProduction,
-        section.value,
-        this.episodeId,
-        section.plugin_id
-      )
-      return result
-    }
-  },
-
-  watch: {
-    section() {
-      if (this.localSection !== this.section) {
-        this.localSection = this.section
-      }
-    },
-
-    localSection() {
-      this.setCurrentSection(this.localSection)
-      if (
-        ['assets', 'episodes', 'sequences', 'shots', 'edits'].includes(
-          this.localSection
-        )
-      ) {
-        this.setLastProductionScreen(this.localSection)
-      }
-    }
+// Functions
+// --------------------------------------------------------------------------
+const selectSection = section => {
+  if (section.value !== 'separator') {
+    localSection.value = section.value
+    showSectionList.value = false
   }
 }
+
+const toggleSectionList = () => {
+  showSectionList.value = !showSectionList.value
+}
+
+const getSectionPath = section => {
+  const result = getProductionPath(
+    currentProduction.value,
+    section.value,
+    props.episodeId,
+    section.plugin_id
+  )
+  // The all pseudo-episode is typed on the playlists page: coming from
+  // the shot side, stay on the shot side.
+  const isShotContext =
+    props.section === 'shots' || route.query.for_entity === 'shot'
+  if (
+    section.value === 'playlists' &&
+    props.episodeId === 'all' &&
+    isShotContext
+  ) {
+    result.query = { ...result.query, for_entity: 'shot' }
+  }
+  return result
+}
+
+// Watchers
+// --------------------------------------------------------------------------
+watch(
+  () => props.section,
+  section => {
+    localSection.value = section
+  }
+)
+
+watch(localSection, section => {
+  store.dispatch('setCurrentSection', section)
+  if (['assets', 'episodes', 'sequences', 'shots', 'edits'].includes(section)) {
+    store.dispatch('setLastProductionScreen', section)
+  }
+})
+
+// Lifecycle
+// --------------------------------------------------------------------------
+onMounted(() => {
+  localSection.value = props.section
+})
 </script>
 
 <style lang="scss" scoped>
 .dark {
   .select-input,
   .selected-section-line,
-  .section-line,
-  .section-combo {
+  .section-line {
     background: $black;
     border-color: $dark-grey;
   }
@@ -297,6 +284,7 @@ hr {
 .section-icon {
   cursor: pointer;
   margin-right: 0.8em;
+  min-width: 20px;
   width: 20px;
 }
 
@@ -306,5 +294,19 @@ svg.section-icon {
 
 .dark svg.section-icon {
   color: #ffffff;
+}
+
+@media screen and (max-width: 768px) {
+  .selected-section-line {
+    min-width: auto;
+
+    .section-icon {
+      margin-right: 0;
+    }
+
+    .section-label {
+      display: none;
+    }
+  }
 }
 </style>
