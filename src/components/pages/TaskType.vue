@@ -449,7 +449,6 @@ import { sortByMetadata, sortByName, sortPeople } from '@/lib/sorting'
 import stringHelpers from '@/lib/string'
 import {
   addBusinessDays,
-  daysToMinutes,
   formatSimpleDate,
   getDatesFromStartDate,
   minutesToDays,
@@ -1294,8 +1293,7 @@ const onExportClick = () => {
   csv.buildCsvFile(name, taskLines)
 }
 
-const updateEstimation = ({ taskId, days, item, daysOff }) => {
-  const estimation = daysToMinutes(organisation.value, days)
+const updateEstimation = ({ taskId, estimation, item, daysOff }) => {
   const task = taskMap.value.get(taskId)
   let data = { estimation }
   if (task.start_date) {
@@ -1506,9 +1504,10 @@ const loadTimesheets = async (personIds, startDate, endDate) => {
       entry.endDate = parseDate(entry.date)
     })
 
-    // merge consecutive timesheet entries with duration >= one organisation day
+    // merge consecutive timesheet entries with duration >= one organisation
+    // day, counted in days: 8.3 * 60 makes 498.00000000000006 minutes, over
+    // the 498 the timesheet stores for a day of 8.3 hours
     const mergedTimesheet = []
-    const oneDay = organisation.value.hours_by_day * 60
     for (const entry of timesheet) {
       const previous = mergedTimesheet.length
         ? mergedTimesheet[mergedTimesheet.length - 1]
@@ -1517,7 +1516,7 @@ const loadTimesheets = async (personIds, startDate, endDate) => {
         previous &&
         previous.task_id === entry.task_id &&
         (previous.date === entry.date ||
-          (previous.duration >= oneDay &&
+          (minutesToDays(organisation.value, previous.duration) >= 1 &&
             entry.startDate.diff(previous.startDate, 'days') === 1))
       ) {
         // merge with previous
@@ -1777,12 +1776,15 @@ const expandPersonElement = personElement => {
 
 // Import
 
+// Close leaves the error of the last save: opening drops it.
 const onAddMetadataClicked = () => {
+  errors.addMetadata = false
   descriptorToEdit.value = {}
   modals.isAddMetadataDisplayed = true
 }
 
 const onEditMetadataClicked = descriptorId => {
+  errors.addMetadata = false
   descriptorToEdit.value = currentProduction.value.descriptors.find(
     descriptor => descriptor.id === descriptorId
   )
@@ -1947,8 +1949,7 @@ const resetScheduleScroll = () => {
 const resetScheduleItemsDebounced = func.debounce(resetScheduleItems, 400)
 
 // Same bursts, and this is the heavier half: onSearchChange walks every
-// entity, re-sorts the tasks and rebuilds the search index. The field is
-// read again on fire, as the page may have been left in the meantime.
+// entity, re-sorts the tasks and rebuilds the search index.
 const refreshTasksDebounced = func.debounce(() => {
   if (searchFieldRef.value) onSearchChange(searchFieldRef.value.getValue())
 }, 400)
@@ -2135,6 +2136,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
   store.dispatch('clearSelectedTasks')
   socket.off('task:update', onRemoteTaskUpdate)
+  resetScheduleItemsDebounced.cancel()
+  refreshTasksDebounced.cancel()
 })
 
 // Head

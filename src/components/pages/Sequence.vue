@@ -1,5 +1,9 @@
 <template>
-  <div class="columns fixed-page sequence xyz-in" xyz="fade">
+  <div
+    class="columns fixed-page sequence xyz-in"
+    xyz="fade"
+    v-if="currentProduction"
+  >
     <div class="page column main-column">
       <div class="page-header flexrow">
         <router-link
@@ -91,7 +95,7 @@
               <button-simple
                 icon="edit"
                 :title="$t('sequences.edit_title')"
-                @click="modals.edit = true"
+                @click="showEditModal"
                 v-if="isCurrentUserManager"
               />
             </div>
@@ -520,6 +524,12 @@ const assetPath = asset =>
     },
     isTVShow.value ? currentEpisode.value?.id || 'main' : null
   )
+
+// Close leaves the error of the last save: opening drops it.
+const showEditModal = () => {
+  errors.edit = false
+  modals.edit = true
+}
 
 const confirmEditSequence = async form => {
   loading.edit = true

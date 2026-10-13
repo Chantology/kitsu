@@ -1,5 +1,15 @@
 {
   "default": {
+    "app_login": {
+      "authorize": "Autorizar",
+      "consent": "Una aplicación de este equipo quiere conectarse a Kitsu como {full_name}.",
+      "consent_named": "Una aplicación de este equipo, que se hace llamar \"{app_name}\", quiere conectarse a Kitsu como {full_name}.",
+      "error": "El inicio de sesión de la aplicación ha fallado. Vuelve a iniciarlo desde la aplicación.",
+      "error_2fa_setup": "Configura primero la autenticación de dos factores en Kitsu y luego vuelve a iniciar sesión desde la aplicación.",
+      "invalid_request": "Este enlace de inicio de sesión no es válido. Vuelve a iniciar sesión desde la aplicación.",
+      "title": "Inicio de sesión de aplicación",
+      "warning": "Autoriza solo si has iniciado tú mismo este inicio de sesión desde la aplicación. Accederá a Kitsu con tus permisos."
+    },
     "assets": {
       "cast_in": "Aparece en",
       "delete_error": "Se ha producido un error al eliminar este recurso. Es probable que tenga datos vinculados. ¿Está seguro de que el tipo de recurso no tiene ninguna tarea asociada?",
@@ -42,6 +52,7 @@
     },
     "asset_types": {
       "all_asset_types": "Todos los tipos de recurso",
+      "all_hidden": "Todos los tipos de recurso están ocultos.",
       "create_error": "Se ha producido un error al guardar este tipo de recurso. ¿Está seguro de que no hay otro tipo de recurso con un nombre similar?",
       "delete_text": "¿Está seguro de que desea eliminar {name} de su base de datos?",
       "delete_error": "Se ha producido un error al eliminar este tipo de recurso. Es probable que haya datos vinculados a él. ¿Está seguro de que este tipo de recurso no tiene ningún recurso asociado?",
@@ -63,12 +74,17 @@
     },
     "breakdown": {
       "all_assets": "Todos los recursos disponibles",
+      "copy_casting": "Copiar este casting (ctrl + V lo pega en las líneas seleccionadas)",
       "edit_label": "Cambiar la etiqueta del recurso",
       "empty": "Casting vacío",
       "label": "Etiqueta",
+      "nb_assets": "{count} recurso | {count} recursos",
+      "nb_occurrences": "{count} aparición | {count} apariciones",
+      "nb_ready": "{ready} / {total} listos",
       "occurrences": "Ocurrencias",
       "picture_mode": "Cambiar a modo de imagen",
       "remove_from_casting": "Quitar del casting",
+      "undo": "Deshacer el último cambio de casting (ctrl + Z)",
       "view_as_cards": "Ver como tarjetas",
       "view_as_list": "Ver como lista",
       "text_mode": "Cambiar a modo de texto",
@@ -85,10 +101,16 @@
       "fields": {
         "standby": "En Espera"
       },
-      "episode_casting": "Reparto de episodios",
       "save_error": "Se ha producido un error al guardar el reparto",
       "hide_library": "Ocultar biblioteca",
-      "show_library": "Mostrar biblioteca"
+      "show_library": "Mostrar biblioteca",
+      "filters": {
+        "all": "Todas las líneas",
+        "asset": "Filtrar por recurso asignado…",
+        "empty": "Sin casting",
+        "label": "Líneas",
+        "standby": "En espera"
+      }
     },
     "comments": {
       "add_attachment": "Adjuntar archivo...",
@@ -99,6 +121,7 @@
       "comment_from_client": "Comentario del cliente",
       "edit_title": "Modificar comentario",
       "empty_text": "Este comentario está vacío",
+      "action_error": "No se ha podido guardar. Por favor, inténtalo de nuevo.",
       "edit_error": "Se ha producido un error al modificar este comentario. Por favor contacte con nuestro equipo de soporte.",
       "error": "Se ha producido un error al publicar el comentario",
       "no_file_attached": "Ninguna vista previa adjunta",
@@ -270,6 +293,7 @@
     },
     "episodes": {
       "all_episodes": "Todos",
+      "all_hidden": "Todos los episodios están ocultos.",
       "edit_error": "Se ha producido un error al guardar este episodio. ¿Está seguro de que no hay otro episodio con un nombre similar?",
       "delete_error": "Se ha producido un error al eliminar este episodio. Es probable que haya datos vinculados a él. ¿Está seguro de que este episodio no tiene una secuencia asociada?",
       "delete_text": "¿Está seguro de que desea eliminar {name} de su base de datos? Se eliminarán todas las tomas y vistas previas relacionadas. Confirme escribiendo el nombre del episodio a continuación.",
@@ -436,6 +460,7 @@
       "history": "historial",
       "info": "Información",
       "or": "o",
+      "next": "Siguiente",
       "no": "No",
       "loading": "Cargando...",
       "loading_data": "Cargando datos",
@@ -448,8 +473,10 @@
       "nb_frames": "fotograma | fotogramas",
       "person": "Persona",
       "preview_3d_not_supported": "Las vistas previas 3D no son compatibles con este navegador (se requiere WebGL2). Por favor, actualízalo a su última versión.",
+      "previous": "Anterior",
       "profile": "Perfil",
       "production": "Producción",
+      "productivity": "Productividad",
       "remove": "Quitar",
       "save": "Guardar",
       "sort_by": "Ordenar por",
@@ -466,6 +493,8 @@
         "choose": "Elige",
         "error_imported_rows": "Se importó {count} línea antes del error. | Se importaron {count} líneas antes del error.",
         "error_line": "Línea {line}",
+        "error_timeout": "La importación está tardando más de lo previsto y continúa en segundo plano.",
+        "error_timeout_hint": "Recargue la página dentro de unos minutos para comprobar el resultado antes de volver a importar.",
         "error_upload": "Se ha producido un error al subir su CSV.",
         "export_file": "Exportar datos a un archivo CSV",
         "import_file": "Importar datos de un archivo CSV",
@@ -476,6 +505,8 @@
         "legend_missing": "Columna esperada que no se ha encontrado",
         "legend_disabled": "Línea que no se actualizará ni se creará",
         "legend_overwrite": "Línea que se actualizará",
+        "legend_incomplete": "Línea a la que le falta un valor obligatorio",
+        "missing_values": "La línea {lines} no tiene ningún valor en una columna obligatoria ({columns}). Complétela o elimínela y vuelva a subir el archivo. | Las líneas {lines} no tienen ningún valor en una columna obligatoria ({columns}). Complételas o elimínelas y vuelva a subir el archivo.",
         "paste": "Pegar",
         "paste_code": "Por favor, pegue aquí sus datos CSV:",
         "preview": "Vista previa",
@@ -584,6 +615,7 @@
       "is_shared": "Compartido con todo el equipo",
       "no_results": "Sin resultados",
       "link": "Enlace",
+      "list": "Lista",
       "hours_spent": "hora invertida | horas invertidas",
       "hours_expected": "hora prevista | horas previstas",
       "hours_estimated": "hora estimada | horas estimadas",
@@ -751,6 +783,8 @@
       "invite_link_error": "Se ha producido un error al generar el enlace de invitación",
       "new_person": "Añadir un usuario nuevo",
       "no_task_assigned": "No hay tareas en ejecución asignadas a usted",
+      "no_task_done": "Todavía no tienes tareas validadas",
+      "no_task_pending": "Ninguna tarea está esperando una revisión",
       "persons": "usuario | usuarios",
       "project_role": "Rol de proyecto",
       "running_tasks": "Tareas en ejecución",
@@ -862,7 +896,7 @@
       "created_at": "Creado en:",
       "delete_text": "¿Está seguro de que desea eliminar {name} de su base de datos?",
       "delete_error": "Se ha producido un error al eliminar esta lista de reproducción.",
-      "edit_error": "Se ha producido un error al guardar esta lista de reproducción.",
+      "edit_error": "Se ha producido un error al guardar esta lista de reproducción. ¿Está seguro de que no hay otra lista de reproducción con un nombre similar?",
       "download_zip": "Descargar .zip",
       "failed": "Fallido",
       "for_client": "El cliente",
@@ -1036,6 +1070,8 @@
       },
       "fields": {
         "fps": "FPS",
+        "hd_bitrate_compression": "Tasa de bits de vídeos en alta definición (Mbit/s)",
+        "hd_bitrate_short": "HD Mbit/s",
         "is_frame_in_numbering": "Iniciar el contador de frames del reproductor en el frame de entrada",
         "name": "Nombre",
         "ratio": "Relación de aspecto",
@@ -1055,6 +1091,8 @@
         "code": "Nombre corto",
         "is_publish_default": "Establecer widget de comentarios para los artistas en el modo de publicación por defecto",
         "is_single_preview_per_revision": "Permitir solo un archivo de vista previa por revisión",
+        "ld_bitrate_compression": "Tasa de bits de vídeos en baja definición (Mbit/s)",
+        "ld_bitrate_short": "LD Mbit/s",
         "revision_padding": "Relleno del número de revisión (0 = sin relleno)"
       },
       "metadata": {
@@ -1103,6 +1141,7 @@
       },
       "parameters": {
         "title": "Parámetros",
+        "previews_and_comments": "Previews y comentarios",
         "save": {
           "button": "Confirmar"
         }
@@ -1176,6 +1215,22 @@
         "assets": "Recursos",
         "shots": "Tomas",
         "sequences": "Secuencias"
+      },
+      "video": {
+        "bitrate_default": "Por defecto: {value} Mbit/s",
+        "bitrate_default_max": "Por defecto y máximo: {value} Mbit/s",
+        "bitrate_explanation": "Una tasa de bits más alta da una imagen más nítida, pero archivos más pesados que tardan más en cargarse.",
+        "bitrate_max": "Máximo: {value} Mbit/s",
+        "bitrate_size": "Unos {size} MB por minuto",
+        "bitrates": "Tasas de bits",
+        "hd_bitrate_description": "Versión a resolución completa, que se reproduce en modo HD y se usa para las descargas.",
+        "ld_bitrate_description": "Versión más ligera, de 1280 píxeles de ancho, que se reproduce en modo LD.",
+        "ld_bitrate_max": "Máximo: {value} Mbit/s (tasa de bits HD)",
+        "next_uploads_only": "Los cambios solo se aplican a las próximas subidas: las vistas previas existentes no se vuelven a codificar.",
+        "restore_default": "Restaurar valor por defecto",
+        "task_type_bitrates": "Déjalo vacío para usar las tasas de bits de la pestaña Vídeo.",
+        "task_type_ld_bitrate_max": "Máximo: la tasa de bits HD del tipo de tarea",
+        "title": "Vídeo"
       },
       "hide_stats": "Ocultar estadísticas",
       "show_stats": "Mostrar estadísticas"
@@ -1364,6 +1419,7 @@
       "library_title": "Biblioteca de tipos de tarea"
     },
     "sequences": {
+      "all_hidden": "Todas las secuencias están ocultas.",
       "all_sequences": "Todas las secuencias",
       "edit_error": "Se ha producido un error al guardar la secuencia. ¿Está seguro que no hay otra secuencia con un nombre similar?",
       "delete_text": "¿Está seguro de que desea eliminar {name} de su base de datos? Se eliminarán todas las tomas y vistas previas relacionadas. Confirme escribiendo el nombre de la secuencia a continuación.",
@@ -1391,6 +1447,8 @@
       "apply_to_prod_confirm": "¿Está seguro de que desea aplicar esta versión del programa a la producción actual? Esto anulará los valores de la tarea actual.",
       "apply_to_prod_error": "Se ha producido un error al aplicar la versión del programa a la producción actual.",
       "assign": "Asignar a:",
+      "assign_error": "No se han podido asignar las tareas. Por favor, inténtalo de nuevo.",
+      "assign_no_fit": "{count} tarea no cupo en el rango de fechas. | {count} tareas no cupieron en el rango de fechas.",
       "confirm_move_children": "Mover esta barra recortará o ajustará {count} subelemento para adaptarlo a los nuevos límites. ¿Continuar? | Mover esta barra recortará o ajustará {count} subelementos para adaptarlos a los nuevos límites. ¿Continuar?",
       "create_version": "Crear versión de la agenda",
       "cut_tool": "Cortar",
@@ -1435,6 +1493,7 @@
       "no_entity": "Ninguna entidad asignable",
       "overall_man_days": "Días-persona",
       "reset_list": "Restablecer lista",
+      "save_task_error": "No se ha podido guardar la tarea. Por favor, inténtalo de nuevo.",
       "select_task_type": "Seleccione un tipo de tarea",
       "show_assigned": "Mostrar entidades asignadas",
       "title": "Calendario",
@@ -1545,15 +1604,18 @@
       "show_timecode": "Mostrar entrada y salida como códigos de tiempo"
     },
     "server_down": {
+      "retrying": "Kitsu sigue intentándolo y le devolverá a su página en cuanto el API responda.",
       "text": "Póngase en contacto con el servicio de asistencia técnica de su proveedor, su administrador de sistemas o su departamento de TI para entender qué es lo que está fallando.",
       "title": "Kitsu encontró un error al intentar alcanzar el API de datos."
     },
     "statistics": {
       "count": "Conteos",
+      "bars": "Barras apiladas",
       "count_mode": "Conteo",
       "display_mode": "Visualización",
       "frames": "Fotogramas",
       "pie": "Gráficos circulares",
+      "heatmap": "Mapa de calor",
       "shots": "Tomas",
       "data_mode": "Datos",
       "retakes": "Retomas",
@@ -1561,7 +1623,8 @@
       "all": "Todas",
       "only_running": "Solo en marcha",
       "episode_status": "Estado de los episodios",
-      "drawings": "Dibujos"
+      "drawings": "Dibujos",
+      "validated": "validado"
     },
     "tasks": {
       "add_preview": "Añadir vista previa",
@@ -1767,6 +1830,7 @@
       "hours": "horas",
       "month": "Mes",
       "time_spents": "Tiempo empleado (horas)",
+      "week_total": "Semana: {hours} horas",
       "timelog_title": "Registro de tiempo",
       "title": "Hojas de horas",
       "year": "Año",
@@ -1997,29 +2061,45 @@
       "send_error": "Se ha producido un error al enviar el mensaje."
     },
     "concepts": {
-      "add_links": "Añadir enlaces a activos",
-      "add_new_concept": "Añadir nuevos conceptos",
+      "actions": {
+        "empty": "Sin enlaces",
+        "remove_link": "Quitar el enlace",
+        "title": "Enlaces a conceptos"
+      },
       "add_concept": "Añadir archivos para nuevos conceptos",
       "add_concept_error": "Se ha producido un error al añadir conceptos.",
+      "add_links": "Añadir enlaces a activos",
+      "add_new_concept": "Añadir nuevos conceptos",
       "delete_for_selection": "Borrar el concepto seleccionado | Borrar los {nbSelectedConcepts} conceptos seleccionados",
+      "delete_for_selection_hard_lock_text": "BORRAR",
+      "delete_for_selection_hard_text": "¿Está seguro de que desea eliminar definitivamente los conceptos seleccionados? También se eliminarán todas las tareas, comentarios y vistas previas relacionadas. Confírmelo escribiendo \"BORRAR\" a continuación.",
+      "drop_new_concepts": "Suelte aquí los archivos de nuevos conceptos",
       "empty": "No hay conceptos para esta producción",
+      "fields": {
+        "asset": "Recurso",
+        "asset_type": "Tipo de recurso",
+        "created_at": "Fecha de creación",
+        "entity_type": "Tipo de entidad",
+        "last_comment_date": "Último comentario",
+        "publisher": "Publicado por",
+        "updated_at": "Fecha de actualización"
+      },
+      "folders": {
+        "delete": "Eliminar carpeta",
+        "delete_error": "Se produjo un error al eliminar esta carpeta.",
+        "delete_text": "¿Seguro que quieres eliminar la carpeta {name}? Sus conceptos se conservan y vuelven a la raíz.",
+        "edit_error": "Se produjo un error al guardar esta carpeta. Puede que otra carpeta ya tenga este nombre.",
+        "empty": "Esta carpeta está vacía",
+        "move": "Mover a una carpeta",
+        "name": "Nombre de la carpeta",
+        "new": "Nueva carpeta",
+        "none": "Sin carpeta",
+        "rename": "Renombrar carpeta"
+      },
       "multiple_delete_error": "Se ha producido un error al eliminar un concepto. Es posible que existan datos vinculados a él. ¿Está seguro de que no hay ninguna tarea vinculada al concepto seleccionado?",
       "no_concept_selected": "No se ha seleccionado ningún concepto",
       "title": "Conceptos",
-      "fields": {
-        "entity_type": "Tipo de entidad",
-        "created_at": "Fecha de creación",
-        "updated_at": "Fecha de actualización",
-        "last_comment_date": "Último comentario",
-        "publisher": "Publicado por"
-      },
-      "actions": {
-        "title": "Enlaces a conceptos",
-        "empty": "Sin enlaces"
-      },
-      "delete_for_selection_hard_text": "¿Está seguro de que desea eliminar definitivamente los conceptos seleccionados? También se eliminarán todas las tareas, comentarios y vistas previas relacionadas. Confírmelo escribiendo \"BORRAR\" a continuación.",
-      "delete_for_selection_hard_lock_text": "BORRAR",
-      "drop_new_concepts": "Suelte aquí los archivos de nuevos conceptos"
+      "uploading": "Subiendo conceptos"
     },
     "intro": {
       "join_discord": "Únete al Discord de la comunidad",
@@ -2034,7 +2114,7 @@
     },
     "preview": {
       "broken": "Esta vista previa está rota.",
-      "processing": "Procesamiento de vídeo en curso..."
+      "processing": "Esta vista previa se está procesando..."
     },
     "studios": {
       "create_error": "Se ha producido un error al guardar este estudio. ¿Está seguro de que no hay ningún estudio con un nombre similar?",
@@ -2053,6 +2133,9 @@
     },
     "days_off": {
       "title": "Días libres",
+      "upcoming": "Próximos",
+      "past": "Pasados",
+      "nb_days": "{count} día | {count} días",
       "period": "Periodo",
       "description": "Descripción",
       "updated_at": "Fecha de actualización",

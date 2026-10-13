@@ -25,6 +25,25 @@
           {{ $t('settings.production.empty_list') }}
         </div>
         <table class="datatable list" v-else>
+          <thead>
+            <tr>
+              <th class="th-grab"></th>
+              <th>{{ $t('task_types.fields.name') }}</th>
+              <th class="th-bitrate">
+                <span class="th-bitrate-label">
+                  {{ $t('productions.fields.hd_bitrate_short') }}
+                  <info-question-mark position="left" :text="bitrateHelp.hd" />
+                </span>
+              </th>
+              <th class="th-bitrate">
+                <span class="th-bitrate-label">
+                  {{ $t('productions.fields.ld_bitrate_short') }}
+                  <info-question-mark position="left" :text="bitrateHelp.ld" />
+                </span>
+              </th>
+              <th></th>
+            </tr>
+          </thead>
           <draggable
             class="datatable-body"
             item-key="id"
@@ -38,6 +57,18 @@
                   <grip-vertical-icon />
                 </td>
                 <task-type-cell :task-type="taskType" />
+                <td class="bitrate" v-for="key in BITRATE_KEYS" :key="key">
+                  <input
+                    class="input"
+                    type="number"
+                    min="1"
+                    :max="bitrateCeiling(taskType, key)"
+                    :placeholder="inheritedBitrate(taskType, key)"
+                    :title="$t(`productions.fields.${key}`)"
+                    :value="taskType[key] ?? ''"
+                    @change="onBitrateChange(taskType, key, $event.target)"
+                  />
+                </td>
                 <td class="remove">
                   <button class="button" @click="$emit('remove', taskType.id)">
                     {{ $t('main.remove') }}
@@ -73,8 +104,10 @@ import { useStore } from 'vuex'
 import draggable from 'vuedraggable'
 import { GripVerticalIcon } from 'lucide-vue-next'
 
+import { clampBitrates } from '@/lib/productions'
 import { sortByName } from '@/lib/sorting'
 
+import InfoQuestionMark from '@/components/widgets/InfoQuestionMark.vue'
 import SettingImporter from '@/components/widgets/SettingImporter.vue'
 import TaskTypeCell from '@/components/cells/TaskTypeCell.vue'
 import TaskTypeName from '@/components/widgets/TaskTypeName.vue'
@@ -85,13 +118,22 @@ const router = useRouter()
 const store = useStore()
 
 const VALID_SECTIONS = ['assets', 'shots', 'sequences', 'episodes', 'edits']
+const BITRATE_KEYS = ['hd_bitrate_compression', 'ld_bitrate_compression']
 
 const props = defineProps({
   taskTypes: { type: Array, default: () => [] },
-  allTaskTypes: { type: Array, default: () => [] }
+  allTaskTypes: { type: Array, default: () => [] },
+  // Bitrates shown as placeholders when a task type inherits them.
+  defaultBitrates: { type: Object, default: () => ({}) }
 })
 
-const emit = defineEmits(['add', 'import-items', 'remove', 'reorder'])
+const emit = defineEmits([
+  'add',
+  'bitrates-changed',
+  'import-items',
+  'remove',
+  'reorder'
+])
 
 const initialSection = VALID_SECTIONS.includes(route.query.section)
   ? route.query.section
@@ -115,6 +157,21 @@ const entityTabs = computed(() => [
 ])
 
 const linkedIds = computed(() => new Set(props.taskTypes.map(tt => tt.id)))
+const bitrateDefaults = computed(() => store.getters.movieBitrateDefaults)
+
+// The low definition bitrate of a row stays within its high definition one.
+const bitrateHelp = computed(() => {
+  const help = maximum =>
+    `${t('productions.video.task_type_bitrates')}\n\n${maximum}`
+  return {
+    hd: help(
+      t('productions.video.bitrate_max', {
+        value: bitrateDefaults.value.hd_bitrate_compression
+      })
+    ),
+    ld: help(t('productions.video.task_type_ld_bitrate_max'))
+  }
+})
 
 const taskTypesForEntity = computed(() =>
   props.taskTypes.filter(
@@ -166,6 +223,34 @@ const onImportFromProduction = async productionId => {
   })
 }
 
+const bitrateCeiling = (taskType, key) =>
+  key === 'hd_bitrate_compression'
+    ? bitrateDefaults.value.hd_bitrate_compression
+    : taskType.hd_bitrate_compression ||
+      props.defaultBitrates.hd_bitrate_compression ||
+      bitrateDefaults.value.hd_bitrate_compression
+
+// The bitrate a task type gets while its own is empty: Zou encodes the low
+// definition version within the high definition bitrate.
+const inheritedBitrate = (taskType, key) =>
+  Math.min(
+    props.defaultBitrates[key] || bitrateDefaults.value[key],
+    bitrateCeiling(taskType, key)
+  )
+
+const onBitrateChange = (taskType, key, input) => {
+  const bitrates = clampBitrates(
+    { ...taskType, [key]: input.value },
+    {
+      inheritedHd: props.defaultBitrates.hd_bitrate_compression,
+      max: bitrateDefaults.value.hd_bitrate_compression
+    }
+  )
+  // A change event skips the checks of the browser: show what is saved.
+  input.value = bitrates[key] ?? ''
+  emit('bitrates-changed', { taskTypeId: taskType.id, ...bitrates })
+}
+
 const onReorder = () => {
   const ordered = draggableList.value.map((tt, index) => ({
     taskTypeId: tt.id,
@@ -198,21 +283,60 @@ const onReorder = () => {
 .column {
   overflow-y: initial;
   flex: 0 0 auto;
-  max-width: 400px;
+  max-width: 600px;
 }
 
 .list {
-  width: 400px;
-  min-width: 400px;
-  max-width: 400px;
+  width: 600px;
+  min-width: 600px;
+  max-width: 600px;
 
   .name {
     width: 100%;
   }
 }
 
+.bitrate {
+  min-width: 120px;
+  width: 120px;
+
+  input {
+    width: 100px;
+  }
+}
+
 .box {
-  max-width: 400px;
+  max-width: 600px;
+}
+
+.datatable th {
+  color: var(--text);
+  padding-left: 10px;
+  padding-top: 1em;
+}
+
+.th-grab {
+  width: 30px;
+}
+
+.th-bitrate {
+  min-width: 120px;
+  white-space: nowrap;
+  // A sticky header cell is its own stacking context: without a z-index, the
+  // inputs of the rows (positioned, later in the page) cover its tooltip.
+  z-index: 2;
+
+  // The tooltip opens over the next columns: narrow, it stays within the tab
+  // on a tablet.
+  :deep(.question-text) {
+    max-width: 320px;
+  }
+}
+
+.th-bitrate-label {
+  align-items: center;
+  display: flex;
+  gap: 0.3em;
 }
 
 .task-type {

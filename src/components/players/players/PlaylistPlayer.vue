@@ -109,7 +109,8 @@
           filler: true,
           flexrow: true,
           'video-container': true,
-          'flexrow-reverse': !isComparisonOverlay
+          'flexrow-reverse': !isComparisonOverlay,
+          'touch-navigation': isTouchNavigationEnabled
         }"
         :style="{ cursor: annotationCursor || null }"
         ref="video-container"
@@ -327,6 +328,7 @@
             class="button"
             ref="preview-file"
             :href="currentPreviewDlPath"
+            download
             v-if="extension && extension.length > 0"
           >
             <download-icon class="icon" />
@@ -459,6 +461,7 @@
           : -1
       "
       :preview-id="currentPreview ? currentPreview.id : ''"
+      :read-only="areHandlesReadOnly"
       @start-scrub="onScrubStart"
       @end-scrub="onScrubEnd"
       @progress-changed="onProgressChanged"
@@ -725,10 +728,17 @@
             hidden: isDlButtonsHidden
           }"
         >
-          <a class="dl-button zip-button" :href="zipDlPath">
+          <!-- Zou builds the zip while it answers: a new tab shows the wait
+               and keeps the player tab out of the navigation. -->
+          <a
+            class="dl-button zip-button"
+            :href="zipDlPath"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             {{ $t('playlists.download_zip') }}
           </a>
-          <a class="dl-button zip-button" :href="csvDlPath">
+          <a class="dl-button zip-button" :href="csvDlPath" download>
             {{ $t('playlists.download_csv') }}
           </a>
           <span
@@ -791,7 +801,7 @@
                 >
                   <play-icon :size="12" />
                 </button>
-                <a class="flexrow-item" :href="getBuildPath(job)">
+                <a class="flexrow-item" :href="getBuildPath(job)" download>
                   {{ formatDate(job.created_at) }}
                 </a>
               </template>
@@ -946,6 +956,7 @@ import { useMediaKind } from '@/composables/players/mediaKind'
 import { useOnionSkin } from '@/composables/players/onionSkin'
 import { usePlaylistComparison } from '@/composables/players/playlistComparison'
 import { usePreviewShortcuts } from '@/composables/players/previewShortcuts'
+import { useTouchNavigation } from '@/composables/players/touchNavigation'
 import { usePlayerTransport } from '@/composables/players/transport'
 import { usePreviewRoom } from '@/composables/previewRoom'
 import { isValidRoomId } from '@/lib/players/events'
@@ -965,6 +976,7 @@ import {
   floorToFrame,
   formatFrame,
   formatTime,
+  frameStartTime,
   getEntityFrameStart,
   roundToFrame
 } from '@/lib/video'
@@ -1105,6 +1117,7 @@ let playLoop = null
 let lastResizeCall = 0
 let playingPictureTimeout = null
 let autoHideTimer = null
+const playerTimeouts = new Set()
 let wavesurfer = null
 // Annotation painted by the show-annotations-while-playing path; reset
 // wherever the canvas is cleared outside that path.
@@ -1207,6 +1220,7 @@ const isCurrentUserSupervisor = computed(
 const organisation = computed(() => store.getters.organisation)
 const personMap = computed(() => store.getters.personMap)
 const previewFileMap = computed(() => store.getters.previewFileMap)
+const previewFileStatusMap = computed(() => store.getters.previewFileStatusMap)
 const productionAssetTaskTypes = computed(
   () => store.getters.productionAssetTaskTypes
 )
@@ -1287,6 +1301,12 @@ const isCurrentTaskSupervisor = computed(() =>
     : isCurrentUserSupervisor.value
 )
 
+// Zou refuses the trim to artists, clients and department supervisors: their
+// handles stay visible but frozen, as in the preview player.
+const areHandlesReadOnly = computed(
+  () => !store.getters.canEditShotTrim(task.value)
+)
+
 const currentPreview = computed(() => {
   const entity = currentEntity.value
   if (!entity) return null
@@ -1345,6 +1365,8 @@ const nextEntityHandleIn = computed(
 // `entry` is the rank of the playlist entry, `position` the rank of the
 // preview inside it. The couple identifies a viewer: the preview file id
 // can't, the same entity repeated in a playlist may point at the same one.
+// The statuses come from the registry: the socket turns a processing
+// preview ready there, never in the playlist payload.
 const picturePreviews = computed(() =>
   entityList.value.flatMap((e, entry) => [
     {
@@ -1353,6 +1375,7 @@ const picturePreviews = computed(() =>
       width: e.preview_file_width,
       extension: e.preview_file_extension,
       revision: e.preview_file_revision,
+      status: previewFileStatusMap.value?.get(e.preview_file_id),
       entry,
       position: 1
     },
@@ -1362,10 +1385,21 @@ const picturePreviews = computed(() =>
       width: p.width,
       extension: p.extension,
       revision: p.revision,
+      status: previewFileStatusMap.value?.get(p.id),
       entry,
       position: index + 2
     }))
   ])
+)
+
+// Every revision the entries can play, with the status the playlist was
+// read with: the processing ones join the registry the socket keeps.
+const entryPreviewFiles = computed(() =>
+  entityList.value.flatMap(entity =>
+    Object.values(entity.preview_files || {})
+      .flat()
+      .flatMap(previewFile => [previewFile, ...(previewFile.previews || [])])
+  )
 )
 
 const currentPreviewPath = computed(() => {
@@ -1752,7 +1786,7 @@ const { fullScreen, toggle: toggleFullScreen } = useFullScreen({
   container,
   onChange: () => {
     resetHeight()
-    setTimeout(() => {
+    setPlayerTimeout(() => {
       if (isCurrentPreviewPicture.value) {
         triggerResize()
         resetHeight()
@@ -1874,6 +1908,40 @@ const isOverlayInteractive = computed(
   () => !isAltHeld.value && !isScrubbing.value
 )
 
+// Two fingers pan and zoom the media, over the annotations too. One finger
+// uses the annotation tool turned on (the laser draws), or pans when none
+// is.
+const isTouchNavigationEnabled = computed(
+  () => isCurrentPreviewMovie.value || isCurrentPreviewPicture.value
+)
+const isAnnotationToolOn = computed(
+  () =>
+    isDrawing.value ||
+    isShapeMode.value ||
+    isEraserModeOn.value ||
+    isTyping.value
+)
+
+const getMainViewer = () => {
+  if (isCurrentPreviewMovie.value) return rawPlayer.value
+  if (isCurrentPreviewPicture.value) return picturePlayer.value
+  return null
+}
+
+useTouchNavigation({
+  container: videoContainer,
+  surfaces: () => [
+    mainAnnotationCanvas.value?.overlay,
+    mainMediaElement.value?.parentElement
+  ],
+  overlay: () => mainAnnotationCanvas.value?.overlay,
+  isAnnotating: isAnnotationToolOn,
+  isEnabled: isTouchNavigationEnabled,
+  panBy: (dx, dy) => getMainViewer()?.panBy(dx, dy),
+  zoomAt: (clientX, clientY, ratio) =>
+    getMainViewer()?.zoomAt(clientX, clientY, ratio)
+})
+
 const { cursor: annotationCursor } = useAnnotationCursor({
   isAltHeld,
   isDrawing,
@@ -1899,6 +1967,17 @@ const isDefaultBackground = background => {
 
 const triggerResize = () => {
   window.dispatchEvent(new Event('resize'))
+}
+
+// Timeouts for the work the player does on itself a little later, like a
+// new layout: a closed player has nothing left to work on, so the unmount
+// clears them.
+const setPlayerTimeout = (callback, delay) => {
+  const timeout = setTimeout(() => {
+    playerTimeouts.delete(timeout)
+    callback()
+  }, delay)
+  playerTimeouts.add(timeout)
 }
 
 const displayBars = () => {
@@ -2168,7 +2247,7 @@ const playFullBuild = () => {
 
 const _setCurrentTimeOnHandleIn = () => {
   if (handleIn.value > 1 && frameNumber.value < handleIn.value) {
-    rawPlayer.value.setCurrentTimeRaw(handleIn.value * frameDuration.value)
+    rawPlayer.value.setCurrentTimeRaw(frameStartTime(handleIn.value, fps.value))
     syncComparisonPlayer()
   }
 }
@@ -2205,9 +2284,11 @@ const pause = () => {
     const comparisonPlayer = rawPlayerComparison.value
     let currentTimeValue = 0
     if (rawPlayer.value) {
-      currentTimeValue = ceilToFrame(
-        rawPlayer.value.getCurrentTimeRaw(),
-        fps.value
+      // The next frame boundary, but within the last frame: the very end of
+      // the movie holds no drawing.
+      currentTimeValue = Math.min(
+        ceilToFrame(rawPlayer.value.getCurrentTimeRaw(), fps.value),
+        frameStartTime(nbFrames.value - 1, fps.value)
       )
     }
     rawPlayer.value?.pause()
@@ -2233,6 +2314,9 @@ const playEntity = (entityIndex, updateFullPlaylist = true, frame = -1) => {
   framesSeenOfPicture.value = 1
   playingEntityIndex.value = entityIndex
   if (entity && isMoviePreview(entity.preview_file_extension)) {
+    // The handles otherwise stay those of the previous entity until its
+    // metadata loads, and a playing switch seeked on them.
+    resetHandles(entity)
     nextTick(() => {
       scrollToEntity(playingEntityIndex.value)
       rawPlayer.value?.loadEntity(entityIndex)
@@ -2280,7 +2364,7 @@ const playEntity = (entityIndex, updateFullPlaylist = true, frame = -1) => {
     const ann = getAnnotation(0)
     if (!isPlaying.value) loadAnnotation(ann)
     if (wasDrawing) {
-      setTimeout(() => {
+      setPlayerTimeout(() => {
         isDrawing.value = true
         setAnnotationDrawingMode(true)
       }, 100)
@@ -2383,8 +2467,8 @@ const goPreviousFrame = () => {
 }
 
 const goNextFrame = () => {
-  clearCanvas()
   if (isFullMode.value) {
+    clearCanvas()
     let nextFrameTime =
       fullPlaylistPlayer.value.currentTime + frameDuration.value
     const nextFrame = Math.round(nextFrameTime * fps.value)
@@ -2399,7 +2483,10 @@ const goNextFrame = () => {
     const nextFrameTime =
       rawPlayer.value.getCurrentTimeRaw() + frameDuration.value + 0.0001
     const nextFrame = Math.round(nextFrameTime * fps.value)
+    // On the last frame the movie does not move and no frame reloads the
+    // drawing: the canvas keeps it.
     if (nextFrame >= nbFrames.value) return
+    clearCanvas()
     rawPlayer.value.goNextFrame()
     if (isComparing.value) syncComparisonPlayer()
     const time = rawPlayer.value.getCurrentTime()
@@ -2411,11 +2498,22 @@ const goNextFrame = () => {
   }
 }
 
+// Like a click on the progress bar, which also shows the drawing of the
+// frame reached. A playing movie only jumps, as in the preview player:
+// loading the drawing would pause it. A picture and the movie of the full
+// mode stay as they are.
+const goToFrame = frame => {
+  if (!isCurrentPreviewMovie.value || isFullMode.value) return
+  if (isPlaying.value) rawPlayer.value?.setCurrentFrame(frame)
+  else onProgressChanged(frame)
+}
+
 const goPreviousDrawing = () => {
   try {
-    clearCanvas()
     const previous = getPreviousAnnotationTime(currentTimeRaw.value)
+    // Without a drawing to go to, the one on screen stays.
     if (!previous) return
+    clearCanvas()
     // Seek by the annotation's time, not its stored frame: .frame can be
     // stale (off by one, or a zero-padded string) and lands on the wrong
     // frame. See PreviewPlayer.jumpToAnnotationFrame.
@@ -2423,7 +2521,8 @@ const goPreviousDrawing = () => {
     if (isFullMode.value) {
       setFullPlayerTime(annotationTime / fps.value)
     } else {
-      rawPlayer.value.setCurrentTimeRaw(annotationTime / fps.value)
+      // It seeks with the nudge of setCurrentFrame: an exact seek on the
+      // start of the last frame can land Chromium on the very end.
       onProgressChanged(annotationTime, true)
     }
     if (isComparing.value) syncComparisonPlayer()
@@ -2434,15 +2533,14 @@ const goPreviousDrawing = () => {
 
 const goNextDrawing = () => {
   try {
-    clearCanvas()
     const next = getNextAnnotationTime(currentTimeRaw.value)
     if (!next) return
+    clearCanvas()
     // Seek by time, not the stale .frame — see goPreviousDrawing.
     const annotationTime = Math.round(next.time / frameDuration.value)
     if (isFullMode.value) {
       setFullPlayerTime(annotationTime / fps.value)
     } else {
-      rawPlayer.value.setCurrentTimeRaw(annotationTime / fps.value)
       onProgressChanged(annotationTime, true)
     }
     if (isComparing.value) syncComparisonPlayer()
@@ -2497,29 +2595,34 @@ const onProgressChanged = (frame, updatePlaylistProgress = true) => {
   }
 }
 
+// Only the moved handle is saved: the other one shows either the clip
+// bound of the revision on screen, or a trim set on another revision.
+const _saveHandles = handles => {
+  const shot = shotMap.value.get(currentEntity.value?.id)
+  if (!shot) return
+  store
+    .dispatch('editShot', {
+      id: shot.id,
+      data: { ...shot.data, ...handles }
+    })
+    .catch(console.error)
+}
+
+// The progress bar still ends a drag started before the handles froze.
 const onHandleInChanged = ({ frameNumber: f, save }) => {
+  if (areHandlesReadOnly.value) return
   handleIn.value = f
-  if (save) _saveHandles()
+  if (save) _saveHandles({ handle_in: f })
   updateRoomStatus()
 }
 
 const onHandleOutChanged = ({ frameNumber: f, save }) => {
+  if (areHandlesReadOnly.value) return
   handleOut.value = f
-  if (save) _saveHandles()
+  // An end handle at the clip end is no trim: saving that frame would
+  // stop a longer revision at the length of the one on screen.
+  if (save) _saveHandles({ handle_out: f < nbFrames.value ? f : null })
   updateRoomStatus()
-}
-
-const _saveHandles = () => {
-  const shot = shotMap.value.get(currentEntity.value?.id)
-  if (!shot) return
-  store.dispatch('editShot', {
-    id: shot.id,
-    data: {
-      ...shot.data,
-      handle_in: handleIn.value,
-      handle_out: handleOut.value
-    }
-  })
 }
 
 const onPreviousFrameClicked = () => {
@@ -2746,8 +2849,9 @@ const onFrameUpdate = frame => {
         // Raw frame-start seek: setCurrentFrame goes through
         // runSetCurrentTime, whose re-entrancy gate can drop the loop
         // seek and let the clip play through to its real end.
-        rawPlayer.value?.setCurrentTimeRaw(startFrame / fps.value)
-        rawPlayerComparison.value?.setCurrentTimeRaw(startFrame / fps.value)
+        const startTime = frameStartTime(startFrame, fps.value)
+        rawPlayer.value?.setCurrentTimeRaw(startTime)
+        rawPlayerComparison.value?.setCurrentTimeRaw(startTime)
       } else {
         onPlayNext()
       }
@@ -3312,13 +3416,19 @@ const extractFrame = (canvas, frame) => {
   context.drawImage(video, 0, 0, canvas.width, canvas.height)
 }
 
+// Resolves false once the player is closed: no video is left to read the
+// frame from, and the snapshots are of no use anymore.
 const extractVideoFrame = (canvas, f) => {
   return new Promise(resolve => {
+    if (!rawPlayer.value) {
+      resolve(false)
+      return
+    }
     rawPlayer.value.setCurrentFrame(f)
     nextTick(() => {
       setTimeout(() => {
-        extractFrame(canvas, f)
-        resolve()
+        if (rawPlayer.value) extractFrame(canvas, f)
+        resolve(Boolean(rawPlayer.value))
       }, 500)
     })
   })
@@ -3374,13 +3484,14 @@ const extractVideoAnnotationSnapshots = async ({ withLabel = false } = {}) => {
     const frame = Math.round(
       roundToFrame(ann.time, fps.value) / frameDuration.value
     )
-    await extractVideoFrame(canvas, frame)
+    if (!(await extractVideoFrame(canvas, frame))) return []
     await copyAnnotationCanvas(canvas, ann)
     if (withLabel) drawSnapshotTitle(canvas, snapshotTitle({ revision, frame }))
     files.push(
       await getFileFromCanvas(canvas, snapshotFilename({ revision, frame }))
     )
   }
+  if (!rawPlayer.value) return []
   rawPlayer.value.setCurrentFrame(cur - 1)
   nextTick(() => {
     clearCanvas()
@@ -3423,6 +3534,8 @@ const extractPicturePreviewSnapshots = async ({ withLabel = false } = {}) => {
     // composite would then capture an empty canvas and the resulting
     // PNG would come out without any annotation.
     await new Promise(resolve => setTimeout(resolve, 500))
+    // Closed meanwhile, like in extractVideoFrame
+    if (!picturePlayer.value) return []
     const canvas = document.getElementById('annotation-snapshot')
     extractPicture(canvas)
     await compositeLiveAnnotationsOntoCanvas(canvas)
@@ -3746,6 +3859,12 @@ const moveSelectedEntity = (entityToMove, toMoveIndex, targetIndex) => {
   }
 }
 
+// On a phone the keyboard resizes the player as a note is typed: the note
+// stays and only the overlay follows the media. AnnotationCanvas resizes
+// the canvas once the typing ends, which reloads the annotations.
+const isTypingNote = () =>
+  Boolean(fabricCanvas.value?.getActiveObject()?.isEditing)
+
 const resetHeight = () => {
   nextTick(() => {
     let height = window.innerHeight - 90
@@ -3775,7 +3894,8 @@ const resetHeight = () => {
       rawPlayerComparison.value.resetHeight(height)
     }
     nextTick(() => {
-      resetCanvas()
+      if (isTypingNote()) resetCanvasSize()
+      else resetCanvas()
       updateProgressBar()
     })
   })
@@ -4004,6 +4124,9 @@ const loadWaveForm = () => {
         if (wavesurfer) wavesurfer.destroy()
         configureWaveForm()
         setTimeout(() => {
+          // Destroyed meanwhile: the player closed, or moved on to a
+          // preview that is no movie.
+          if (!wavesurfer) return
           // destroy() aborts the in-flight fetch, rejecting load() with an
           // expected AbortError; real failures already reach the 'error'
           // handler, which load() fires before rejecting.
@@ -4275,6 +4398,7 @@ const resetCanvasVisibility = () => {
 }
 
 const resizeAnnotations = () => {
+  if (isTypingNote()) return
   resetCanvas().then(() => {
     reloadAnnotations()
     loadAnnotation()
@@ -4371,9 +4495,9 @@ const onKeyDown = event => {
       onNextFrameClicked()
     }
   } else if (event.code === 'Home') {
-    rawPlayer.value?.setCurrentFrame(0)
+    goToFrame(0)
   } else if (event.code === 'End') {
-    rawPlayer.value?.setCurrentFrame(nbFrames.value - 1)
+    goToFrame(nbFrames.value - 1)
   }
 }
 
@@ -4381,7 +4505,7 @@ const onWindowResize = () => {
   const now = new Date().getTime()
   if (now - lastResizeCall > 100) {
     lastResizeCall = now
-    setTimeout(() => {
+    setPlayerTimeout(() => {
       resetHeight()
       resizeAnnotations()
     }, 200)
@@ -4543,7 +4667,7 @@ watch(playingEntityIndex, () => {
 
 watch(fullScreen, () => {
   resetHeight()
-  setTimeout(() => {
+  setPlayerTimeout(() => {
     if (isCurrentPreviewPicture.value) {
       triggerResize()
       resetHeight()
@@ -4658,6 +4782,10 @@ watch(
   () => startProgressiveRender()
 )
 
+watch(entryPreviewFiles, previewFiles =>
+  store.dispatch('registerPreviewFileStatuses', previewFiles)
+)
+
 // Lazy-load annotations for the current preview at every transition (entity
 // change, version switch, sub-preview change), then apply and redraw. A token
 // guards against a slower fetch landing after the user has moved on.
@@ -4741,7 +4869,7 @@ watch(
 
 watch(isEntitiesHidden, () => {
   nextTick(() => {
-    setTimeout(() => triggerResize(), RESIZE_DELAY)
+    setPlayerTimeout(() => triggerResize(), RESIZE_DELAY)
   })
 })
 
@@ -4820,6 +4948,9 @@ onMounted(() => {
       container.value.onmousemove = onMouseMove
     }
     window.addEventListener('beforeunload', onWindowsClosed)
+    // The temporary playlist mounts while it loads: size the player right
+    // away so the modal does not grow once the entities arrive.
+    resetHeight()
     resetCanvas()
     setPlayerSpeed(1)
     onFrameUpdate(0)
@@ -4860,6 +4991,7 @@ onBeforeUnmount(() => {
   cancelProgressiveRender()
   _stopPlaylistProgressUpdateLoop()
   if (playingPictureTimeout) clearTimeout(playingPictureTimeout)
+  playerTimeouts.forEach(clearTimeout)
   window.removeEventListener('keydown', onKeyDown)
   window.removeEventListener('resize', onWindowResize)
   window.removeEventListener('beforeunload', onWindowsClosed)
@@ -5076,6 +5208,12 @@ const playerProxy = {
   // would otherwise let Chrome's two-finger swipe navigate back / forward
   // and drop any unsaved comment — issue #1700.
   overscroll-behavior-x: contain;
+
+  // The fingers navigate the media there: the page must not scroll or
+  // zoom under them.
+  &.touch-navigation {
+    touch-action: none;
+  }
 }
 
 .main-content-anchor,
@@ -5277,6 +5415,9 @@ const playerProxy = {
 }
 
 .loading-wrapper {
+  align-items: center;
+  display: flex;
+  justify-content: center;
   width: 100%;
 }
 

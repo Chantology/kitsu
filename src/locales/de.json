@@ -1,5 +1,15 @@
 {
   "default": {
+    "app_login": {
+      "authorize": "Autorisieren",
+      "consent": "Eine Anwendung auf diesem Computer möchte sich als {full_name} mit Kitsu verbinden.",
+      "consent_named": "Eine Anwendung auf diesem Computer, die sich \"{app_name}\" nennt, möchte sich als {full_name} mit Kitsu verbinden.",
+      "error": "Die Anmeldung der Anwendung ist fehlgeschlagen. Bitte starte sie erneut in der Anwendung.",
+      "error_2fa_setup": "Richte zuerst die Zwei-Faktor-Authentifizierung in Kitsu ein und starte dann die Anmeldung erneut in der Anwendung.",
+      "invalid_request": "Dieser Anmeldelink ist ungültig. Bitte starte die Anmeldung erneut in der Anwendung.",
+      "title": "Anmeldung der Anwendung",
+      "warning": "Autorisiere nur, wenn du diese Anmeldung selbst in der Anwendung gestartet hast. Sie greift mit deinen Berechtigungen auf Kitsu zu."
+    },
     "assets": {
       "cast_in": "Gecastet in",
       "delete_error": "Beim Löschen dieses Assets ist ein Fehler aufgetreten. Wahrscheinlich sind damit Daten verknüpft. Sind Sie sicher, dass dieser Asset-Typ keine Aufgabe hat, die mit ihm verbunden ist?",
@@ -42,6 +52,7 @@
     },
     "asset_types": {
       "all_asset_types": "Alle Assettypen",
+      "all_hidden": "Alle Assettypen sind ausgeblendet.",
       "create_error": "Beim Speichern dieses Asset-Typs ist ein Fehler aufgetreten. Sind Sie sicher, dass es keinen Asset-Typ mit einem ähnlichen Namen gibt?",
       "delete_text": "Sind Sie sicher, dass Sie {name} aus Ihrer Datenbank entfernen möchten?",
       "delete_error": "Beim Löschen dieses Asset-Typs ist ein Fehler aufgetreten. Wahrscheinlich sind damit Daten verknüpft. Sind Sie sicher, dass mit diesem Asset-Typ kein Asset verknüpft ist?",
@@ -63,12 +74,17 @@
     },
     "breakdown": {
       "all_assets": "Alle verfügbaren Assets",
+      "copy_casting": "Dieses Casting kopieren (Strg + V fügt es in die ausgewählten Zeilen ein)",
       "edit_label": "Etikett bearbeiten",
       "empty": "Leeres Casting",
       "label": "Etikett",
+      "nb_assets": "{count} Asset | {count} Assets",
+      "nb_occurrences": "{count} Vorkommen | {count} Vorkommen",
+      "nb_ready": "{ready} / {total} bereit",
       "occurrences": "Vorkommen",
       "picture_mode": "Zum Bildmodus wechseln",
       "remove_from_casting": "Aus dem Casting entfernen",
+      "undo": "Letzte Casting-Änderung rückgängig machen (Strg + Z)",
       "view_as_cards": "Als Karten anzeigen",
       "view_as_list": "Als Liste anzeigen",
       "text_mode": "Zum Textmodus wechseln",
@@ -85,10 +101,16 @@
       "fields": {
         "standby": "STDB"
       },
-      "episode_casting": "Episodencasting",
       "save_error": "Fehler beim Speichern des Castings",
       "hide_library": "Bibliothek ausblenden",
-      "show_library": "Bibliothek anzeigen"
+      "show_library": "Bibliothek anzeigen",
+      "filters": {
+        "all": "Alle Zeilen",
+        "asset": "Nach gecastetem Asset filtern…",
+        "empty": "Ohne Casting",
+        "label": "Zeilen",
+        "standby": "Standby"
+      }
     },
     "comments": {
       "add_attachment": "Anhang hinzufügen",
@@ -99,6 +121,7 @@
       "comment_from_client": "Kommentar vom Kunden",
       "edit_title": "Kommentar bearbeiten",
       "empty_text": "Dieser Kommentar ist leer",
+      "action_error": "Speichern fehlgeschlagen. Bitte versuchen Sie es erneut.",
       "edit_error": "Beim Bearbeiten des Kommentars ist ein Fehler aufgetreten. Bitte kontaktieren Sie unser Support-Team.",
       "error": "Beim Posten von Kommentaren ist ein Fehler aufgetreten.",
       "no_file_attached": "Keine Datei angehängt",
@@ -270,6 +293,7 @@
     },
     "episodes": {
       "all_episodes": "Alle Episoden",
+      "all_hidden": "Alle Episoden sind ausgeblendet.",
       "edit_error": "Beim speichern dieser Episode ist ein Fehler aufgetreten. Sind Sie sicher, dass keine Episode mit gleichem Namen vorhanden ist?",
       "delete_error": "Beim Löschen dieser Episode ist ein Fehler aufgetreten. Wahrscheinlich sind damit Daten verknüpft. Bist du sicher, dass diese Episode keine Sequenz hat, die mit ihr verbunden ist?",
       "delete_text": "Sind Sie sicher, dass Sie {name} aus Ihrer Datenbank entfernen möchten? Alle zugehörigen Shots und Vorschauen werden ebenfalls gelöscht. Bitte bestätigen Sie, indem Sie unten den Episodennamen eingeben.",
@@ -436,6 +460,7 @@
       "history": "Historie",
       "info": "Informationen",
       "or": "oder",
+      "next": "Weiter",
       "no": "Nein",
       "loading": "Laden...",
       "loading_data": "Laden von Daten",
@@ -448,8 +473,10 @@
       "nb_frames": "Frame | Frames",
       "person": "Person",
       "preview_3d_not_supported": "3D-Vorschauen werden in diesem Browser nicht unterstützt (WebGL2 ist erforderlich). Bitte aktualisieren Sie ihn auf die neueste Version.",
+      "previous": "Zurück",
       "profile": "Profil",
       "production": "Produktion",
+      "productivity": "Produktivität",
       "remove": "Entfernen",
       "save": "Speichern",
       "sort_by": "Sortieren nach",
@@ -466,6 +493,8 @@
         "choose": "Auswählen",
         "error_imported_rows": "{count} Zeile wurde vor dem Fehler importiert. | {count} Zeilen wurden vor dem Fehler importiert.",
         "error_line": "Zeile {line}",
+        "error_timeout": "Der Import dauert länger als erwartet und läuft im Hintergrund weiter.",
+        "error_timeout_hint": "Laden Sie die Seite in ein paar Minuten neu, um das Ergebnis zu prüfen, bevor Sie erneut importieren.",
         "error_upload": "Beim Hochladen Ihrer CSV-Datei ist ein Fehler aufgetreten.",
         "export_file": "Daten in eine CSV-Datei exportieren",
         "import_file": "Daten aus einer CSV-Datei importieren",
@@ -476,6 +505,8 @@
         "legend_missing": "Erwartete Spalte, die nicht gefunden wurde",
         "legend_disabled": "Zeile, die nicht aktualisiert oder erstellt wird",
         "legend_overwrite": "Zeile, die aktualisiert wird",
+        "legend_incomplete": "Zeile, der ein Pflichtwert fehlt",
+        "missing_values": "Zeile {lines} hat keinen Wert in einer Pflichtspalte ({columns}). Füllen Sie sie aus oder entfernen Sie sie, und laden Sie die Datei dann erneut hoch. | Die Zeilen {lines} haben keinen Wert in einer Pflichtspalte ({columns}). Füllen Sie sie aus oder entfernen Sie sie, und laden Sie die Datei dann erneut hoch.",
         "paste": "Einfügen",
         "paste_code": "Bitte fügen Sie hier Ihre CSV-Daten ein:",
         "preview": "Vorschau",
@@ -584,6 +615,7 @@
       "is_shared": "Gemeinsam mit dem gesamten Team",
       "no_results": "Keine Ergebnisse",
       "link": "Link",
+      "list": "Liste",
       "hours_spent": "verbrachte Stunde | verbrachte Stunden",
       "hours_expected": "erwartete Stunde | erwartete Stunden",
       "hours_estimated": "Stunde geschätzt | Stunden geschätzt",
@@ -751,6 +783,8 @@
       "invite_link_error": "Beim Erstellen des Einladungslinks ist ein Fehler aufgetreten.",
       "new_person": "Einen neuen Mitarbeiter hinzufügen",
       "no_task_assigned": "Es gibt keine laufenden Aufgaben, die Ihnen zugeordnet sind.",
+      "no_task_done": "Du hast noch keine freigegebenen Aufgaben",
+      "no_task_pending": "Keine Aufgabe wartet auf Feedback",
       "persons": "Person | Personen",
       "project_role": "Projektrolle",
       "running_tasks": "Laufende Aufgaben",
@@ -862,7 +896,7 @@
       "created_at": "Erstellt am:",
       "delete_text": "Sind Sie sicher, dass Sie {name} aus Ihrer Datenbank entfernen möchten?",
       "delete_error": "Beim Löschen dieser Playlist ist ein Fehler aufgetreten.",
-      "edit_error": "Beim speichern dieser Playlist ist ein Fehler aufgetreten.",
+      "edit_error": "Beim Speichern dieser Playlist ist ein Fehler aufgetreten. Sind Sie sicher, dass es keine Playlist mit einem ähnlichen Namen gibt?",
       "download_zip": "Download.zip",
       "failed": "Fehlgeschlagen",
       "for_client": "Der Kunde",
@@ -1036,6 +1070,8 @@
       },
       "fields": {
         "fps": "FPS",
+        "hd_bitrate_compression": "Bitrate für Videos in hoher Auflösung (Mbit/s)",
+        "hd_bitrate_short": "HD Mbit/s",
         "is_frame_in_numbering": "Den Frame-Zähler des Players beim Frame-In starten",
         "name": "Name",
         "ratio": "Verhältnis",
@@ -1055,6 +1091,8 @@
         "code": "Kurzer Name",
         "is_publish_default": "Kommentar-Widget für Künstler standardmäßig auf Veröffentlichungsmodus einstellen",
         "is_single_preview_per_revision": "Nur eine Vorschaudatei pro Revision zulassen",
+        "ld_bitrate_compression": "Bitrate für Videos in niedriger Auflösung (Mbit/s)",
+        "ld_bitrate_short": "LD Mbit/s",
         "revision_padding": "Auffüllung der Revisionsnummer (0 = keine Auffüllung)"
       },
       "metadata": {
@@ -1103,6 +1141,7 @@
       },
       "parameters": {
         "title": "Parameter",
+        "previews_and_comments": "Previews und Kommentare",
         "save": {
           "button": "Bestätigen"
         }
@@ -1176,6 +1215,22 @@
         "assets": "Assets",
         "shots": "Shots",
         "sequences": "Sequenzen"
+      },
+      "video": {
+        "bitrate_default": "Standard: {value} Mbit/s",
+        "bitrate_default_max": "Standard und Maximum: {value} Mbit/s",
+        "bitrate_explanation": "Eine höhere Bitrate sorgt für ein schärferes Bild, aber auch für größere Dateien, die langsamer geladen werden.",
+        "bitrate_max": "Maximum: {value} Mbit/s",
+        "bitrate_size": "Etwa {size} MB pro Minute",
+        "bitrates": "Bitraten",
+        "hd_bitrate_description": "Version in voller Auflösung, die im HD-Modus abgespielt und für Downloads verwendet wird.",
+        "ld_bitrate_description": "Kleinere, 1280 Pixel breite Version, die im LD-Modus abgespielt wird.",
+        "ld_bitrate_max": "Maximum: {value} Mbit/s (HD-Bitrate)",
+        "next_uploads_only": "Änderungen gelten nur für künftig hochgeladene Videos: Vorhandene Vorschauen werden nicht neu enkodiert.",
+        "restore_default": "Standard wiederherstellen",
+        "task_type_bitrates": "Leer lassen, um die Bitraten der Registerkarte „Video“ zu verwenden.",
+        "task_type_ld_bitrate_max": "Maximum: die HD-Bitrate des Aufgabentyps",
+        "title": "Video"
       },
       "hide_stats": "Statistiken ausblenden",
       "show_stats": "Statistiken anzeigen"
@@ -1364,6 +1419,7 @@
       "library_title": "Aufgabentyp-Bibliothek"
     },
     "sequences": {
+      "all_hidden": "Alle Sequenzen sind ausgeblendet.",
       "all_sequences": "Alle Sequenzen",
       "edit_error": "Beim Speichern dieser Sequenz ist ein Fehler aufgetreten. Sind Sie sicher, dass es keine Sequenz mit einem ähnlichen Namen gibt?",
       "delete_text": "Sind Sie sicher, dass Sie {name} aus Ihrer Datenbank entfernen möchten? Alle zugehörigen Shots und Vorschauen werden ebenfalls gelöscht. Bitte bestätigen Sie, indem Sie unten den Sequenznamen eingeben.",
@@ -1391,6 +1447,8 @@
       "apply_to_prod_confirm": "Sind Sie sicher, dass Sie diese Planversion auf die aktuelle Produktion anwenden wollen? Dadurch werden die aktuellen Aufgabenwerte außer Kraft gesetzt.",
       "apply_to_prod_error": "Bei der Anwendung der Planversion auf die aktuelle Produktion ist ein Fehler aufgetreten.",
       "assign": "Zuweisen an:",
+      "assign_error": "Die Aufgaben konnten nicht zugewiesen werden. Bitte versuchen Sie es erneut.",
+      "assign_no_fit": "{count} Aufgabe passte nicht in den Zeitraum. | {count} Aufgaben passten nicht in den Zeitraum.",
       "confirm_move_children": "Das Verschieben dieses Balkens wird {count} Unterelement zuschneiden oder verschieben, damit es in die neuen Grenzen passt. Fortfahren? | Das Verschieben dieses Balkens wird {count} Unterelemente zuschneiden oder verschieben, damit sie in die neuen Grenzen passen. Fortfahren?",
       "create_version": "Version des Zeitplans erstellen",
       "cut_tool": "Schneiden",
@@ -1435,6 +1493,7 @@
       "no_entity": "Keine zuweisbare Entität",
       "overall_man_days": "Personentage",
       "reset_list": "Liste zurücksetzen",
+      "save_task_error": "Die Aufgabe konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.",
       "select_task_type": "Wählen Sie einen Aufgabentyp...",
       "show_assigned": "Zugeordnete Einheiten anzeigen",
       "title": "Zeitplan",
@@ -1545,15 +1604,18 @@
       "show_timecode": "Ein- und Ausgänge als Timecode anzeigen"
     },
     "server_down": {
+      "retrying": "Kitsu versucht es weiter und bringt Sie zu Ihrer Seite zurück, sobald die API antwortet.",
       "text": "Bitte wenden Sie sich an unser Support-Team oder Ihren Systemadministrator, um zu erfahren, was schiefläuft.",
       "title": "Kitsu ist beim Erreichen seiner Daten-API auf einen Fehler gestoßen."
     },
     "statistics": {
       "count": "Anzahl",
+      "bars": "Gestapelte Balken",
       "count_mode": "Zählmodus",
       "display_mode": "Anzeigemodus",
       "frames": "Einzelbilder",
       "pie": "Kreisdiagramme",
+      "heatmap": "Heatmap",
       "shots": "Shots",
       "data_mode": "Daten",
       "retakes": "Retakes",
@@ -1561,7 +1623,8 @@
       "all": "Alle",
       "only_running": "Nur laufend",
       "episode_status": "Status der Episode",
-      "drawings": "Zeichnungen"
+      "drawings": "Zeichnungen",
+      "validated": "validiert"
     },
     "tasks": {
       "add_preview": "Vorschau hinzufügen",
@@ -1767,7 +1830,8 @@
       "hours": "Stunden",
       "month": "Monat",
       "time_spents": "Zeitaufwand (Stunden)",
-      "timelog_title": "Timelog",
+      "week_total": "Woche: {hours} Stunden",
+      "timelog_title": "Zeiterfassung",
       "title": "Stundenzettel",
       "year": "Jahr",
       "confirm_day_off": "Wenn Sie diesen Tag als freien Tag festlegen, werden alle für den aktuellen Tag eingetragenen Zeiten gelöscht. Sind Sie sicher, dass Sie fortfahren möchten?",
@@ -1997,29 +2061,45 @@
       "send_error": "Beim Senden der Nachricht ist ein Fehler aufgetreten."
     },
     "concepts": {
-      "add_links": "Links zu Assets hinzufügen",
-      "add_new_concept": "Neue Konzepte hinzufügen",
+      "actions": {
+        "empty": "Keine Links",
+        "remove_link": "Verknüpfung entfernen",
+        "title": "Links zu Konzepten"
+      },
       "add_concept": "Dateien für neue Konzepte hinzufügen",
       "add_concept_error": "Beim Hinzufügen von Konzepten ist ein Fehler aufgetreten.",
+      "add_links": "Links zu Assets hinzufügen",
+      "add_new_concept": "Neue Konzepte hinzufügen",
       "delete_for_selection": "Löschen des ausgewählten Konzepts | Löschen der {nbSelectedConcepts} ausgewählten Konzepte",
+      "delete_for_selection_hard_lock_text": "LÖSCHEN",
+      "delete_for_selection_hard_text": "Sind Sie sicher, dass Sie die ausgewählten Konzepte dauerhaft entfernen möchten? Alle zugehörigen Aufgaben, Kommentare und Vorschauen werden ebenfalls gelöscht. Bitte bestätigen Sie, indem Sie unten \"LÖSCHEN\" eingeben.",
+      "drop_new_concepts": "Neue Konzeptdateien hier ablegen",
       "empty": "Für diese Produktion gibt es keine Konzepte",
+      "fields": {
+        "asset": "Asset",
+        "asset_type": "Asset-Typ",
+        "created_at": "Datum der Erstellung",
+        "entity_type": "Entitätstyp",
+        "last_comment_date": "Letzter Kommentar",
+        "publisher": "Veröffentlicht von",
+        "updated_at": "Datum der Aktualisierung"
+      },
+      "folders": {
+        "delete": "Ordner löschen",
+        "delete_error": "Beim Löschen dieses Ordners ist ein Fehler aufgetreten.",
+        "delete_text": "Möchten Sie den Ordner {name} wirklich löschen? Seine Konzepte bleiben erhalten und kehren auf die oberste Ebene zurück.",
+        "edit_error": "Beim Speichern dieses Ordners ist ein Fehler aufgetreten. Möglicherweise trägt bereits ein anderer Ordner diesen Namen.",
+        "empty": "Dieser Ordner ist leer",
+        "move": "In einen Ordner verschieben",
+        "name": "Ordnername",
+        "new": "Neuer Ordner",
+        "none": "Kein Ordner",
+        "rename": "Ordner umbenennen"
+      },
       "multiple_delete_error": "Beim Löschen eines Konzepts ist ein Fehler aufgetreten. Möglicherweise sind bereits Daten mit diesem Konzept verknüpft. Sind Sie sicher, dass mit dem ausgewählten Konzept keine Aufgabe verknüpft ist?",
       "no_concept_selected": "Kein Konzept ausgewählt",
       "title": "Konzepte",
-      "fields": {
-        "entity_type": "Entitätstyp",
-        "created_at": "Datum der Erstellung",
-        "updated_at": "Datum der Aktualisierung",
-        "last_comment_date": "Letzter Kommentar",
-        "publisher": "Veröffentlicht von"
-      },
-      "actions": {
-        "title": "Links zu Konzepten",
-        "empty": "Keine Links"
-      },
-      "delete_for_selection_hard_text": "Sind Sie sicher, dass Sie die ausgewählten Konzepte dauerhaft entfernen möchten? Alle zugehörigen Aufgaben, Kommentare und Vorschauen werden ebenfalls gelöscht. Bitte bestätigen Sie, indem Sie unten \"LÖSCHEN\" eingeben.",
-      "delete_for_selection_hard_lock_text": "LÖSCHEN",
-      "drop_new_concepts": "Neue Konzeptdateien hier ablegen"
+      "uploading": "Konzepte werden hochgeladen"
     },
     "intro": {
       "join_discord": "Treten Sie dem Community-Discord bei",
@@ -2034,7 +2114,7 @@
     },
     "preview": {
       "broken": "Diese Vorschau ist fehlerhaft.",
-      "processing": "Videobearbeitung im Gange..."
+      "processing": "Diese Vorschau wird verarbeitet..."
     },
     "studios": {
       "create_error": "Beim Speichern dieses Studios ist ein Fehler aufgetreten. Sind Sie sicher, dass es kein Studio mit einem ähnlichen Namen gibt?",
@@ -2053,6 +2133,9 @@
     },
     "days_off": {
       "title": "Freie Tage",
+      "upcoming": "Bevorstehend",
+      "past": "Vergangen",
+      "nb_days": "{count} Tag | {count} Tage",
       "period": "Zeitraum",
       "description": "Beschreibung",
       "updated_at": "Datum der Aktualisierung",

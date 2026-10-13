@@ -1,8 +1,19 @@
 export default {
 
+  app_login: {
+    authorize: 'Authorize',
+    consent: 'An application on this computer wants to connect to Kitsu as {full_name}.',
+    consent_named: 'An application on this computer, which calls itself "{app_name}", wants to connect to Kitsu as {full_name}.',
+    error: 'The application login failed. Please start it again from the application.',
+    error_2fa_setup: 'Set up two-factor authentication in Kitsu first, then start the login again from the application.',
+    invalid_request: 'This login link is invalid. Please start the login again from the application.',
+    title: 'Application login',
+    warning: 'Only authorize it if you started this login from the application yourself. It will access Kitsu with your permissions.'
+  },
+
   assets: {
     cast_in: 'Cast in',
-    casted_in_shots: 'Casted in {nbShots} shots',
+    casted_in_shots: 'Cast in {nbShots} shots',
     cancel_text: 'Are you sure you want to archive {name}?',
     delete_error: 'An error occurred while deleting this asset. There may be existing data currently linked to it. Are you sure this asset type has no task linked to it?',
     delete_for_selection: 'Delete the selected asset | Delete the {nbSelectedAssets} selected assets',
@@ -45,6 +56,7 @@ export default {
     add_asset_type_placeholder: '+ Add Asset Type',
     add_asset_type_to_library: 'Add an asset type to the library',
     all_asset_types: 'All asset types',
+    all_hidden: 'All asset types are hidden.',
     create_error: 'An error occurred while saving this asset type. Are you sure there is no asset type with a similar name?',
     delete_text: 'Are you sure you want to remove {name} from your database?',
     delete_error: 'An error occurred while deleting this asset type. There may be existing data currently linked to it. Are you sure this asset type has no asset linked to it?',
@@ -116,11 +128,14 @@ export default {
 
   breakdown: {
     all_assets: 'All available assets',
+    copy_casting: 'Copy this casting (ctrl + V pastes it on the selected lines)',
     edit_label: 'Change the asset\'s label',
     empty: 'Empty casting',
-    episode_casting: 'Episode casting',
     hide_library: 'Hide Library',
     label: 'Label',
+    nb_assets: '{count} asset | {count} assets',
+    nb_occurrences: '{count} occurrence | {count} occurrences',
+    nb_ready: '{ready} / {total} ready',
     occurrences: 'Occurrences',
     picture_mode: 'Switch to picture mode',
     remove_from_casting: 'Remove from casting',
@@ -128,6 +143,7 @@ export default {
     show_library: 'Display Library',
     text_mode: 'Switch to text mode',
     title: 'Breakdown',
+    undo: 'Undo the last casting change (ctrl + Z)',
     view_as_cards: 'View as cards',
     view_as_list: 'View as list',
     options: {
@@ -141,6 +157,13 @@ export default {
     },
     fields: {
       standby: 'STDB'
+    },
+    filters: {
+      all: 'All lines',
+      asset: 'Filter by cast asset…',
+      empty: 'Without casting',
+      label: 'Lines',
+      standby: 'Standby'
     }
   },
 
@@ -261,6 +284,7 @@ export default {
     edit_title: 'Edit comment',
     edited_by: 'Edited by {name}',
     empty_text: 'This comment is empty',
+    action_error: 'Could not save. Please try again.',
     edit_error: 'An error occurred while editing the comment. Please contact our support team.',
     error: 'An error occurred while posting comment',
     max_retakes_error: 'You cannot add retakes anymore on this task.',
@@ -314,29 +338,45 @@ export default {
   },
 
   concepts: {
-    add_links: 'Add links to assets',
-    add_new_concept: 'Add new concepts',
+    actions: {
+      empty: 'No links',
+      remove_link: 'Remove link',
+      title: 'Links to Concepts'
+    },
     add_concept: 'Add files for new concepts',
     add_concept_error: 'An error occurred while adding concepts.',
+    add_links: 'Add links to assets',
+    add_new_concept: 'Add new concepts',
     delete_for_selection: 'Delete the selected concept | Delete the {nbSelectedConcepts} selected concepts',
-    delete_for_selection_hard_text: 'Are you sure you want to permanently remove the selected concepts? All related tasks, comments and previews will also be deleted. Please confirm by typing \'DELETE\' below.',
     delete_for_selection_hard_lock_text: 'DELETE',
+    delete_for_selection_hard_text: 'Are you sure you want to permanently remove the selected concepts? All related tasks, comments and previews will also be deleted. Please confirm by typing \'DELETE\' below.',
     drop_new_concepts: 'Drop new concept files here',
     empty: 'There are no concepts for this production',
+    fields: {
+      asset: 'Asset',
+      asset_type: 'Asset type',
+      created_at: 'Creation date',
+      entity_type: 'Entity type',
+      last_comment_date: 'Last comment',
+      publisher: 'Published by',
+      updated_at: 'Update date'
+    },
+    folders: {
+      delete: 'Delete folder',
+      delete_error: 'An error occurred while deleting this folder.',
+      delete_text: 'Are you sure you want to delete the folder {name}? Its concepts are kept and go back to the root.',
+      edit_error: 'An error occurred while saving this folder. Another folder may already have this name.',
+      empty: 'This folder is empty',
+      move: 'Move to a folder',
+      name: 'Folder name',
+      new: 'New folder',
+      none: 'No folder',
+      rename: 'Rename folder'
+    },
     multiple_delete_error: 'An error occurred while deleting a concept. There may be existing data currently linked to it. Are you sure there is no task linked to a selected concept?',
     no_concept_selected: 'No concept selected',
     title: 'Concepts',
-    fields: {
-      entity_type: 'Entity type',
-      created_at: 'Creation date',
-      updated_at: 'Update date',
-      last_comment_date: 'Last comment',
-      publisher: 'Published by'
-    },
-    actions: {
-      title: 'Links to Concepts',
-      empty: 'No links'
-    }
+    uploading: 'Uploading concepts'
   },
 
   custom_actions: {
@@ -570,6 +610,7 @@ export default {
 
   episodes: {
     all_episodes: 'All',
+    all_hidden: 'All episodes are hidden.',
     edit_error: 'An error occurred while saving this episode. Are you sure there is no episode with similar name?',
     delete_error: 'An error occurred while deleting this episode. There may be existing data currently linked to it. Are you sure this episode has no sequence linked to it?',
     delete_text: 'Are you sure you want to remove {name} from your database? All related shots and previews will also be deleted. Please confirm by typing the episode name below.',
@@ -877,6 +918,7 @@ export default {
     },
     less_filters: 'Fewer filters',
     link: 'Link',
+    list: 'List',
     load_more: 'Load more',
     loading: 'Loading...',
     loading_data: 'Loading data',
@@ -892,6 +934,7 @@ export default {
     move_action_bar: 'Move action bar',
     nb_drawings: 'drawing | drawings',
     nb_frames: 'frame | frames',
+    next: 'Next',
     no: 'No',
     no_estimation: 'No estimation',
     no_results: 'No results',
@@ -903,8 +946,10 @@ export default {
     people: 'People',
     preview_3d_not_supported:
       '3D previews are not supported in this browser (WebGL2 is required). Please update it to its latest version.',
+    previous: 'Previous',
     profile: 'Profile',
     production: 'Production',
+    productivity: 'Productivity',
     record_audio: 'Record audio',
     record_video: 'Record video',
     recording: {
@@ -970,6 +1015,8 @@ export default {
       choose: 'Choose',
       error_imported_rows: '{count} row was imported before the error. | {count} rows were imported before the error.',
       error_line: 'Line {line}',
+      error_timeout: 'The import is taking longer than expected and continues in the background.',
+      error_timeout_hint: 'Reload the page in a few minutes to check the result before importing again.',
       error_upload: 'An error occurred while uploading your CSV.',
       export_current_view: 'Export current view',
       export_file: 'Export data to CSV',
@@ -983,6 +1030,8 @@ export default {
       legend_missing_optional: 'Optional column that was not found',
       legend_disabled: 'Line that will not be updated or created',
       legend_overwrite: 'Line that will be updated',
+      legend_incomplete: 'Line missing a required value',
+      missing_values: 'Line {lines} has no value in a required column ({columns}). Fill it in or remove it, then upload the file again. | Lines {lines} have no value in a required column ({columns}). Fill them in or remove them, then upload the file again.',
       new_entities_confirmation: 'I confirm that I want to create this new entry | I confirm that I want to create these {count} new entries',
       new_entities_to_create: '{count} line does not match any existing entry and will be created as a new entry: | {count} lines do not match any existing entries and will be created as new entries:',
       paste: 'Paste',
@@ -1144,6 +1193,8 @@ export default {
     invite_link_error: 'An error occurred while generating the invitation link',
     new_person: 'Add a new user',
     no_task_assigned: 'There are no running tasks assigned to you',
+    no_task_done: 'You have no validated task yet',
+    no_task_pending: 'No task is waiting for a feedback',
     persons: 'user | users',
     project_role: 'Project role',
     seats_remaining: 'no seats remaining | {count} seat remaining | {count} seats remaining',
@@ -1478,12 +1529,16 @@ export default {
       end_date: 'End date',
       episode_span: 'Episode spacing',
       fps: 'FPS',
+      hd_bitrate_compression: 'High definition movie bitrate (Mbit/s)',
+      hd_bitrate_short: 'HD Mbit/s',
       is_clients_isolated: 'Isolate client comments (not visible to each others)',
       is_frame_in_numbering: 'Start the player frame counter at the frame in',
       is_preview_download_allowed: 'Allow artists to download previews',
       is_publish_default: 'Set comment widget for artists on publish mode by default',
       is_set_preview_automated: 'Set new preview as entity thumbnail automatically',
       is_single_preview_per_revision: 'Allow only one preview file per revision',
+      ld_bitrate_compression: 'Low definition movie bitrate (Mbit/s)',
+      ld_bitrate_short: 'LD Mbit/s',
       max_retakes: 'Maximum number of retakes',
       name: 'Name',
       nb_episodes: 'Number of episodes',
@@ -1547,8 +1602,25 @@ export default {
       'sequences': 'Sequences'
     },
 
+    video: {
+      bitrate_default: 'Default: {value} Mbit/s',
+      bitrate_default_max: 'Default and maximum: {value} Mbit/s',
+      bitrate_explanation: 'A higher bitrate gives a sharper image but heavier files that are slower to load.',
+      bitrate_max: 'Maximum: {value} Mbit/s',
+      bitrate_size: 'About {size} MB per minute',
+      bitrates: 'Bitrates',
+      hd_bitrate_description: 'Full-resolution version, played in HD mode and used for downloads.',
+      ld_bitrate_description: 'Lighter version, 1280 pixels wide, played in LD mode.',
+      ld_bitrate_max: 'Maximum: {value} Mbit/s (HD bitrate)',
+      next_uploads_only: 'Changes apply to the next uploads only: existing previews are not re-encoded.',
+      restore_default: 'Restore default',
+      task_type_bitrates: 'Leave empty to use the bitrates of the Video tab.',
+      task_type_ld_bitrate_max: 'Maximum: the HD bitrate of the task type',
+      title: 'Video'
+    },
     parameters: {
       title: 'Parameters',
+      previews_and_comments: 'Previews and Comments',
       save: {
         button: 'Confirm'
       }
@@ -1800,6 +1872,7 @@ export default {
   },
 
   sequences: {
+    all_hidden: 'All sequences are hidden.',
     all_sequences: 'All sequences',
     edit_error: 'An error occurred while saving this sequence. Are you sure there is no sequence with a similar name?',
     delete_text: 'Are you sure you want to remove {name} from your database? All related shots and previews will also be deleted. Please confirm by typing the sequence name below.',
@@ -1861,6 +1934,9 @@ export default {
     apply_to_prod_confirm: 'Are you sure you want to apply this schedule version to the current production? This will override the current task values.',
     apply_to_prod_error: 'An error occurred while applying the schedule version to the current production.',
     assign: 'Assign to:',
+    assign_error: 'Could not assign the tasks. Please try again.',
+    assign_no_fit:
+      '{count} task could not fit in the date range. | {count} tasks could not fit in the date range.',
     confirm_move_children:
       'Moving this bar will clip or snap {count} sub-item to fit the new bounds. Continue? | Moving this bar will clip or snap {count} sub-items to fit the new bounds. Continue?',
     create_version: 'Create schedule version',
@@ -1907,6 +1983,7 @@ export default {
     no_entity: 'No assignable entity',
     overall_man_days: 'Person-days',
     reset_list: 'Reset list',
+    save_task_error: 'Could not save the task. Please try again.',
     select_task_type: 'Select a task type',
     show_assigned: 'Show assigned entities',
     title: 'Schedule',
@@ -2032,12 +2109,14 @@ export default {
   },
 
   server_down: {
+    retrying: 'Kitsu keeps trying and will take you back to your page as soon as the API answers.',
     text: 'Please contact our support team or your system administrator to understand what is going wrong.',
     title: 'Kitsu encountered an error while reaching its data API'
   },
 
   statistics: {
     all: 'All',
+    bars: 'Stacked bars',
     count: 'Counts',
     count_mode: 'Count',
     data_mode: 'Data',
@@ -2045,11 +2124,13 @@ export default {
     drawings: 'Drawings',
     episode_status: 'Episode status',
     frames: 'Frames',
+    heatmap: 'Heatmap',
     only_running: 'Only running',
     pie: 'Pie charts',
     retakes: 'Retakes',
     status: 'Status',
-    shots: 'Shots'
+    shots: 'Shots',
+    validated: 'validated'
   },
 
   tasks: {
@@ -2246,7 +2327,7 @@ export default {
 
   preview: {
     broken: 'This preview is broken.',
-    processing: 'Video processing in progress...'
+    processing: 'This preview is being processed...'
   },
 
   search: {
@@ -2298,6 +2379,7 @@ export default {
     timelog_title: 'Timelog',
     title: 'Timesheets',
     unit: 'Unit',
+    week_total: 'Week: {hours} hours',
     with_time_logged: 'With time logged',
     year: 'Year'
   },
@@ -2315,7 +2397,10 @@ export default {
     delete: 'Delete day off',
     confirm_day_offs: 'Setting these days off will erase all time filled for the affected days. Are you sure you want to continue?',
     confirm_unset_day_offs: 'Days off are currently applied from {start} to {end}. Are you sure you want to remove this period?',
-    error_days_off: 'An error occurred while updating days off.'
+    error_days_off: 'An error occurred while updating days off.',
+    upcoming: 'Upcoming',
+    past: 'Past',
+    nb_days: '{count} day | {count} days'
   },
 
   library: {

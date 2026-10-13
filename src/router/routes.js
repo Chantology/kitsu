@@ -1,6 +1,7 @@
 import Bowser from 'bowser'
 
 import auth from '@/lib/auth'
+import errors from '@/lib/errors'
 import init from '@/lib/init'
 import lang from '@/lib/lang'
 import sentry from '@/lib/sentry'
@@ -15,6 +16,7 @@ import Login from '@/components/pages/Login.vue'
 import Main from '@/components/Main.vue'
 
 const AllTasks = () => import('@/components/pages/AllTasks.vue')
+const AppLogin = () => import('@/components/pages/AppLogin.vue')
 const SharedPlaylist = () => import('@/components/pages/SharedPlaylist.vue')
 const Asset = () => import('@/components/pages/Asset.vue')
 const AssetLibrary = () => import('@/components/pages/AssetLibrary.vue')
@@ -113,6 +115,9 @@ export const routes = [
       const redirect = await auth.requireAuth(to, from)
       if (redirect) return redirect
 
+      const ssoRedirect = auth.popSSORedirect()
+      if (ssoRedirect) return ssoRedirect
+
       timezone.setTimezone()
       lang.setLocale(userStore.state.user.locale)
       sentry.setContext(peopleStore.state.organisation, userStore.state.user)
@@ -121,7 +126,11 @@ export const routes = [
         try {
           const ready = await init()
           if (!ready) return false
-        } catch {
+        } catch (err) {
+          // The server-down page loads the app again once the server answers,
+          // where a bug would fail again on each check: it fails the
+          // navigation instead, which Sentry reports.
+          if (!errors.isRequestFailure(err)) throw err
           return { name: 'server-down' }
         }
       } else {
@@ -164,9 +173,11 @@ export const routes = [
           const ready = await init()
           store.commit('DATA_LOADING_END')
           if (!ready) return false
-        } catch {
+        } catch (err) {
           store.commit('DATA_LOADING_END')
-          return { name: 'server-down' }
+          // As in the home guard: a bug fails the navigation.
+          if (!errors.isRequestFailure(err)) throw err
+          return { name: 'server-down', query: { redirect: to.fullPath } }
         }
       } else {
         store.commit('DATA_LOADING_END')
@@ -924,6 +935,17 @@ export const routes = [
     name: 'login-2fa',
     beforeEnter: (to, from) => {
       if (!store.getters.user) return { name: 'login' }
+    }
+  },
+  {
+    path: '/app-login',
+    component: AppLogin,
+    name: 'app-login',
+    beforeEnter: async (to, from) => {
+      const redirect = await auth.requireAuth(to, from)
+      if (redirect) return redirect
+      lang.setLocale(userStore.state.user.locale)
+      store.commit('DATA_LOADING_END')
     }
   },
   {

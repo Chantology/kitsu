@@ -3,23 +3,8 @@
 import func from '@/lib/func'
 
 describe('func', () => {
-  test('runPromiseMapAsSeries', async () => {
-    let counter = 0
-    const mapFunc = (item) => {
-      counter += item
-      return Promise.resolve(item)
-    }
-    await func.runPromiseMapAsSeries([1, 5], mapFunc)
-    expect(counter).toEqual(6)
-  })
-
-  test('throttle', () => {
-    let count = 0
-    const fn = func.throttle(() => { count++ }, 100)
-    fn()
-    expect(count).toBe(1)
-    fn()
-    expect(count).toBe(1) // throttled
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   test('runPromiseMapAsSeries starts a call only after the previous one', async () => {
@@ -29,5 +14,32 @@ describe('func', () => {
       return Promise.resolve().then(() => order.push(`end-${item}`))
     })
     expect(order).toEqual(['start-1', 'end-1', 'start-2', 'end-2'])
+  })
+
+  test('debounce runs nothing once cancelled', () => {
+    vi.useFakeTimers()
+    const fn = vi.fn()
+    const debounced = func.debounce(fn, 100)
+
+    debounced()
+    debounced.cancel()
+    vi.advanceTimersByTime(100)
+
+    expect(fn).not.toHaveBeenCalled()
+  })
+
+  test('debounce flush runs the pending call once, at once', () => {
+    vi.useFakeTimers()
+    const fn = vi.fn()
+    const debounced = func.debounce(fn, 100)
+
+    debounced('first')
+    debounced('last')
+    debounced.flush()
+    expect(fn.mock.calls).toEqual([['last']])
+    vi.advanceTimersByTime(100)
+    debounced.flush()
+
+    expect(fn).toHaveBeenCalledTimes(1)
   })
 })

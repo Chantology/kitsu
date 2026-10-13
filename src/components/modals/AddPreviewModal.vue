@@ -13,7 +13,7 @@
       @dragover="onFileDragover"
       @dragleave="onFileDragLeave"
     >
-      <div id="modal-content" class="box content" :class="{ dragging: true }">
+      <div id="modal-content" class="box content">
         <div
           id="drop-mask"
           class="drop-mask"
@@ -51,7 +51,7 @@
         </p>
 
         <h3 class="subtitle has-text-centered" v-if="forms.length > 0">
-          Selected Files
+          {{ $t('comments.selected_files') }}
         </h3>
         <div class="upload-previews" v-if="forms.length > 0">
           <template v-for="(form, index) in forms" :key="`preview-${index}`">
@@ -66,6 +66,14 @@
                 >x</span
               >
             </p>
+            <div class="progress-wrapper" v-if="isLoading && uploadProgress">
+              <div
+                class="progress"
+                :style="{
+                  width: (uploadProgress[form.get('file').name] || 0) + '%'
+                }"
+              ></div>
+            </div>
             <img alt="uploaded file" :src="getURL(form)" v-if="isImage(form)" />
             <video
               :src="getURL(form)"
@@ -109,9 +117,9 @@
             }"
             role="button"
             tabindex="0"
-            @click="$emit('confirm', forms)"
-            @keydown.enter.prevent="$emit('confirm', forms)"
-            @keydown.space.prevent="$emit('confirm', forms)"
+            @click="confirm"
+            @keydown.enter.prevent="confirm"
+            @keydown.space.prevent="confirm"
           >
             {{
               confirmLabel?.length
@@ -131,6 +139,8 @@
 </template>
 
 <script setup>
+// Imports
+// --------------------------------------------------------------------------
 import { AlertTriangleIcon } from 'lucide-vue-next'
 import { onBeforeUnmount, onMounted, ref, toRef, watch } from 'vue'
 
@@ -139,6 +149,8 @@ import files from '@/lib/files'
 
 import FileUploadZone from '@/components/widgets/FileUploadZone.vue'
 
+// Props / Emits
+// --------------------------------------------------------------------------
 const props = defineProps({
   active: { type: Boolean, default: false },
   confirmLabel: { type: String, default: '' },
@@ -151,21 +163,31 @@ const props = defineProps({
   isLoading: { type: Boolean, default: false },
   isMultiple: { type: Boolean, default: true },
   message: { type: String, default: 'tasks.revision_preview_file' },
-  title: { type: String, default: '' }
+  title: { type: String, default: '' },
+  // By file name, for the uploads no other part of the page shows.
+  uploadProgress: { type: Object, default: null }
 })
 
 const emit = defineEmits(['cancel', 'confirm', 'fileselected'])
 
 useModal(toRef(props, 'active'), emit)
 
+// State
+// --------------------------------------------------------------------------
 const forms = ref([])
 const isDraggingFile = ref(false)
 const isWrongDuration = ref(false)
 const previewField = ref(null)
 
+// Functions
+// --------------------------------------------------------------------------
 const onFileSelected = newForms => {
   forms.value = props.isMultiple ? forms.value.concat(newForms) : [newForms]
   emit('fileselected', forms.value)
+}
+
+const confirm = () => {
+  if (forms.value.length > 0) emit('confirm', forms.value)
 }
 
 const reset = () => {
@@ -218,6 +240,8 @@ const onDrop = event => {
   event.preventDefault()
 }
 
+// Watchers
+// --------------------------------------------------------------------------
 watch(() => props.active, reset)
 
 watch(
@@ -228,6 +252,8 @@ watch(
   { deep: true }
 )
 
+// Lifecycle
+// --------------------------------------------------------------------------
 onMounted(() => {
   window.addEventListener('paste', onPaste, false)
 })
@@ -249,16 +275,8 @@ defineExpose({
   max-height: calc(100vh - 150px);
 }
 
-.modal-content .box p.text {
-  margin-bottom: 1em;
-}
-
 .error {
   margin-top: 1em;
-}
-
-.description {
-  margin-bottom: 1em;
 }
 
 .is-fullwidth {
@@ -305,6 +323,18 @@ h3.subtitle {
   float: right;
 }
 
+.progress-wrapper {
+  border-radius: 5px;
+  background: var(--background-alt);
+  height: 5px;
+  margin-bottom: 1em;
+}
+
+.progress {
+  height: 5px;
+  background-color: $light-green;
+}
+
 .message-body {
   border-width: 0 0 0 4px;
 }
@@ -315,7 +345,7 @@ h3.subtitle {
 
 .drop-mask {
   align-items: center;
-  background: rgba(0.1, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.5);
   border-radius: 5px;
   color: white;
   display: flex;

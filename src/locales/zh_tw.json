@@ -1,5 +1,15 @@
 {
   "default": {
+    "app_login": {
+      "authorize": "授權",
+      "consent": "此電腦上的一個應用程式想以 {full_name} 的身分連線到 Kitsu。",
+      "consent_named": "此電腦上一個自稱為 \"{app_name}\" 的應用程式想以 {full_name} 的身分連線到 Kitsu。",
+      "error": "應用程式登入失敗。請從應用程式重新開始。",
+      "error_2fa_setup": "請先在 Kitsu 中設定雙重驗證，然後從應用程式重新開始登入。",
+      "invalid_request": "此登入連結無效。請從應用程式重新開始登入。",
+      "title": "應用程式登入",
+      "warning": "僅當您親自從應用程式發起此登入時才授權。該應用程式將以您的權限存取 Kitsu。"
+    },
     "assets": {
       "cast_in": "角色分配",
       "delete_error": "刪除此資產時出現錯誤。很可能存在有連接至此的數據。您確定沒有任務連接至此資產類型嗎？",
@@ -42,6 +52,7 @@
     },
     "asset_types": {
       "all_asset_types": "所有資產類型",
+      "all_hidden": "所有資產類型皆已隱藏。",
       "create_error": "儲存此資產類型時出錯。您確定沒有相同名稱的資產類型嗎？",
       "delete_text": "您確定要從您的資料庫移除{name}嗎？",
       "delete_error": "刪除此資產類型時出現錯誤。可能已存在連接至此的數據。您確定沒有資產連接至此資產類型嗎？",
@@ -63,12 +74,17 @@
     },
     "breakdown": {
       "all_assets": "所有可用資產",
+      "copy_casting": "複製此選角（ctrl + V 貼到所選列）",
       "edit_label": "更改資產的標籤",
       "empty": "角色分配為空",
       "label": "標籤",
+      "nb_assets": "{count} 個資產 | {count} 個資產",
+      "nb_occurrences": "出現 {count} 次 | 出現 {count} 次",
+      "nb_ready": "{ready} / {total} 已就緒",
       "occurrences": "出現次數",
       "picture_mode": "切換到圖片模式",
       "remove_from_casting": "從選角中移除",
+      "undo": "復原上一次選角變更（ctrl + Z）",
       "view_as_cards": "卡片檢視",
       "view_as_list": "列表檢視",
       "text_mode": "切換到文字模式",
@@ -85,10 +101,16 @@
       "fields": {
         "standby": "STDB"
       },
-      "episode_casting": "集數角色分配",
       "save_error": "儲存角色分配時出錯",
       "hide_library": "隱藏資產庫",
-      "show_library": "顯示資產庫"
+      "show_library": "顯示資產庫",
+      "filters": {
+        "all": "所有列",
+        "asset": "依已分配的資產篩選…",
+        "empty": "無選角",
+        "label": "列",
+        "standby": "待定"
+      }
     },
     "comments": {
       "add_attachment": "新增附件",
@@ -99,6 +121,7 @@
       "comment_from_client": "客戶評論",
       "edit_title": "編輯評論",
       "empty_text": "此條評論為空",
+      "action_error": "無法儲存。請再試一次。",
       "edit_error": "編輯評論時發生錯誤。請聯絡我們的技術人員。",
       "error": "發佈評論時出現錯誤",
       "no_file_attached": "未附加預覽",
@@ -270,6 +293,7 @@
     },
     "episodes": {
       "all_episodes": "所有",
+      "all_hidden": "所有集數皆已隱藏。",
       "edit_error": "儲存此集數時發生錯誤。您確定沒有名稱相似的集數嗎？",
       "delete_error": "刪除此集數時出現錯誤。很可能存在有連接至此的數據。您確定沒有序列連接至此集數嗎？",
       "delete_text": "您確定要從您的資料庫移除{name}嗎？所有相關的鏡頭和預覽也將被刪除。請在下方輸入集數名稱以確認。",
@@ -436,6 +460,7 @@
       "history": "歷史",
       "info": "資訊",
       "or": "或",
+      "next": "下一個",
       "no": "否",
       "loading": "加載中...",
       "loading_data": "正在加載數據",
@@ -448,8 +473,10 @@
       "nb_frames": "幀 | 幀",
       "person": "人員",
       "preview_3d_not_supported": "此瀏覽器不支援 3D 預覽（需要 WebGL2）。請將瀏覽器更新至最新版本。",
+      "previous": "上一個",
       "profile": "簡介",
       "production": "製作項目",
+      "productivity": "生產力",
       "remove": "移除",
       "save": "儲存",
       "sort_by": "排序方式",
@@ -466,6 +493,8 @@
         "choose": "選擇",
         "error_imported_rows": "錯誤發生前已匯入 {count} 行。 | 錯誤發生前已匯入 {count} 行。",
         "error_line": "第 {line} 行",
+        "error_timeout": "匯入耗時超出預期，正在背景繼續進行。",
+        "error_timeout_hint": "請在幾分鐘後重新整理頁面，確認結果後再重新匯入。",
         "error_upload": "上傳您的CSV檔案時出現錯誤。",
         "export_file": "匯出資料至CSV檔案",
         "import_file": "從CSV檔案匯入資料",
@@ -476,6 +505,8 @@
         "legend_missing": "未找到的預期欄",
         "legend_disabled": "不會被更新或建立的行",
         "legend_overwrite": "將被更新的行",
+        "legend_incomplete": "缺少必填值的行",
+        "missing_values": "第 {lines} 行的必填欄（{columns}）沒有值。請補齊或刪除該行，然後重新上傳檔案。 | 第 {lines} 行的必填欄（{columns}）沒有值。請補齊或刪除這些行，然後重新上傳檔案。",
         "paste": "貼上",
         "paste_code": "請在此處貼上您的CSV資料：",
         "preview": "預覽",
@@ -584,6 +615,7 @@
       "is_shared": "與整個團隊分享",
       "no_results": "沒有結果",
       "link": "連結",
+      "list": "列表",
       "hours_spent": "花費的小時 | 花費的小時",
       "hours_expected": "預期小時數 | 預期小時數",
       "hours_estimated": "小時估計 | 小時估計",
@@ -751,6 +783,8 @@
       "invite_link_error": "產生邀請連結時發生錯誤",
       "new_person": "新增新用戶",
       "no_task_assigned": "沒有分配給您正在執行的任務",
+      "no_task_done": "您還沒有已通過的任務",
+      "no_task_pending": "沒有等待回饋的任務",
       "persons": "用戶 | 用戶",
       "project_role": "專案角色",
       "running_tasks": "在執行任務",
@@ -862,7 +896,7 @@
       "created_at": "創建於：",
       "delete_text": "您確定要從您的資料庫移除{name}嗎？",
       "delete_error": "刪除此播放列表時出現錯誤。",
-      "edit_error": "儲存此播放列表時發生錯誤。",
+      "edit_error": "儲存此播放列表時發生錯誤。您確定沒有名稱相似的播放列表嗎？",
       "download_zip": "下載 .zip",
       "failed": "失敗",
       "for_client": "客戶",
@@ -1036,6 +1070,8 @@
       },
       "fields": {
         "fps": "FPS",
+        "hd_bitrate_compression": "高畫質影片位元率 (Mbit/s)",
+        "hd_bitrate_short": "HD Mbit/s",
         "is_frame_in_numbering": "播放器影格計數器從入點影格開始",
         "name": "名稱",
         "ratio": "寬高比",
@@ -1055,6 +1091,8 @@
         "code": "簡稱",
         "is_publish_default": "預設在發佈模式下為藝術家設定評論小工具",
         "is_single_preview_per_revision": "每個修訂版僅允許一個預覽檔案",
+        "ld_bitrate_compression": "低畫質影片位元率 (Mbit/s)",
+        "ld_bitrate_short": "LD Mbit/s",
         "revision_padding": "修訂版編號補零（0 = 不補零）"
       },
       "metadata": {
@@ -1103,6 +1141,7 @@
       },
       "parameters": {
         "title": "參數",
+        "previews_and_comments": "預覽與留言",
         "save": {
           "button": "確定"
         }
@@ -1176,6 +1215,22 @@
         "assets": "資產",
         "shots": "鏡頭",
         "sequences": "序列"
+      },
+      "video": {
+        "bitrate_default": "預設值：{value} Mbit/s",
+        "bitrate_default_max": "預設值與最大值：{value} Mbit/s",
+        "bitrate_explanation": "位元率越高，畫面越清晰，但檔案也越大，載入越慢。",
+        "bitrate_max": "最大值：{value} Mbit/s",
+        "bitrate_size": "每分鐘約 {size} MB",
+        "bitrates": "位元率",
+        "hd_bitrate_description": "完整解析度版本，在 HD 模式下播放，也用於下載。",
+        "ld_bitrate_description": "寬度為 1280 像素的輕量版本，在 LD 模式下播放。",
+        "ld_bitrate_max": "最大值：{value} Mbit/s (HD 位元率)",
+        "next_uploads_only": "變更僅適用於之後的上傳，現有預覽不會重新編碼。",
+        "restore_default": "還原預設值",
+        "task_type_bitrates": "留空以使用「影片」分頁中的位元率。",
+        "task_type_ld_bitrate_max": "最大值：該任務類型的 HD 位元率",
+        "title": "影片"
       },
       "hide_stats": "隱藏統計",
       "show_stats": "顯示統計資料"
@@ -1364,6 +1419,7 @@
       "library_title": "任務類型庫"
     },
     "sequences": {
+      "all_hidden": "所有序列皆已隱藏。",
       "all_sequences": "所有序列",
       "edit_error": "儲存此序列時發生錯誤。您確定沒有相似名稱的序列嗎？",
       "delete_text": "您確定要從您的資料庫移除{name}嗎？所有相關的鏡頭和預覽也將被刪除。請在下方輸入序列名稱以確認。",
@@ -1391,6 +1447,8 @@
       "apply_to_prod_confirm": "您確定要將此排程版本套用至目前的生產嗎？這將會覆寫目前的任務值。",
       "apply_to_prod_error": "將時間表版本套用至目前生產時發生錯誤。",
       "assign": "指派給",
+      "assign_error": "無法分配任務。請再試一次。",
+      "assign_no_fit": "{count} 個任務無法排入日期範圍。 | {count} 個任務無法排入日期範圍。",
       "confirm_move_children": "移動此條將裁剪或移動 {count} 個子項目以符合新範圍。是否繼續？| 移動此條將裁剪或移動 {count} 個子項目以符合新範圍。是否繼續？",
       "create_version": "建立排程版本",
       "cut_tool": "剪下",
@@ -1435,6 +1493,7 @@
       "no_entity": "無可指派的實體",
       "overall_man_days": "人日",
       "reset_list": "重設清單",
+      "save_task_error": "無法儲存任務。請再試一次。",
       "select_task_type": "選擇任務類型",
       "show_assigned": "顯示指定的實體",
       "title": "時間表",
@@ -1545,15 +1604,18 @@
       "show_timecode": "以時間碼顯示進出"
     },
     "server_down": {
+      "retrying": "Kitsu會持續重試，API一旦回應，就會將您帶回原來的頁面。",
       "text": "請聯絡我們的支援團隊或您的系統管理員，以了解出了什麼問題。",
       "title": "Kitsu在訪問其數據API時出現錯誤。"
     },
     "statistics": {
       "count": "計數",
+      "bars": "堆疊長條圖",
       "count_mode": "計數",
       "display_mode": "顯示",
       "frames": "幀數",
       "pie": "圓餅圖",
+      "heatmap": "熱力圖",
       "shots": "鏡頭",
       "data_mode": "資料",
       "retakes": "重拍",
@@ -1561,7 +1623,8 @@
       "all": "全部",
       "only_running": "僅運行",
       "episode_status": "集數狀態",
-      "drawings": "繪圖"
+      "drawings": "繪圖",
+      "validated": "已驗證"
     },
     "tasks": {
       "add_preview": "新增檔案以建立新的預覽修訂版",
@@ -1767,6 +1830,7 @@
       "hours": "小時",
       "month": "月",
       "time_spents": "已用時長(小時)",
+      "week_total": "本週：{hours} 小時",
       "timelog_title": "時間記錄",
       "title": "時間表",
       "year": "年",
@@ -1997,29 +2061,45 @@
       "send_error": "傳送訊息時出現錯誤。"
     },
     "concepts": {
-      "add_links": "新增連結至資產",
-      "add_new_concept": "新增概念",
+      "actions": {
+        "empty": "無連結",
+        "remove_link": "移除連結",
+        "title": "概念連結"
+      },
       "add_concept": "為新概念新增檔案",
       "add_concept_error": "新增概念時發生錯誤。",
+      "add_links": "新增連結至資產",
+      "add_new_concept": "新增概念",
       "delete_for_selection": "刪除選取的概念 | 刪除 {nbSelectedConcepts} 選取的概念",
+      "delete_for_selection_hard_lock_text": "刪除",
+      "delete_for_selection_hard_text": "您確定要永久移除選取的概念嗎？所有相關的任務、註解和預覽也會被刪除。請在下方輸入「刪除」確認。",
+      "drop_new_concepts": "在此丟入新的概念檔案",
       "empty": "本製作沒有任何概念",
+      "fields": {
+        "asset": "資產",
+        "asset_type": "資產類型",
+        "created_at": "建立日期",
+        "entity_type": "實體類型",
+        "last_comment_date": "最後評論",
+        "publisher": "發表者",
+        "updated_at": "更新日期"
+      },
+      "folders": {
+        "delete": "刪除資料夾",
+        "delete_error": "刪除此資料夾時發生錯誤。",
+        "delete_text": "確定要刪除資料夾 {name} 嗎？其中的概念將保留並回到根目錄。",
+        "edit_error": "儲存此資料夾時發生錯誤。可能已有其他資料夾使用此名稱。",
+        "empty": "此資料夾是空的",
+        "move": "移動到資料夾",
+        "name": "資料夾名稱",
+        "new": "新增資料夾",
+        "none": "無資料夾",
+        "rename": "重新命名資料夾"
+      },
       "multiple_delete_error": "刪除概念時發生錯誤。目前可能有現有資料與它連結。您確定沒有任務連結到選取的概念嗎？",
       "no_concept_selected": "未選擇概念",
       "title": "概念",
-      "fields": {
-        "entity_type": "實體類型",
-        "created_at": "建立日期",
-        "updated_at": "更新日期",
-        "last_comment_date": "最後評論",
-        "publisher": "發表者"
-      },
-      "actions": {
-        "title": "概念連結",
-        "empty": "無連結"
-      },
-      "delete_for_selection_hard_text": "您確定要永久移除選取的概念嗎？所有相關的任務、註解和預覽也會被刪除。請在下方輸入「刪除」確認。",
-      "delete_for_selection_hard_lock_text": "刪除",
-      "drop_new_concepts": "在此丟入新的概念檔案"
+      "uploading": "正在上傳概念圖"
     },
     "intro": {
       "join_discord": "加入社群 Discord",
@@ -2034,7 +2114,7 @@
     },
     "preview": {
       "broken": "此預覽已損壞。",
-      "processing": "視訊處理中..."
+      "processing": "此預覽正在處理中..."
     },
     "studios": {
       "create_error": "儲存此工作室時發生錯誤。您確定沒有名稱相似的工作室嗎？",
@@ -2053,6 +2133,9 @@
     },
     "days_off": {
       "title": "休息日",
+      "upcoming": "即將到來",
+      "past": "已過去",
+      "nb_days": "{count} 天 | {count} 天",
       "period": "期間",
       "description": "說明",
       "updated_at": "更新日期",

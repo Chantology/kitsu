@@ -1,5 +1,15 @@
 {
   "default": {
+    "app_login": {
+      "authorize": "Godkend",
+      "consent": "Et program på denne computer vil oprette forbindelse til Kitsu som {full_name}.",
+      "consent_named": "Et program på denne computer, som kalder sig \"{app_name}\", vil oprette forbindelse til Kitsu som {full_name}.",
+      "error": "Programlogin mislykkedes. Start det igen fra programmet.",
+      "error_2fa_setup": "Opsæt totrinsgodkendelse i Kitsu først, og start derefter login igen fra programmet.",
+      "invalid_request": "Dette loginlink er ugyldigt. Start login igen fra programmet.",
+      "title": "Programlogin",
+      "warning": "Godkend kun, hvis du selv har startet dette login fra programmet. Det får adgang til Kitsu med dine rettigheder."
+    },
     "assets": {
       "cast_in": "Castet i",
       "delete_error": "Der opstod en fejl under sletning af denne asset. Der kan være eksisterende data, der er knyttet til den. Er du sikker på, at denne asset-type ikke har nogen opgave knyttet til den?",
@@ -42,6 +52,7 @@
     },
     "asset_types": {
       "all_asset_types": "Alle asset-typer",
+      "all_hidden": "Alle asset-typer er skjult.",
       "create_error": "Der opstod en fejl under gemning af denne asset-type. Er du sikker på, at der ikke er en asset-type med et lignende navn?",
       "delete_text": "Er du sikker på, at du vil fjerne {name} fra din database?",
       "delete_error": "Der opstod en fejl under sletningen af denne asset-type. Der kan være eksisterende data, der er knyttet til den. Er du sikker på, at denne asset-type ikke har nogen asset knyttet til den?",
@@ -63,12 +74,17 @@
     },
     "breakdown": {
       "all_assets": "Alle tilgængelige assets",
+      "copy_casting": "Kopiér denne casting (ctrl + V indsætter den på de valgte linjer)",
       "edit_label": "Rediger assetets label",
       "empty": "Tom casting",
       "label": "Label",
+      "nb_assets": "{count} asset | {count} assets",
+      "nb_occurrences": "{count} forekomst | {count} forekomster",
+      "nb_ready": "{ready} / {total} klar",
       "occurrences": "Forekomster",
       "picture_mode": "Skift til billedtilstand",
       "remove_from_casting": "Fjern fra casting",
+      "undo": "Fortryd den seneste castingændring (ctrl + Z)",
       "view_as_cards": "Vis som kort",
       "view_as_list": "Vis som liste",
       "text_mode": "Skift til teksttilstand",
@@ -85,10 +101,16 @@
       "fields": {
         "standby": "STDB"
       },
-      "episode_casting": "Episode-casting",
       "save_error": "Fejl under gemning af casting",
       "hide_library": "Skjul bibliotek",
-      "show_library": "Vis bibliotek"
+      "show_library": "Vis bibliotek",
+      "filters": {
+        "all": "Alle linjer",
+        "asset": "Filtrer efter castet asset…",
+        "empty": "Uden casting",
+        "label": "Linjer",
+        "standby": "Standby"
+      }
     },
     "comments": {
       "add_attachment": "Tilføj vedhæftning",
@@ -99,6 +121,7 @@
       "comment_from_client": "Kommentar fra klient",
       "edit_title": "Rediger kommentar",
       "empty_text": "Denne kommentar er tom",
+      "action_error": "Kunne ikke gemme. Prøv venligst igen.",
       "edit_error": "Der opstod en fejl under redigering af kommentaren. Kontakt venligst vores supportteam.",
       "error": "Der opstod en fejl under afsendelse af kommentaren",
       "no_file_attached": "Intet preview vedhæftet",
@@ -270,6 +293,7 @@
     },
     "episodes": {
       "all_episodes": "Alle",
+      "all_hidden": "Alle episoder er skjult.",
       "edit_error": "Der er opstået en fejl under gemning af denne episode. Er du sikker på, at der ikke er en episode med et lignende navn?",
       "delete_error": "Der er opstået en fejl under sletningen af denne episode. Der kan være eksisterende data, der er knyttet til den. Er du sikker på, at denne episode ikke har nogen sequence knyttet til den?",
       "delete_text": "Er du sikker på, at du vil fjerne {name} fra din database? Alle relaterede shots og previews vil blive slettet. Bekræft venligst ved at skrive episodens navn nedenfor.",
@@ -436,6 +460,7 @@
       "history": "historik",
       "info": "Information",
       "or": "eller",
+      "next": "Næste",
       "no": "Nej",
       "loading": "Indlæser...",
       "loading_data": "Indlæser data",
@@ -448,8 +473,10 @@
       "nb_frames": "frame | frames",
       "person": "Person",
       "preview_3d_not_supported": "3D-previews understøttes ikke i denne browser (WebGL2 er påkrævet). Opdater den venligst til nyeste version.",
+      "previous": "Forrige",
       "profile": "Profil",
       "production": "Produktion",
+      "productivity": "Produktivitet",
       "remove": "Fjern",
       "save": "Gem",
       "sort_by": "Sorter efter",
@@ -466,6 +493,8 @@
         "choose": "Vælg",
         "error_imported_rows": "{count} linje blev importeret før fejlen. | {count} linjer blev importeret før fejlen.",
         "error_line": "Linje {line}",
+        "error_timeout": "Importen tager længere tid end forventet og fortsætter i baggrunden.",
+        "error_timeout_hint": "Genindlæs siden om et par minutter for at kontrollere resultatet, før du importerer igen.",
         "error_upload": "Der opstod en fejl under upload af din CSV-fil.",
         "export_file": "Eksporter data til CSV",
         "import_file": "Importer data fra CSV",
@@ -476,6 +505,8 @@
         "legend_missing": "Forventet kolonne, der ikke blev fundet",
         "legend_disabled": "Linje, der ikke vil blive opdateret eller oprettet",
         "legend_overwrite": "Linje, der vil blive opdateret",
+        "legend_incomplete": "Linje, der mangler en påkrævet værdi",
+        "missing_values": "Linje {lines} har ingen værdi i en påkrævet kolonne ({columns}). Udfyld eller fjern den, og upload derefter filen igen. | Linjerne {lines} har ingen værdi i en påkrævet kolonne ({columns}). Udfyld eller fjern dem, og upload derefter filen igen.",
         "paste": "Indsæt",
         "paste_code": "Indsæt venligst dine CSV-data her:",
         "preview": "Preview",
@@ -584,6 +615,7 @@
       "is_shared": "Delt med hele teamet",
       "no_results": "Ingen resultater",
       "link": "Link",
+      "list": "Liste",
       "hours_spent": "time brugt | timer brugt",
       "hours_expected": "forventet time | forventede timer",
       "hours_estimated": "time estimeret | timer estimeret",
@@ -751,6 +783,8 @@
       "invite_link_error": "Der opstod en fejl under generering af invitationslinket",
       "new_person": "Opret en ny bruger",
       "no_task_assigned": "Der er ingen igangværende opgaver tildelt til dig",
+      "no_task_done": "Du har endnu ingen godkendte opgaver",
+      "no_task_pending": "Ingen opgaver venter på feedback",
       "persons": "bruger | brugere",
       "project_role": "Projektrolle",
       "running_tasks": "Igangværende opgaver",
@@ -862,7 +896,7 @@
       "created_at": "Oprettet den:",
       "delete_text": "Er du sikker på, at du vil fjerne {name} fra din database?",
       "delete_error": "Der opstod en fejl under sletning af denne playlist.",
-      "edit_error": "Der opstod en fejl under gemning af denne playlist.",
+      "edit_error": "Der opstod en fejl under gemning af denne playlist. Er du sikker på, at der ikke er en playlist med et lignende navn?",
       "download_zip": "Download .zip",
       "failed": "Fejlet",
       "for_client": "Klienten",
@@ -1019,7 +1053,7 @@
       "current": "Valgt produktion",
       "delete_text": "Er du sikker på, at du vil fjerne {name} fra din database? Bekræft venligst ved at skrive navnet på den produktion, du ønsker at slette, i tekstfeltet.",
       "delete_error": "Der opstod en fejl under sletning af denne produktion. Der kan være eksisterende data, der er knyttet til den. Er du sikker på, at denne produktion ikke har nogen opgave, shot eller asset knyttet til sig? Kitsu tillader ikke sletning af produktioner. Hvis du ikke længere ønsker at se produktionen, kan du i stedet lukke den.",
-      "edit_title": "Rediger",
+      "edit_title": "Rediger produktion",
       "new_production": "Opret en produktion",
       "number": "produktion | produktioner",
       "open_productions": "Mine Produktioner",
@@ -1036,6 +1070,8 @@
       },
       "fields": {
         "fps": "FPS",
+        "hd_bitrate_compression": "Bitrate for videoer i høj opløsning (Mbit/s)",
+        "hd_bitrate_short": "HD Mbit/s",
         "is_frame_in_numbering": "Start afspillerens billedtæller ved frame in",
         "name": "Navn",
         "ratio": "Ratio",
@@ -1055,6 +1091,8 @@
         "code": "Kort Navn",
         "is_publish_default": "Indstil kommentarwidget til kunstnere i publiceringstilstand som standard",
         "is_single_preview_per_revision": "Tillad kun én preview-fil pr. revision",
+        "ld_bitrate_compression": "Bitrate for videoer i lav opløsning (Mbit/s)",
+        "ld_bitrate_short": "LD Mbit/s",
         "revision_padding": "Nuller foran revisionsnummer (0 = ingen nuller)"
       },
       "metadata": {
@@ -1103,6 +1141,7 @@
       },
       "parameters": {
         "title": "Parametre",
+        "previews_and_comments": "Previews og kommentarer",
         "save": {
           "button": "Bekræft"
         }
@@ -1176,6 +1215,22 @@
         "assets": "Assets",
         "shots": "Shots",
         "sequences": "Sequences"
+      },
+      "video": {
+        "bitrate_default": "Standard: {value} Mbit/s",
+        "bitrate_default_max": "Standard og maksimum: {value} Mbit/s",
+        "bitrate_explanation": "En højere bitrate giver et skarpere billede, men større filer, der tager længere tid at indlæse.",
+        "bitrate_max": "Maksimum: {value} Mbit/s",
+        "bitrate_size": "Ca. {size} MB pr. minut",
+        "bitrates": "Bitrater",
+        "hd_bitrate_description": "Version i fuld opløsning, der afspilles i HD-tilstand og bruges til downloads.",
+        "ld_bitrate_description": "Lettere version, 1280 pixels bred, der afspilles i LD-tilstand.",
+        "ld_bitrate_max": "Maksimum: {value} Mbit/s (HD-bitrate)",
+        "next_uploads_only": "Ændringerne gælder kun for kommende uploads: eksisterende previews bliver ikke kodet igen.",
+        "restore_default": "Gendan standard",
+        "task_type_bitrates": "Lad feltet stå tomt for at bruge bitraten fra fanen Video.",
+        "task_type_ld_bitrate_max": "Maksimum: opgavetypens HD-bitrate",
+        "title": "Video"
       },
       "hide_stats": "Skjul statistikker",
       "show_stats": "Vis statistikker"
@@ -1364,6 +1419,7 @@
       "library_title": "Opgavetype-bibliotek"
     },
     "sequences": {
+      "all_hidden": "Alle sequences er skjult.",
       "all_sequences": "Alle sequences",
       "edit_error": "Der opstod en fejl under gemning af denne sequence. Er du sikker på, at der ikke allerede findes en sequence med et lignende navn?",
       "delete_text": "Er du sikker på, at du vil fjerne {name} fra din database? Alle relaterede shots og previews vil også blive slettet. Bekræft venligst ved at skrive sequence-navnet nedenfor.",
@@ -1391,6 +1447,8 @@
       "apply_to_prod_confirm": "Er du sikker på, at du vil anvende denne version af tidsplanen på den aktuelle produktion? Dette vil tilsidesætte de aktuelle opgaveværdier.",
       "apply_to_prod_error": "Der opstod en fejl under anvendelse af versionen af tidsplanen på den aktuelle produktion.",
       "assign": "Tildel til:",
+      "assign_error": "Opgaverne kunne ikke tildeles. Prøv venligst igen.",
+      "assign_no_fit": "{count} opgave passede ikke ind i datointervallet. | {count} opgaver passede ikke ind i datointervallet.",
       "confirm_move_children": "Flytning af denne bjælke vil beskære eller flytte {count} under-element, så det passer til de nye grænser. Fortsæt? | Flytning af denne bjælke vil beskære eller flytte {count} under-elementer, så de passer til de nye grænser. Fortsæt?",
       "create_version": "Opret version af tidsplan",
       "cut_tool": "Klip",
@@ -1435,6 +1493,7 @@
       "no_entity": "Ingen enhed at tildele",
       "overall_man_days": "Person-dage",
       "reset_list": "Nulstil listen",
+      "save_task_error": "Opgaven kunne ikke gemmes. Prøv venligst igen.",
       "select_task_type": "Vælg en opgavetype",
       "show_assigned": "Vis tildelte enheder",
       "title": "Tidsplan",
@@ -1545,15 +1604,18 @@
       "show_timecode": "Vis ind og ud som tidskoder"
     },
     "server_down": {
+      "retrying": "Kitsu bliver ved med at prøve og fører dig tilbage til din side, så snart API'et svarer.",
       "text": "Kontakt venligst vores supportteam eller din systemadministrator for at forstå, hvad der går galt.",
       "title": "Kitsu stødte på en fejl under forbindelsen til sin data-API."
     },
     "statistics": {
       "count": "Antal",
+      "bars": "Stablede søjler",
       "count_mode": "Antal",
       "display_mode": "Visning",
       "frames": "Frames",
       "pie": "Cirkeldiagrammer",
+      "heatmap": "Heatmap",
       "shots": "Shots",
       "data_mode": "Data",
       "retakes": "Retakes",
@@ -1561,7 +1623,8 @@
       "all": "Alle",
       "only_running": "Kun igangværende",
       "episode_status": "Episodestatus",
-      "drawings": "Tegninger"
+      "drawings": "Tegninger",
+      "validated": "valideret"
     },
     "tasks": {
       "add_preview": "Tilføj filer til en ny preview-revision",
@@ -1767,7 +1830,8 @@
       "hours": "timer",
       "month": "Måned",
       "time_spents": "Tid brugt (timer)",
-      "timelog_title": "Timelog",
+      "week_total": "Uge: {hours} timer",
+      "timelog_title": "Tidslog",
       "title": "Tidsregistreringer",
       "year": "År",
       "confirm_day_off": "Hvis du markerer denne dag som en fridag, vil al registreret tid for den aktuelle dag blive slettet. Er du sikker på, at du vil fortsætte?",
@@ -1997,29 +2061,45 @@
       "send_error": "Der opstod en fejl under afsendelse af beskeden."
     },
     "concepts": {
-      "add_links": "Tilføj links til assets",
-      "add_new_concept": "Tilføj nye koncepter",
+      "actions": {
+        "empty": "Ingen links",
+        "remove_link": "Fjern link",
+        "title": "Links til Koncepter"
+      },
       "add_concept": "Tilføj filer til nye koncepter",
       "add_concept_error": "Der opstod en fejl under tilføjelse af koncepter.",
+      "add_links": "Tilføj links til assets",
+      "add_new_concept": "Tilføj nye koncepter",
       "delete_for_selection": "Slet det valgte koncept | Slet de {nbSelectedConcepts} valgte koncepter",
+      "delete_for_selection_hard_lock_text": "SLET",
+      "delete_for_selection_hard_text": "Er du sikker på, at du vil fjerne de valgte koncepter permanent? Alle relaterede opgaver, kommentarer og previews vil også blive slettet. Bekræft venligst ved at skrive 'SLET' nedenfor.",
+      "drop_new_concepts": "Læg nye konceptfiler her",
       "empty": "Der er ingen koncepter for denne produktion",
+      "fields": {
+        "asset": "Asset",
+        "asset_type": "Asset-type",
+        "created_at": "Oprettelsesdato",
+        "entity_type": "Enhedstype",
+        "last_comment_date": "Sidste kommentar",
+        "publisher": "Publiceret af",
+        "updated_at": "Opdateringsdato"
+      },
+      "folders": {
+        "delete": "Slet mappe",
+        "delete_error": "Der opstod en fejl under sletning af denne mappe.",
+        "delete_text": "Er du sikker på, at du vil slette mappen {name}? Dens koncepter bevares og flyttes tilbage til roden.",
+        "edit_error": "Der opstod en fejl under lagring af denne mappe. En anden mappe har måske allerede dette navn.",
+        "empty": "Denne mappe er tom",
+        "move": "Flyt til en mappe",
+        "name": "Mappenavn",
+        "new": "Ny mappe",
+        "none": "Ingen mappe",
+        "rename": "Omdøb mappe"
+      },
       "multiple_delete_error": "Der opstod en fejl under sletning af et koncept. Der kan være eksisterende data knyttet til det. Er du sikker på, at der ikke er nogen opgaver knyttet til det valgte koncept?",
       "no_concept_selected": "Intet koncept valgt",
       "title": "Koncepter",
-      "fields": {
-        "entity_type": "Enhedstype",
-        "created_at": "Oprettelsesdato",
-        "updated_at": "Opdateringsdato",
-        "last_comment_date": "Sidste kommentar",
-        "publisher": "Publiceret af"
-      },
-      "actions": {
-        "title": "Links til Koncepter",
-        "empty": "Ingen links"
-      },
-      "delete_for_selection_hard_text": "Er du sikker på, at du vil fjerne de valgte koncepter permanent? Alle relaterede opgaver, kommentarer og previews vil også blive slettet. Bekræft venligst ved at skrive 'SLET' nedenfor.",
-      "delete_for_selection_hard_lock_text": "SLET",
-      "drop_new_concepts": "Læg nye konceptfiler her"
+      "uploading": "Uploader koncepter"
     },
     "intro": {
       "join_discord": "Deltag i fællesskabets Discord",
@@ -2034,7 +2114,7 @@
     },
     "preview": {
       "broken": "Dette preview er ødelagt.",
-      "processing": "Videobehandling i gang..."
+      "processing": "Dette preview er ved at blive behandlet..."
     },
     "studios": {
       "create_error": "Der opstod en fejl under gemning af dette studio. Er du sikker på, at der ikke allerede findes et studio med et lignende navn?",
@@ -2053,6 +2133,9 @@
     },
     "days_off": {
       "title": "Fridage",
+      "upcoming": "Kommende",
+      "past": "Tidligere",
+      "nb_days": "{count} dag | {count} dage",
       "period": "Periode",
       "description": "Beskrivelse",
       "updated_at": "Opdateringsdato",

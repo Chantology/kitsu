@@ -1,4 +1,4 @@
-import { shallowMount } from '@vue/test-utils'
+import { flushPromises, shallowMount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import { createStore } from 'vuex'
 
@@ -28,6 +28,8 @@ vi.mock('@/components/players/players/PlaylistPlayer.vue', () => ({
   default: { name: 'PlaylistPlayer', props: ['canSave'], render: () => null }
 }))
 
+import shotStore from '@/store/modules/shots'
+
 import ViewPlaylistModal from '@/components/modals/ViewPlaylistModal.vue'
 import EditPlaylistModal from '@/components/modals/EditPlaylistModal.vue'
 
@@ -36,12 +38,16 @@ describe('ViewPlaylistModal', () => {
   let wrapper
   let i18n
   let editPlaylistPayload
+  let newPlaylistError
+  let newPlaylistRequest
   let tempEntities
 
   beforeEach(() => {
     routeState.path = '/shots'
     routeState.params = { production_id: 'production-1' }
     editPlaylistPayload = null
+    newPlaylistError = null
+    newPlaylistRequest = null
     tempEntities = []
     store = createStore({
       strict: true,
@@ -58,6 +64,8 @@ describe('ViewPlaylistModal', () => {
         // The create response does not necessarily echo task_type_id back, so
         // the save flow must not rely on it being present here.
         newPlaylist: (_ctx, data) => {
+          if (newPlaylistError) return Promise.reject(newPlaylistError)
+          if (newPlaylistRequest) return newPlaylistRequest
           const created = { ...data, id: 'playlist-1' }
           delete created.task_type_id
           return Promise.resolve(created)
@@ -85,6 +93,11 @@ describe('ViewPlaylistModal', () => {
       global: { plugins: [store, i18n] },
       props: { active: false }
     })
+  })
+
+  afterEach(() => {
+    shotStore.cache.shotMap.delete('shot-1')
+    vi.restoreAllMocks()
   })
 
   it('keeps the selected task type when saving a playlist from a selection', async () => {
@@ -127,6 +140,53 @@ describe('ViewPlaylistModal', () => {
     expect(editModal.props('successText')).toContain('My playlist')
   })
 
+  // Close keeps the error of a failed save: the next Save opens without it.
+  it('opens the save form without the error of a failed save', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    newPlaylistError = new Error('taken')
+    const player = wrapper.findComponent({ name: 'PlaylistPlayer' })
+    const editModal = wrapper.findComponent(EditPlaylistModal)
+
+    player.vm.$emit('save-clicked')
+    await wrapper.vm.$nextTick()
+    editModal.vm.$emit('confirm', { name: 'My playlist', for_entity: 'shot' })
+    await flushPromises()
+    expect(editModal.props('isError')).toBe(true)
+
+    editModal.vm.$emit('cancel')
+    await wrapper.vm.$nextTick()
+    player.vm.$emit('save-clicked')
+    await wrapper.vm.$nextTick()
+
+    expect(editModal.props('active')).toBe(true)
+    expect(editModal.props('isError')).toBe(false)
+  })
+
+  // Clearing on cancel would miss a save that fails after the cancel.
+  it('opens the save form without the error of a save that failed after a cancel', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    let rejectSave
+    newPlaylistRequest = new Promise((resolve, reject) => {
+      rejectSave = reject
+    })
+    const player = wrapper.findComponent({ name: 'PlaylistPlayer' })
+    const editModal = wrapper.findComponent(EditPlaylistModal)
+
+    player.vm.$emit('save-clicked')
+    await wrapper.vm.$nextTick()
+    editModal.vm.$emit('confirm', { name: 'My playlist', for_entity: 'shot' })
+    editModal.vm.$emit('cancel')
+    rejectSave(new Error('taken'))
+    await flushPromises()
+    expect(editModal.props('isError')).toBe(true)
+
+    player.vm.$emit('save-clicked')
+    await wrapper.vm.$nextTick()
+
+    expect(editModal.props('active')).toBe(true)
+    expect(editModal.props('isError')).toBe(false)
+  })
+
   it('saves the chosen task type preview for each entity, not the default one', async () => {
     // Entity carries a preview per task type; the default differs from the one
     // matching the task type the user picks.
@@ -159,6 +219,25 @@ describe('ViewPlaylistModal', () => {
     expect(editPlaylistPayload.data.shots).toEqual([
       { entity_id: 'shot-1', preview_file_id: 'pf-compo' }
     ])
+  })
+
+  // The cached shot has no preview duration: copying it onto the
+  // sub-previews of a multi-file revision erased the durations Zou sends.
+  it('keeps the duration of each sub-preview', async () => {
+    shotStore.cache.shotMap.set('shot-1', { id: 'shot-1', name: 'SH01' })
+    tempEntities = [
+      {
+        id: 'shot-1',
+        preview_file_id: 'pf-1',
+        preview_file_duration: 2,
+        preview_file_previews: [{ id: 'pf-1-b', duration: 3.5 }],
+        preview_files: { 'tt-anim': [{ id: 'pf-1' }] }
+      }
+    ]
+    await wrapper.setProps({ active: true })
+    await new Promise(resolve => setTimeout(resolve))
+
+    expect(tempEntities[0].preview_file_previews[0].duration).toBe(3.5)
   })
 
   it.each([

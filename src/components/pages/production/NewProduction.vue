@@ -480,6 +480,7 @@
       :data-matchers="shotsDataMatchers"
       :database="{}"
       :disable-update="true"
+      :required-values="shotsDataMatchers"
       @reupload="resetShotsImport"
       @confirm="uploadShotsImportFile"
       @cancel="toggleModal('isShotsImportRenderDisplayed')"
@@ -683,12 +684,7 @@ const allowedProductionTypes = computed(() =>
   PRODUCTION_TYPE_OPTIONS.map(option => option.value)
 )
 
-const isEmpty = value =>
-  value === null ||
-  value === undefined ||
-  value === '' ||
-  value === [] ||
-  value === {}
+const isEmpty = value => value === null || value === undefined || value === ''
 
 const isFloat = value => !isEmpty(value) && /^[(\d)*,(\d)+]|(\d)+$/.test(value)
 

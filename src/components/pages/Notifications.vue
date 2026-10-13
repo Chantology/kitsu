@@ -633,10 +633,10 @@ const buildTaskFromNotification = notification => ({
   episode_id: notification.episode_id
 })
 
-const buildTaskTypeFromNotification = notification => ({
-  ...taskTypeMap.value.get(notification.task_type_id),
-  episode_id: notification.episode_id
-})
+const buildTaskTypeFromNotification = notification => {
+  const taskType = taskTypeMap.value.get(notification.task_type_id)
+  return taskType ? { ...taskType, episode_id: notification.episode_id } : null
+}
 
 const isSelected = notification =>
   notification.id === currentNotificationId.value
@@ -666,7 +666,9 @@ const onNotificationSelected = (event, notification) => {
 
 const toggleNotificationRead = (notification, value) => {
   if (value !== notification.read) {
-    store.dispatch('toggleNotificationReadStatus', notification)
+    store
+      .dispatch('toggleNotificationReadStatus', notification)
+      .catch(console.error)
   }
 }
 

@@ -352,6 +352,7 @@
                     :comment="comment"
                     :fps="currentFps"
                     :frame="currentFrame"
+                    :is-action-error="comment.id === failedActionCommentId"
                     :is-change="isStatusChange(index)"
                     :is-checkable="
                       (user && user.id === comment.person?.id) ||
@@ -366,13 +367,7 @@
                     :is-pinnable="
                       isDepartmentSupervisor || isCurrentUserManager
                     "
-                    :is-replyable="
-                      (user && user.id === comment.person?.id) ||
-                      isAssigned ||
-                      isMentioned ||
-                      isDepartmentSupervisor ||
-                      isCurrentUserManager
-                    "
+                    :is-replyable="canReplyTo(comment)"
                     :revision="currentRevision"
                     :task="task"
                     :team="currentTeam"
@@ -427,6 +422,7 @@
         :is-error="errors.addExtraPreview"
         :form-data="addExtraPreviewFormData"
         message=""
+        :upload-progress="uploadProgress"
         :title="
           task
             ? `${task.entity_name} / ${taskTypeMap.get(task.task_type_id)?.name || ''}`
@@ -499,7 +495,9 @@ import {
   ImageIcon
 } from 'lucide-vue-next'
 
+import { isClientThread } from '@/lib/comments'
 import drafts from '@/lib/drafts'
+import { logRequestFailure } from '@/lib/errors'
 import func from '@/lib/func'
 import { getTaskEntityPath, getTaskEntitiesPath } from '@/lib/path'
 import { formatRevision } from '@/lib/preview'
@@ -558,6 +556,7 @@ const task = ref(null)
 const taskComments = ref([])
 const taskPreviews = ref([])
 const commentToEdit = ref(null)
+const failedActionCommentId = ref(null)
 const selectedPreviewId = ref(null)
 const previewForms = ref([])
 const currentFrame = ref(0)
@@ -629,6 +628,7 @@ const taskMetadataDescriptors = computed(
   () => store.getters.taskMetadataDescriptors
 )
 const taskTypeMap = computed(() => store.getters.taskTypeMap)
+const uploadProgress = computed(() => store.getters.uploadProgress)
 const user = computed(() => store.getters.user)
 const organisation = computed(() => store.getters.organisation)
 const isCurrentUserManager = computed(
@@ -941,6 +941,11 @@ const isMentioned = computed(() => {
   )
 })
 
+// The roles the comment authors hold on the production of the task.
+const teamRoles = computed(() =>
+  store.getters.teamRolesForProduction(task.value?.project_id)
+)
+
 const isDepartmentSupervisor = computed(() => {
   if (!isCurrentUserSupervisor.value) return false
   if (user.value.departments.length === 0) return true
@@ -1114,9 +1119,11 @@ const resetPreview = (changeRoute = true) => {
 }
 
 const clearPreviewFiles = () => {
+  store.commit(
+    'CLEAR_UPLOAD_PROGRESS',
+    previewForms.value.map(form => form.get('file').name)
+  )
   previewForms.value = []
-  store.dispatch('loadPreviewFileFormData', previewForms.value)
-  store.commit('CLEAR_UPLOAD_PROGRESS')
 }
 
 const reset = ({ keepPreviewFiles = false } = {}) => {
@@ -1216,12 +1223,14 @@ const postComment = (
   link = undefined,
   forClient = false
 ) => {
+  const taskId = task.value.id
   const params = {
-    taskId: task.value.id,
+    taskId,
     taskStatusId,
     attachment,
     checklist,
     comment,
+    forms: previewForms.value,
     links: link ? [link] : null,
     revision,
     forClient
@@ -1234,9 +1243,13 @@ const postComment = (
   store
     .dispatch(action, params)
     .then(() => {
-      drafts.clearTaskDraft(task.value.id)
-      addCommentRef.value?.reset()
-      reset()
+      drafts.clearTaskDraft(taskId)
+      // A long upload may end once the page shows another task, whose
+      // comment box holds a comment still to publish.
+      if (route.params.task_id === taskId) {
+        addCommentRef.value?.reset()
+        reset()
+      }
       loading.value.addComment = false
     })
     .catch(err => {
@@ -1328,6 +1341,28 @@ const confirmDeleteTaskComment = () => {
     })
 }
 
+// The client is shown who answers the threads it sees: there, the production
+// managers answer for the studio, and the client once mentioned. The other
+// threads reach the client emptied of their text, so only the studio answers.
+const canReplyTo = comment => {
+  if (isCurrentUserManager.value) return true
+  const isAuthor = Boolean(user.value) && user.value.id === comment.person?.id
+  if (isCurrentUserClient.value) {
+    return (
+      isAuthor ||
+      (isClientThread(comment, teamRoles.value) &&
+        (isAssigned.value || isMentioned.value))
+    )
+  }
+  return (
+    !isClientThread(comment, teamRoles.value) &&
+    (isAuthor ||
+      isAssigned.value ||
+      isMentioned.value ||
+      isDepartmentSupervisor.value)
+  )
+}
+
 const isStatusChange = index => {
   const comments = taskComments.value
   const comment = comments[index]
@@ -1337,14 +1372,22 @@ const isStatusChange = index => {
   )
 }
 
-const onAckComment = comment => store.dispatch('ackComment', comment)
+const runCommentAction = (action, comment) => {
+  failedActionCommentId.value = null
+  store.dispatch(action, comment).catch(err => {
+    console.error(err)
+    failedActionCommentId.value = comment.id
+  })
+}
+
+const onAckComment = comment => runCommentAction('ackComment', comment)
 
 const onDuplicateComment = comment => addCommentRef.value.setValue(comment)
 
-const onPinComment = comment => store.dispatch('pinComment', comment)
+const onPinComment = comment => runCommentAction('pinComment', comment)
 
 const onToggleForClient = comment =>
-  store.dispatch('toggleCommentForClient', comment)
+  runCommentAction('toggleCommentForClient', comment)
 
 const onEditComment = comment => {
   commentToEdit.value = comment
@@ -1368,29 +1411,30 @@ const onCancelDeleteComment = () => {
 // --------------------------------------------------------------------------
 const selectFile = forms => {
   previewForms.value = previewForms.value.concat(forms)
-  store.dispatch('loadPreviewFileFormData', previewForms.value)
 }
 
 const createExtraPreview = forms => {
-  selectFile(forms)
   errors.value.addExtraPreview = false
   loading.value.addExtraPreview = true
   const comment = getCurrentTaskComments().find(item =>
     item.previews.find(preview => preview.id === currentPreviewId.value)
   )
+  const taskId = task.value.id
   store
     .dispatch('addCommentExtraPreview', {
-      taskId: task.value.id,
+      taskId,
       commentId: comment?.id,
-      previewId: currentPreviewId.value
+      previewId: currentPreviewId.value,
+      forms
     })
     .then(() => {
       loading.value.addExtraPreview = false
       modals.value.addExtraPreview = false
       addExtraPreviewModalRef.value.reset()
-      clearPreviewFiles()
       setTimeout(() => {
-        previewPlayerRef.value.displayLast()
+        // The page may have moved on to another task, with or without a
+        // player.
+        if (task.value?.id === taskId) previewPlayerRef.value?.displayLast()
       }, 0)
     })
     .catch(err => {
@@ -1416,12 +1460,12 @@ const setPreview = () => {
       previewId,
       frame
     })
-    .then(() => {
-      loading.value.setPreview = false
-    })
     .catch(err => {
       console.error(err)
       errors.value.setPreview = true
+    })
+    .finally(() => {
+      loading.value.setPreview = false
     })
 }
 
@@ -1459,30 +1503,33 @@ const onPreviewAdded = eventData => {
   const revision = eventData.revision
   const extensionName = eventData.extension
   const comment = store.getters.getTaskComment(taskId, commentId)
+  // The comment reloaded on 'comment:update' already lists the preview: the
+  // task previews tell whether the player has it.
+  const isAlreadyAdded = store.getters
+    .getTaskPreviews(taskId)
+    .some(preview => preview.previews?.some(({ id }) => id === previewId))
 
-  if (
-    task.value &&
-    comment &&
-    comment.previews &&
-    (comment.previews.length === 0 || comment.previews[0].id !== previewId) &&
-    taskId === task.value.id
-  ) {
+  if (task.value && comment && !isAlreadyAdded && taskId === task.value.id) {
     store.commit('ADD_PREVIEW_END', {
       preview: {
         id: previewId,
         revision,
-        extension: extensionName
+        extension: extensionName,
+        status: eventData.status
       },
       taskId,
       commentId,
       comment
     })
+    // Zou may still build its files, or have announced them built before.
+    store.dispatch('registerPreviewFileStatuses', [
+      { id: previewId, status: eventData.status }
+    ])
     reset({ keepPreviewFiles: true })
   }
 }
 
 const onAddExtraPreviewClicked = () => {
-  clearPreviewFiles()
   modals.value.addExtraPreview = true
 }
 
@@ -1521,7 +1568,6 @@ const onPreviewsOrderChanged = () => {
 
 const onPreviewFormRemoved = previewForm => {
   previewForms.value = previewForms.value.filter(f => f !== previewForm)
-  store.dispatch('loadPreviewFileFormData', previewForms.value)
 }
 
 const changeCurrentPreview = preview => {
@@ -1559,8 +1605,9 @@ const extractAnnotationSnapshots = async (withLabel = false) => {
   const files = await previewPlayerRef.value.extractAnnotationSnapshots({
     withLabel
   })
-  addCommentRef.value.setAnnotationSnapshots(files)
-  addCommentRef.value.hideAnnotationLoading()
+  // The page may have been left during the extraction.
+  addCommentRef.value?.setAnnotationSnapshots(files)
+  addCommentRef.value?.hideAnnotationLoading()
   return files
 }
 
@@ -1581,9 +1628,9 @@ const timeCodeClicked = ({ versionRevision, frame }) => {
 const toggleSubscribe = () => {
   if (task.value && !isAssigned.value) {
     if (task.value.is_subscribed) {
-      store.dispatch('unsubscribeFromTask', task.value.id)
+      store.dispatch('unsubscribeFromTask', task.value.id).catch(console.error)
     } else {
-      store.dispatch('subscribeToTask', task.value.id)
+      store.dispatch('subscribeToTask', task.value.id).catch(console.error)
     }
   }
 }
@@ -1650,11 +1697,8 @@ const onRemoteAcknowledge = (eventData, type) => {
 const onPreviewFileAddFile = eventData => onPreviewAdded(eventData)
 
 const onPreviewFileUpdate = eventData => {
-  const comment = taskComments.value.find(
-    c =>
-      c.previews &&
-      c.previews.length > 0 &&
-      c.previews[0].id === eventData.preview_file_id
+  const comment = taskComments.value.find(c =>
+    c.previews?.some(preview => preview.id === eventData.preview_file_id)
   )
   if (comment && task.value) {
     store
@@ -1663,8 +1707,15 @@ const onPreviewFileUpdate = eventData => {
         previewId: eventData.preview_file_id
       })
       .then(preview => {
-        comment.previews[0].validation_status = preview.validation_status
+        const target = comment.previews.find(
+          p => p.id === eventData.preview_file_id
+        )
+        if (target) {
+          target.validation_status = preview.validation_status
+          target.status = preview.status
+        }
       })
+      .catch(console.error)
   }
 }
 
@@ -1673,8 +1724,11 @@ const onCommentAcknowledge = eventData => onRemoteAcknowledge(eventData, 'ack')
 const onCommentUnacknowledge = eventData =>
   onRemoteAcknowledge(eventData, 'unack')
 
-const onCommentNew = () => {
+const onCommentNew = eventData => {
   setTimeout(() => {
+    // The store keeps the lists of a task viewed earlier: refreshing from
+    // them before the task is loaded would mount the player on a null task.
+    if (eventData.task_id !== task.value?.id) return
     if (getCurrentTaskComments().length !== taskComments.value.length) {
       taskComments.value = getCurrentTaskComments()
       taskPreviews.value = getCurrentTaskPreviews()
@@ -1682,12 +1736,18 @@ const onCommentNew = () => {
   }, 1000)
 }
 
+// App.vue reloads the comment when the event names its task. Older Zou
+// versions leave the task out of the preview events: the page then reloads
+// the comments it shows.
 const onCommentUpdate = eventData => {
   const commentId = eventData.comment_id
-  if (!taskComments.value.some(({ id }) => id === commentId)) {
+  if (
+    eventData.task_id ||
+    !taskComments.value.some(({ id }) => id === commentId)
+  ) {
     return
   }
-  store.dispatch('loadComment', { commentId }).catch(console.error)
+  store.dispatch('loadComment', { commentId }).catch(logRequestFailure)
 }
 
 const onCommentReply = eventData => {
@@ -1751,6 +1811,7 @@ const onAnnotationUpdate = eventData => {
           })
         }
       })
+      .catch(console.error)
   }
 }
 
@@ -1771,6 +1832,7 @@ const socketEvents = {
 // --------------------------------------------------------------------------
 watch(route, () => {
   if (task.value && route.params.task_id !== task.value.id) {
+    failedActionCommentId.value = null
     loadTaskData()
   }
   if (route.params.preview_id !== selectedPreviewId.value) {
@@ -1781,6 +1843,15 @@ watch(route, () => {
 watch(currentProduction, () => {
   loadTaskData()
 })
+
+watch(
+  () => task.value?.project_id,
+  productionId => {
+    if (productionId) {
+      store.dispatch('loadTeamRolesOnce', productionId).catch(console.error)
+    }
+  }
+)
 
 watch(selectedPreviewId, () => {
   if (task.value && selectedPreviewId.value) {

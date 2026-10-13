@@ -15,7 +15,7 @@ import {
 import { buildSelectionGrid, clearSelectionGrid } from '@/lib/selection'
 import { applyFilters, getFilters, getKeyWords } from '@/lib/filtering'
 import { getFilledColumns, removeModelFromList } from '@/lib/models'
-import { computeStats } from '@/lib/stats'
+import { computeStats, countEntities } from '@/lib/stats'
 import {
   ADD_SEQUENCE,
   ADD_SEQUENCE_SEARCH,
@@ -229,7 +229,8 @@ const initialState = {
   selectedSequences: new Map(),
 
   sequenceRetakeStats: {},
-  sequenceStats: {}
+  sequenceStats: {},
+  sequenceShotCounts: {}
 }
 
 const state = { ...initialState }
@@ -252,10 +253,10 @@ const getters = {
   isSequenceResolution: state => state.isSequenceResolution,
   isSequenceTime: state => state.isSequenceTime,
 
-  sequences: state => cache.sequences,
   sequenceMap: state => cache.sequenceMap,
   sequenceRetakeStats: state => state.sequenceRetakeStats,
   sequenceStats: state => state.sequenceStats,
+  sequenceShotCounts: state => state.sequenceShotCounts,
 
   sequenceListScrollPosition: state => state.sequenceListScrollPosition,
   sequenceFilledColumns: state => state.sequenceFilledColumns,
@@ -1022,6 +1023,7 @@ const mutations = {
       taskStatusMap,
       taskMap
     )
+    state.sequenceShotCounts = countEntities(shots, 'sequence_id')
   },
 
   [CREATE_TASKS_END](state, { tasks, production, taskTypeMap, taskStatusMap }) {
@@ -1116,7 +1118,9 @@ const mutations = {
 
   [DELETE_TASK_END](state, task) {
     const sequence = cache.sequenceMap.get(task.entity_id)
-    if (sequence) {
+    // loadSequences fills the map without tasks, unlike
+    // loadSequencesWithTasks.
+    if (sequence?.tasks) {
       const validations = new Map(sequence.validations)
       validations.delete(task.task_type_id)
       delete sequence.validations

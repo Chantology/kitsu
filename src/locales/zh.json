@@ -1,5 +1,15 @@
 {
   "default": {
+    "app_login": {
+      "authorize": "授权",
+      "consent": "此计算机上的一个应用程序想以 {full_name} 的身份连接到 Kitsu。",
+      "consent_named": "此计算机上一个自称为 \"{app_name}\" 的应用程序想以 {full_name} 的身份连接到 Kitsu。",
+      "error": "应用程序登录失败。请从应用程序重新开始。",
+      "error_2fa_setup": "请先在 Kitsu 中设置双重身份验证，然后从应用程序重新开始登录。",
+      "invalid_request": "此登录链接无效。请从应用程序重新开始登录。",
+      "title": "应用程序登录",
+      "warning": "仅当您亲自从应用程序发起此登录时才授权。该应用程序将以您的权限访问 Kitsu。"
+    },
     "assets": {
       "cast_in": "已分配到",
       "delete_error": "删除此资产时出现错误。很可能存在有链接至此的数据。您确定没有任务链接至此资产类型吗？",
@@ -42,6 +52,7 @@
     },
     "asset_types": {
       "all_asset_types": "所有资产种类",
+      "all_hidden": "所有资产种类均已隐藏。",
       "create_error": "保存此资产类型时出错。您确定没有相同名称的资产类型吗？",
       "delete_text": "您确定要从您的数据库移除{name}吗？",
       "delete_error": "删除此资产类型时出现错误。很可能存在有链接至此的数据。您确定没有资产链接至此资产类型吗？",
@@ -63,12 +74,17 @@
     },
     "breakdown": {
       "all_assets": "所有可用资产",
+      "copy_casting": "复制此选角（ctrl + V 粘贴到所选行）",
       "edit_label": "更改资产的标签",
       "empty": "空的选角",
       "label": "标签",
+      "nb_assets": "{count} 个资产 | {count} 个资产",
+      "nb_occurrences": "出现 {count} 次 | 出现 {count} 次",
+      "nb_ready": "{ready} / {total} 已就绪",
       "occurrences": "出现次数",
       "picture_mode": "切换到图片模式",
       "remove_from_casting": "从选角中移除",
+      "undo": "撤销上一次选角更改（ctrl + Z）",
       "view_as_cards": "卡片视图",
       "view_as_list": "列表视图",
       "text_mode": "切换到文字模式",
@@ -85,10 +101,16 @@
       "fields": {
         "standby": "待命"
       },
-      "episode_casting": "剧集选角",
       "save_error": "保存选角时出错",
       "hide_library": "隐藏资源库",
-      "show_library": "显示资源库"
+      "show_library": "显示资源库",
+      "filters": {
+        "all": "所有行",
+        "asset": "按已分配的资产筛选…",
+        "empty": "无选角",
+        "label": "行",
+        "standby": "待定"
+      }
     },
     "comments": {
       "add_attachment": "添加附件",
@@ -99,6 +121,7 @@
       "comment_from_client": "客户留言",
       "edit_title": "编辑评论",
       "empty_text": "此条评论为空",
+      "action_error": "无法保存。请重试。",
       "edit_error": "编辑评论时发生错误。请联系我们的支持团队。",
       "error": "发布评论时出现错误",
       "no_file_attached": "未附加预览",
@@ -270,6 +293,7 @@
     },
     "episodes": {
       "all_episodes": "所有",
+      "all_hidden": "所有剧集均已隐藏。",
       "edit_error": "保存此剧集时发生错误。您确定没有名称相似的剧集吗？",
       "delete_error": "删除此剧集时出现错误。很可能存在有链接至此的数据。您确定没有序列链接至此剧集吗？",
       "delete_text": "您确定要从数据库中移除 {name} 吗？所有相关的镜头和预览也将被删除。请在下方输入剧集名称以确认。",
@@ -436,6 +460,7 @@
       "history": "历史",
       "info": "信息",
       "or": "或",
+      "next": "下一个",
       "no": "否",
       "loading": "加载中...",
       "loading_data": "正在加载数据",
@@ -448,8 +473,10 @@
       "nb_frames": "帧 | 帧",
       "person": "人员",
       "preview_3d_not_supported": "此浏览器不支持 3D 预览（需要 WebGL2）。请将其更新到最新版本。",
+      "previous": "上一个",
       "profile": "简介",
       "production": "生产",
+      "productivity": "生产力",
       "remove": "移除",
       "save": "保存",
       "sort_by": "排序方式",
@@ -466,6 +493,8 @@
         "choose": "选择",
         "error_imported_rows": "错误发生前已导入 {count} 行。 | 错误发生前已导入 {count} 行。",
         "error_line": "第 {line} 行",
+        "error_timeout": "导入耗时超出预期，正在后台继续进行。",
+        "error_timeout_hint": "请在几分钟后刷新页面，确认结果后再重新导入。",
         "error_upload": "上传您的CSV文件时出现错误。",
         "export_file": "导出数据到CSV文件",
         "import_file": "从CSV文件导入数据",
@@ -476,6 +505,8 @@
         "legend_missing": "未找到的预期列",
         "legend_disabled": "不会被更新或创建的行",
         "legend_overwrite": "将被更新的行",
+        "legend_incomplete": "缺少必填值的行",
+        "missing_values": "第 {lines} 行的必填列（{columns}）没有值。请补全或删除该行，然后重新上传文件。 | 第 {lines} 行的必填列（{columns}）没有值。请补全或删除这些行，然后重新上传文件。",
         "paste": "粘贴",
         "paste_code": "请在此处粘贴您的CSV数据：",
         "preview": "预览",
@@ -584,6 +615,7 @@
       "is_shared": "与整个团队共享",
       "no_results": "无结果",
       "link": "链接",
+      "list": "列表",
       "hours_spent": "花费的小时数 | 花费的小时数",
       "hours_expected": "预期小时数 | 预期小时数",
       "hours_estimated": "估计小时数 | 估计小时数",
@@ -751,6 +783,8 @@
       "invite_link_error": "生成邀请链接时发生错误",
       "new_person": "添加新用户",
       "no_task_assigned": "没有分配给您正在执行的任务",
+      "no_task_done": "您还没有已通过的任务",
+      "no_task_pending": "没有等待反馈的任务",
       "persons": "用户 | 用户",
       "project_role": "项目角色",
       "running_tasks": "在执行任务",
@@ -862,7 +896,7 @@
       "created_at": "创建于：",
       "delete_text": "您确定要从您的数据库移除{name}吗？",
       "delete_error": "删除此播放列表时出现错误。",
-      "edit_error": "保存此播放列表时发生错误。",
+      "edit_error": "保存此播放列表时发生错误。您确定没有名称相似的播放列表吗？",
       "download_zip": "下载 .zip",
       "failed": "失败",
       "for_client": "客户",
@@ -1036,6 +1070,8 @@
       },
       "fields": {
         "fps": "FPS",
+        "hd_bitrate_compression": "高清视频码率 (Mbit/s)",
+        "hd_bitrate_short": "HD Mbit/s",
         "is_frame_in_numbering": "播放器帧计数器从入点帧开始",
         "name": "名称",
         "ratio": "宽高比",
@@ -1055,6 +1091,8 @@
         "code": "简称",
         "is_publish_default": "在发布模式下默认设置艺术家评论小部件",
         "is_single_preview_per_revision": "每个修订仅允许一个预览文件",
+        "ld_bitrate_compression": "低清视频码率 (Mbit/s)",
+        "ld_bitrate_short": "LD Mbit/s",
         "revision_padding": "修订号补零位数（0 = 不补零）"
       },
       "metadata": {
@@ -1103,6 +1141,7 @@
       },
       "parameters": {
         "title": "参数",
+        "previews_and_comments": "预览和评论",
         "save": {
           "button": "确定"
         }
@@ -1176,6 +1215,22 @@
         "assets": "资产",
         "shots": "镜头",
         "sequences": "序列"
+      },
+      "video": {
+        "bitrate_default": "默认值：{value} Mbit/s",
+        "bitrate_default_max": "默认值和最大值：{value} Mbit/s",
+        "bitrate_explanation": "码率越高，画面越清晰，但文件也越大，加载越慢。",
+        "bitrate_max": "最大值：{value} Mbit/s",
+        "bitrate_size": "每分钟约 {size} MB",
+        "bitrates": "码率",
+        "hd_bitrate_description": "全分辨率版本，在 HD 模式下播放，也用于下载。",
+        "ld_bitrate_description": "宽度为 1280 像素的轻量版本，在 LD 模式下播放。",
+        "ld_bitrate_max": "最大值：{value} Mbit/s (HD 码率)",
+        "next_uploads_only": "更改仅适用于之后的上传，现有预览不会重新编码。",
+        "restore_default": "恢复默认值",
+        "task_type_bitrates": "留空则使用“视频”标签页中的码率。",
+        "task_type_ld_bitrate_max": "最大值：该任务类型的 HD 码率",
+        "title": "视频"
       },
       "hide_stats": "隐藏统计",
       "show_stats": "显示统计数据"
@@ -1364,6 +1419,7 @@
       "library_title": "任务类型库"
     },
     "sequences": {
+      "all_hidden": "所有序列均已隐藏。",
       "all_sequences": "所有序列",
       "edit_error": "保存此序列时发生错误。您确定没有相似名称的序列吗？",
       "delete_text": "您确定要从您的数据库移除{name}吗?所有相关的镜头和预览也将被删除。请在下方输入序列名称以确认。",
@@ -1391,6 +1447,8 @@
       "apply_to_prod_confirm": "您确定要将此计划版本应用到当前生产中吗？这将覆盖当前任务值。",
       "apply_to_prod_error": "将计划版本应用到当前生产时发生错误。",
       "assign": "指派给",
+      "assign_error": "无法分配任务。请重试。",
+      "assign_no_fit": "{count} 个任务无法排入日期范围。 | {count} 个任务无法排入日期范围。",
       "confirm_move_children": "移动此条将裁剪或移动 {count} 个子项以适应新范围。是否继续？| 移动此条将裁剪或移动 {count} 个子项以适应新范围。是否继续？",
       "create_version": "创建时间表版本",
       "cut_tool": "剪切",
@@ -1435,6 +1493,7 @@
       "no_entity": "无可指派实体",
       "overall_man_days": "人-天",
       "reset_list": "重置列表",
+      "save_task_error": "无法保存任务。请重试。",
       "select_task_type": "选择任务类型",
       "show_assigned": "显示分配的实体",
       "title": "日程计划",
@@ -1545,15 +1604,18 @@
       "show_timecode": "以时间码显示进出"
     },
     "server_down": {
+      "retrying": "Kitsu会持续重试，API一旦响应，就会将您带回原来的页面。",
       "text": "请联系您的供应商支持，您的系统管理员或您的IT部门来搞清楚出什么问题了。",
       "title": "Kitsu在访问其数据API时出现错误。"
     },
     "statistics": {
       "count": "计数",
+      "bars": "堆叠条形图",
       "count_mode": "计数",
       "display_mode": "显示",
       "frames": "帧数",
       "pie": "饼图",
+      "heatmap": "热力图",
       "shots": "镜头",
       "data_mode": "数据",
       "retakes": "返修",
@@ -1561,7 +1623,8 @@
       "all": "全部",
       "only_running": "仅进行中",
       "episode_status": "剧集状态",
-      "drawings": "画稿"
+      "drawings": "画稿",
+      "validated": "已验证"
     },
     "tasks": {
       "add_preview": "为新预览修订版添加文件",
@@ -1767,6 +1830,7 @@
       "hours": "小时",
       "month": "月",
       "time_spents": "已用时长(小时)",
+      "week_total": "本周：{hours} 小时",
       "timelog_title": "时间日志",
       "title": "时间表",
       "year": "年",
@@ -1997,29 +2061,45 @@
       "send_error": "发送信息时出现错误。"
     },
     "concepts": {
-      "add_links": "添加资产链接",
-      "add_new_concept": "添加新概念",
+      "actions": {
+        "empty": "无链接",
+        "remove_link": "移除链接",
+        "title": "概念链接"
+      },
       "add_concept": "为新概念添加文件",
       "add_concept_error": "添加概念时发生错误。",
+      "add_links": "添加资产链接",
+      "add_new_concept": "添加新概念",
       "delete_for_selection": "删除所选概念 | 删除 {nbSelectedConcepts} 个所选概念",
+      "delete_for_selection_hard_lock_text": "删除",
+      "delete_for_selection_hard_text": "您确定要永久删除所选概念吗？所有相关任务、注释和预览也将被删除。请在下面输入 \"删除 \"确认。",
+      "drop_new_concepts": "在此投放新概念文件",
       "empty": "本作品没有概念",
+      "fields": {
+        "asset": "资产",
+        "asset_type": "资产类别",
+        "created_at": "创建日期",
+        "entity_type": "实体类型",
+        "last_comment_date": "最后评论",
+        "publisher": "发布者",
+        "updated_at": "更新日期"
+      },
+      "folders": {
+        "delete": "删除文件夹",
+        "delete_error": "删除此文件夹时出错。",
+        "delete_text": "确定要删除文件夹 {name} 吗？其中的概念将保留并回到根目录。",
+        "edit_error": "保存此文件夹时出错。可能已有其他文件夹使用此名称。",
+        "empty": "此文件夹为空",
+        "move": "移动到文件夹",
+        "name": "文件夹名称",
+        "new": "新建文件夹",
+        "none": "无文件夹",
+        "rename": "重命名文件夹"
+      },
       "multiple_delete_error": "删除概念时发生错误。当前可能有与之链接的现有数据。您确定没有任务链接到选定的概念吗？",
       "no_concept_selected": "未选择概念",
       "title": "概念",
-      "fields": {
-        "entity_type": "实体类型",
-        "created_at": "创建日期",
-        "updated_at": "更新日期",
-        "last_comment_date": "最后评论",
-        "publisher": "发布者"
-      },
-      "actions": {
-        "title": "概念链接",
-        "empty": "无链接"
-      },
-      "delete_for_selection_hard_text": "您确定要永久删除所选概念吗？所有相关任务、注释和预览也将被删除。请在下面输入 \"删除 \"确认。",
-      "delete_for_selection_hard_lock_text": "删除",
-      "drop_new_concepts": "在此投放新概念文件"
+      "uploading": "正在上传概念图"
     },
     "intro": {
       "join_discord": "加入社区 Discord",
@@ -2034,7 +2114,7 @@
     },
     "preview": {
       "broken": "这个预览坏了。",
-      "processing": "视频处理中..."
+      "processing": "这个预览正在处理中..."
     },
     "studios": {
       "create_error": "保存此工作室时发生错误。您确定没有名称相似的工作室吗？",
@@ -2053,6 +2133,9 @@
     },
     "days_off": {
       "title": "休息日",
+      "upcoming": "即将到来",
+      "past": "已过去",
+      "nb_days": "{count} 天 | {count} 天",
       "period": "期间",
       "description": "说明",
       "updated_at": "更新日期",

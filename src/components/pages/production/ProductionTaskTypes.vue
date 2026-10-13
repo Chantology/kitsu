@@ -51,6 +51,32 @@
                 taskListObject.entity === activeTab
               "
             >
+              <thead>
+                <tr>
+                  <th class="th-grab"></th>
+                  <th>{{ $t('task_types.fields.name') }}</th>
+                  <th>{{ $t('task_types.fields.short_name') }}</th>
+                  <th class="th-bitrate">
+                    <span class="th-bitrate-label">
+                      {{ $t('productions.fields.hd_bitrate_short') }}
+                      <info-question-mark
+                        position="left"
+                        :text="bitrateHelp.hd"
+                      />
+                    </span>
+                  </th>
+                  <th class="th-bitrate">
+                    <span class="th-bitrate-label">
+                      {{ $t('productions.fields.ld_bitrate_short') }}
+                      <info-question-mark
+                        position="left"
+                        :text="bitrateHelp.ld"
+                      />
+                    </span>
+                  </th>
+                  <th></th>
+                </tr>
+              </thead>
               <draggable
                 class="datatable-body"
                 item-key="taskType.id"
@@ -63,6 +89,7 @@
                     class="task-type"
                     :task-type="taskTypeData.taskType"
                     :schedule-item="taskTypeData.scheduleItem"
+                    @bitrates-changed="onBitratesChanged"
                     @date-changed="onDateChanged"
                     @remove="removeTaskType"
                   />
@@ -108,6 +135,7 @@ import { sortByName, sortTaskTypes } from '@/lib/sorting'
 import { formatFullDate } from '@/lib/time'
 
 import ComboboxTaskType from '@/components/widgets/ComboboxTaskType.vue'
+import InfoQuestionMark from '@/components/widgets/InfoQuestionMark.vue'
 import ProductionTaskType from '@/components/pages/production/ProductionTaskType.vue'
 import RouteSectionTabs from '@/components/widgets/RouteSectionTabs.vue'
 import SettingImporter from '@/components/widgets/SettingImporter.vue'
@@ -163,6 +191,26 @@ const productionEpisodeTaskTypes = computed(
 )
 const taskTypeMap = computed(() => store.getters.taskTypeMap)
 const taskTypes = computed(() => store.getters.taskTypes)
+
+const bitrateDefaults = computed(() => store.getters.movieBitrateDefaults)
+
+// The low definition bitrate of a row stays within its high definition one.
+const bitrateHelp = computed(() => {
+  const help = maximum =>
+    [
+      t('productions.video.task_type_bitrates'),
+      maximum,
+      t('productions.video.next_uploads_only')
+    ].join('\n\n')
+  return {
+    hd: help(
+      t('productions.video.bitrate_max', {
+        value: bitrateDefaults.value.hd_bitrate_compression
+      })
+    ),
+    ld: help(t('productions.video.task_type_ld_bitrate_max'))
+  }
+})
 
 const groupByType = {
   Asset: { ref: assetTaskTypes, getter: productionAssetTaskTypes },
@@ -223,9 +271,12 @@ const taskTypeTabs = computed(() =>
 
 const isEmpty = list => !list || list.length === 0
 
+// The loaded items also hold the entity bars of each task type: keep the
+// task type bar, the one attached to no entity.
 const getScheduleItemForTaskType = taskType =>
   currentScheduleItems.value.find(
-    scheduleItem => scheduleItem.task_type_id === taskType.id
+    scheduleItem =>
+      scheduleItem.task_type_id === taskType.id && !scheduleItem.object_id
   ) || {
     start_date: formatFullDate(moment()),
     end_date: formatFullDate(moment())
@@ -290,6 +341,19 @@ const removeTaskType = async ({ taskType, scheduleItem }) => {
   await nextTick()
   updateTaskTypeIdFromRemaining()
   resetDisplayedTaskTypes()
+}
+
+const onBitratesChanged = async ({ taskType, ...bitrates }) => {
+  errors.scheduleTimeUpdate = false
+  try {
+    await store.dispatch('addTaskTypeToProduction', {
+      taskTypeId: taskType.id,
+      ...bitrates
+    })
+  } catch (err) {
+    console.error(err)
+    errors.scheduleTimeUpdate = true
+  }
 }
 
 const onDateChanged = async scheduleItem => {
@@ -416,6 +480,32 @@ watch(
 
 .datatable th {
   color: var(--text);
+  padding-left: 10px;
+  padding-top: 1em;
+}
+
+.th-grab {
+  width: 30px;
+}
+
+.th-bitrate {
+  min-width: 120px;
+  white-space: nowrap;
+  // A sticky header cell is its own stacking context: without a z-index, the
+  // inputs of the rows (positioned, later in the page) cover its tooltip.
+  z-index: 2;
+
+  // The tooltip opens over the next columns: narrow, it stays within the tab
+  // on a tablet.
+  :deep(.question-text) {
+    max-width: 320px;
+  }
+}
+
+.th-bitrate-label {
+  align-items: center;
+  display: flex;
+  gap: 0.3em;
 }
 
 table {

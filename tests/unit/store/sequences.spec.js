@@ -8,6 +8,7 @@ vi.mock('@/store', () => ({ default: {} }))
 
 import sequencesStore from '@/store/modules/sequences'
 import shotsApi from '@/store/api/shots'
+import shotsStore from '@/store/modules/shots'
 
 describe('Sequences store, all-episodes pseudo-episode', () => {
   const production = { id: 'p-all' }
@@ -282,6 +283,24 @@ describe('Sequences store, all-episodes pseudo-episode', () => {
         { label: 'SQ010', value: 'sq-2' }
       ])
     })
+  })
+})
+
+describe('Sequences store, COMPUTE_SEQUENCE_STATS', () => {
+  test('counts the shots of each sequence along with the task stats', () => {
+    shotsStore.cache.shots = [
+      { id: 's1', sequence_id: 'sq01', tasks: [] },
+      { id: 's2', sequence_id: 'sq01', tasks: [] },
+      { id: 's3', sequence_id: 'sq02', tasks: [], canceled: true }
+    ]
+    const state = { searchSequenceFilters: [] }
+    sequencesStore.mutations.COMPUTE_SEQUENCE_STATS(state, {
+      taskStatusMap: new Map(),
+      taskMap: new Map()
+    })
+    expect(state.sequenceShotCounts).toEqual({ sq01: 2 })
+    expect(sequencesStore.getters.sequenceShotCounts(state)).toEqual({ sq01: 2 })
+    shotsStore.cache.shots = []
   })
 })
 
@@ -707,5 +726,56 @@ describe('Sequences store, late responses', () => {
     })
 
     expect(commit).not.toHaveBeenCalled()
+  })
+})
+
+describe('Sequences store, DELETE_TASK_END', () => {
+  afterEach(() => {
+    sequencesStore.cache.sequenceMap.clear()
+    sequencesStore.cache.sequences = []
+  })
+
+  // The task page reloads the plain list, whose rows carry no tasks: deleting
+  // a task of one of them threw, and the modules after this one kept the task.
+  test('leaves a sequence loaded without its tasks unchanged', () => {
+    sequencesStore.mutations.LOAD_SEQUENCES_END(
+      { displayedSequences: [] },
+      {
+        sequences: [{ id: 'sq-plain', name: 'SQ01', parent_id: 'ep-a' }],
+        episodeMap: new Map(),
+        production: { id: 'p-delete' },
+        userFilters: {},
+        loadingKey: 'p-delete/ep-a#partial'
+      }
+    )
+
+    sequencesStore.mutations.DELETE_TASK_END(
+      {},
+      { id: 't1', entity_id: 'sq-plain', task_type_id: 'tt1' }
+    )
+
+    const sequence = sequencesStore.cache.sequenceMap.get('sq-plain')
+    expect(sequence.tasks).toBeUndefined()
+    expect(sequence.validations).toBeUndefined()
+  })
+
+  test('removes the task of a sequence loaded with its tasks', () => {
+    sequencesStore.cache.sequenceMap.set('sq-full', {
+      id: 'sq-full',
+      tasks: ['t1', 't2'],
+      validations: new Map([
+        ['tt1', 't1'],
+        ['tt2', 't2']
+      ])
+    })
+
+    sequencesStore.mutations.DELETE_TASK_END(
+      {},
+      { id: 't1', entity_id: 'sq-full', task_type_id: 'tt1' }
+    )
+
+    const sequence = sequencesStore.cache.sequenceMap.get('sq-full')
+    expect(sequence.tasks).toEqual(['t2'])
+    expect([...sequence.validations]).toEqual([['tt2', 't2']])
   })
 })

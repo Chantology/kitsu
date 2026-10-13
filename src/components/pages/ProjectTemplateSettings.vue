@@ -25,6 +25,17 @@
               {{ $t('productions.parameters.title') }}
             </a>
           </li>
+          <li :class="{ 'is-active': isActiveTab('video') }">
+            <a
+              role="button"
+              tabindex="0"
+              @click="activeTab = 'video'"
+              @keydown.enter.prevent="activeTab = 'video'"
+              @keydown.space.prevent="activeTab = 'video'"
+            >
+              {{ $t('productions.video.title') }}
+            </a>
+          </li>
           <li :class="{ 'is-active': isActiveTab('metadataDescriptors') }">
             <a
               role="button"
@@ -131,60 +142,51 @@
                 :options="homepageOptions"
                 v-model="params.homepage"
               />
+              <h3 class="section-title">
+                {{ $t('productions.parameters.previews_and_comments') }}
+              </h3>
               <text-field
-                type="number"
-                :max="60"
-                :step="0.001"
-                :label="$t('productions.fields.fps')"
-                placeholder="25"
-                v-model="params.fps"
-              />
-              <text-field
-                :label="$t('productions.fields.ratio')"
-                placeholder="16:9"
-                :maxlength="10"
-                v-model.trim="params.ratio"
-                @input="ratioError = ''"
-              />
-              <p class="field-error" v-if="ratioError">{{ ratioError }}</p>
-              <text-field
-                :label="$t('productions.fields.resolution')"
-                placeholder="1920x1080"
-                v-model.trim="params.resolution"
-                @input="resolutionError = ''"
-              />
-              <p class="field-error" v-if="resolutionError">
-                {{ resolutionError }}
-              </p>
-              <combobox-boolean
-                :label="$t('productions.fields.is_clients_isolated')"
-                v-model="params.is_clients_isolated"
-              />
-              <combobox-boolean
-                :label="$t('productions.fields.is_preview_download_allowed')"
-                v-model="params.is_preview_download_allowed"
-              />
-              <combobox-boolean
-                :label="$t('productions.fields.is_set_preview_automated')"
-                v-model="params.is_set_preview_automated"
-              />
-              <combobox-boolean
-                :label="$t('productions.fields.is_single_preview_per_revision')"
-                v-model="params.is_single_preview_per_revision"
-              />
-              <combobox-boolean
-                :label="$t('productions.fields.is_publish_default')"
-                v-model="params.is_publish_default_for_artists"
-              />
-              <combobox-boolean
-                :label="$t('productions.fields.is_frame_in_numbering')"
-                v-model="params.is_frame_in_numbering"
-              />
-              <text-field
+                class="number-line"
                 type="number"
                 :step="1"
                 :label="$t('productions.fields.max_retakes')"
                 v-model="params.max_retakes"
+              />
+              <checkbox
+                class="mb1"
+                :toggle="true"
+                :label="$t('productions.fields.is_clients_isolated')"
+                v-model="params.is_clients_isolated"
+              />
+              <checkbox
+                class="mb1"
+                :toggle="true"
+                :label="$t('productions.fields.is_preview_download_allowed')"
+                v-model="params.is_preview_download_allowed"
+              />
+              <checkbox
+                class="mb1"
+                :toggle="true"
+                :label="$t('productions.fields.is_set_preview_automated')"
+                v-model="params.is_set_preview_automated"
+              />
+              <checkbox
+                class="mb1"
+                :toggle="true"
+                :label="$t('productions.fields.is_single_preview_per_revision')"
+                v-model="params.is_single_preview_per_revision"
+              />
+              <checkbox
+                class="mb1"
+                :toggle="true"
+                :label="$t('productions.fields.is_publish_default')"
+                v-model="params.is_publish_default_for_artists"
+              />
+              <checkbox
+                class="mb2"
+                :toggle="true"
+                :label="$t('productions.fields.is_frame_in_numbering')"
+                v-model="params.is_frame_in_numbering"
               />
               <p v-if="errors.parameters" class="error mt1">
                 {{ $t('productions.edit_error') }}
@@ -199,7 +201,9 @@
         <task-type-settings
           :task-types="templateTaskTypes"
           :all-task-types="allTaskTypes"
+          :default-bitrates="params"
           @add="addTaskType"
+          @bitrates-changed="setTaskTypeBitrates"
           @import-items="importTaskTypes"
           @remove="removeTaskType"
           @reorder="reorderTaskTypes"
@@ -248,6 +252,68 @@
       </div>
 
       <!-- Metadata Descriptors -->
+      <div class="tab" v-show="isActiveTab('video')">
+        <div class="columns">
+          <div class="column is-one-third box">
+            <div class="form">
+              <p class="explanation mb1">
+                {{ $t('productions.creation.explanation_video') }}
+              </p>
+              <text-field
+                type="number"
+                :max="60"
+                :step="0.001"
+                :label="$t('productions.fields.fps')"
+                placeholder="25"
+                v-model="params.fps"
+              />
+              <text-field
+                :label="$t('productions.fields.ratio')"
+                placeholder="16:9"
+                :maxlength="10"
+                v-model.trim="params.ratio"
+                @input="ratioError = ''"
+              />
+              <p class="field-error" v-if="ratioError">{{ ratioError }}</p>
+              <text-field
+                :label="$t('productions.fields.resolution')"
+                placeholder="1920x1080"
+                v-model.trim="params.resolution"
+                @input="resolutionError = ''"
+              />
+              <p class="field-error" v-if="resolutionError">
+                {{ resolutionError }}
+              </p>
+              <h3 class="section-title">
+                {{ $t('productions.video.bitrates') }}
+              </h3>
+              <p class="explanation mb1">
+                {{ $t('productions.video.bitrate_explanation') }}
+              </p>
+              <movie-bitrate-field
+                :default-value="bitrateDefaults.hd_bitrate_compression"
+                :description="$t('productions.video.hd_bitrate_description')"
+                :label="$t('productions.fields.hd_bitrate_compression')"
+                :max="bitrateDefaults.hd_bitrate_compression"
+                v-model="params.hd_bitrate_compression"
+              />
+              <movie-bitrate-field
+                :ceiling="bitrateDefaults.hd_bitrate_compression"
+                :default-value="bitrateDefaults.ld_bitrate_compression"
+                :description="$t('productions.video.ld_bitrate_description')"
+                is-low-definition
+                :label="$t('productions.fields.ld_bitrate_compression')"
+                :max="ldBitrateCeiling"
+                v-model="params.ld_bitrate_compression"
+              />
+              <p v-if="errors.parameters" class="error mt1">
+                {{ $t('productions.edit_error') }}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="tab" v-show="isActiveTab('metadataDescriptors')">
         <div class="section-tabs tabs">
           <ul>
@@ -392,8 +458,9 @@ import AssetTypeSettings from '@/components/pages/production/AssetTypeSettings.v
 import BackgroundSettings from '@/components/pages/production/BackgroundSettings.vue'
 import RowActionsCell from '@/components/cells/RowActionsCell.vue'
 import BoardSettings from '@/components/pages/production/BoardSettings.vue'
+import MovieBitrateField from '@/components/pages/production/MovieBitrateField.vue'
 import StatusAutomationSettings from '@/components/pages/production/StatusAutomationSettings.vue'
-import ComboboxBoolean from '@/components/widgets/ComboboxBoolean.vue'
+import Checkbox from '@/components/widgets/Checkbox.vue'
 import ComboboxStyled from '@/components/widgets/ComboboxStyled.vue'
 import Spinner from '@/components/widgets/Spinner.vue'
 import TaskStatusSettings from '@/components/pages/production/TaskStatusSettings.vue'
@@ -401,9 +468,11 @@ import TaskTypeSettings from '@/components/pages/production/TaskTypeSettings.vue
 import TextField from '@/components/widgets/TextField.vue'
 
 import {
-  PRODUCTION_TYPE_OPTIONS,
+  HOME_PAGE_OPTIONS,
   PRODUCTION_STYLE_OPTIONS,
-  HOME_PAGE_OPTIONS
+  PRODUCTION_TYPE_OPTIONS,
+  clampBitrate,
+  clampBitrates
 } from '@/lib/productions'
 
 const { t } = useI18n()
@@ -485,12 +554,14 @@ const params = ref({
   fps: '25',
   ratio: '16:9',
   resolution: '1920x1080',
-  is_clients_isolated: 'false',
-  is_preview_download_allowed: 'false',
-  is_set_preview_automated: 'false',
-  is_single_preview_per_revision: 'false',
-  is_publish_default_for_artists: 'false',
-  is_frame_in_numbering: 'false',
+  hd_bitrate_compression: '',
+  ld_bitrate_compression: '',
+  is_clients_isolated: false,
+  is_preview_download_allowed: false,
+  is_set_preview_automated: false,
+  is_single_preview_per_revision: false,
+  is_publish_default_for_artists: false,
+  is_frame_in_numbering: false,
   max_retakes: 0
 })
 
@@ -505,6 +576,15 @@ const allAutomations = computed(() => store.getters.statusAutomations || [])
 const allBackgrounds = computed(() => store.getters.backgrounds || [])
 const departmentMap = computed(() => store.getters.departmentMap || new Map())
 const taskTypeMap = computed(() => store.getters.taskTypeMap || new Map())
+const bitrateDefaults = computed(() => store.getters.movieBitrateDefaults)
+
+const ldBitrateCeiling = computed(
+  () =>
+    clampBitrate(
+      params.value.hd_bitrate_compression,
+      bitrateDefaults.value.hd_bitrate_compression
+    ) ?? bitrateDefaults.value.hd_bitrate_compression
+)
 
 const isActiveTab = tab => activeTab.value === tab
 
@@ -547,18 +627,14 @@ const loadTemplateData = async () => {
     fps: tmpl.fps || '25',
     ratio: tmpl.ratio || '16:9',
     resolution: tmpl.resolution || '1920x1080',
-    is_clients_isolated: tmpl.is_clients_isolated ? 'true' : 'false',
-    is_preview_download_allowed: tmpl.is_preview_download_allowed
-      ? 'true'
-      : 'false',
-    is_set_preview_automated: tmpl.is_set_preview_automated ? 'true' : 'false',
-    is_single_preview_per_revision: tmpl.is_single_preview_per_revision
-      ? 'true'
-      : 'false',
-    is_publish_default_for_artists: tmpl.is_publish_default_for_artists
-      ? 'true'
-      : 'false',
-    is_frame_in_numbering: tmpl.is_frame_in_numbering ? 'true' : 'false',
+    hd_bitrate_compression: tmpl.hd_bitrate_compression ?? '',
+    ld_bitrate_compression: tmpl.ld_bitrate_compression ?? '',
+    is_clients_isolated: !!tmpl.is_clients_isolated,
+    is_preview_download_allowed: !!tmpl.is_preview_download_allowed,
+    is_set_preview_automated: !!tmpl.is_set_preview_automated,
+    is_single_preview_per_revision: !!tmpl.is_single_preview_per_revision,
+    is_publish_default_for_artists: !!tmpl.is_publish_default_for_artists,
+    is_frame_in_numbering: !!tmpl.is_frame_in_numbering,
     max_retakes: tmpl.max_retakes || 0
   }
   // Build roles map from task status link data (if available from API)
@@ -593,22 +669,25 @@ const saveParameters = async () => {
   if (ratioError.value || resolutionError.value) return
   loading.parameters = true
   errors.parameters = false
+  const max = bitrateDefaults.value.hd_bitrate_compression
+  const bitrates = clampBitrates(params.value, { max })
+  // No form submit makes the browser check these fields: show each bitrate
+  // rounded and within bounds. The low definition one goes under the high
+  // definition one in the payload only: a save in the middle of typing the
+  // high definition one must not lower it for good.
+  Object.keys(bitrates).forEach(key => {
+    const bitrate = clampBitrate(params.value[key], max)
+    if (bitrate !== null && bitrate !== params.value[key]) {
+      params.value[key] = bitrate
+    }
+  })
   try {
     await store.dispatch('editProjectTemplate', {
       id: templateId.value,
       name: template.value.name,
       description: template.value.description,
       ...params.value,
-      is_clients_isolated: params.value.is_clients_isolated === 'true',
-      is_preview_download_allowed:
-        params.value.is_preview_download_allowed === 'true',
-      is_set_preview_automated:
-        params.value.is_set_preview_automated === 'true',
-      is_single_preview_per_revision:
-        params.value.is_single_preview_per_revision === 'true',
-      is_publish_default_for_artists:
-        params.value.is_publish_default_for_artists === 'true',
-      is_frame_in_numbering: params.value.is_frame_in_numbering === 'true'
+      ...bitrates
     })
   } catch {
     errors.parameters = true
@@ -641,6 +720,15 @@ const addTaskType = async taskTypeId => {
   await store.dispatch('addTaskTypeToTemplate', {
     templateId: templateId.value,
     taskTypeId
+  })
+  await loadTemplateData()
+}
+
+const setTaskTypeBitrates = async ({ taskTypeId, ...bitrates }) => {
+  await store.dispatch('addTaskTypeToTemplate', {
+    templateId: templateId.value,
+    taskTypeId,
+    ...bitrates
   })
   await loadTemplateData()
 }
@@ -794,7 +882,9 @@ const persistDescriptors = async () => {
   await loadTemplateData()
 }
 
+// Close leaves the error of the last save: opening drops it.
 const openAddDescriptor = () => {
+  errors.saveDescriptor = false
   descriptorToEditIndex.value = -1
   descriptorToEdit.value = {
     name: '',
@@ -809,6 +899,7 @@ const openAddDescriptor = () => {
 const openEditDescriptor = index => {
   const d = descriptors.value[index]
   if (!d) return
+  errors.saveDescriptor = false
   descriptorToEditIndex.value = index
   descriptorToEdit.value = {
     id: `template-descriptor-${index}`,
@@ -944,7 +1035,41 @@ h2.subtitle {
 .box {
   max-width: 600px;
   width: 100%;
-  padding: 1em;
+  padding: 2em;
+}
+
+.explanation {
+  color: var(--text-alt);
+}
+
+.section-title {
+  color: var(--text);
+  font-size: 1.1em;
+  font-weight: 500;
+  margin: 1.5em 0 0.8em;
+  text-transform: uppercase;
+}
+
+// Short numeric settings: the input sits on the left of its label.
+.number-line {
+  align-items: center;
+  display: flex;
+  flex-direction: row-reverse;
+  gap: 0.6em;
+  justify-content: flex-end;
+
+  :deep(.label) {
+    margin-bottom: 0;
+  }
+
+  :deep(.control) {
+    flex: 0 0 auto;
+  }
+
+  :deep(.input) {
+    padding: 0.3em 0.5em;
+    width: 65px;
+  }
 }
 
 .input.is-small,

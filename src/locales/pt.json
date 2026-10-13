@@ -1,5 +1,15 @@
 {
   "default": {
+    "app_login": {
+      "authorize": "Autorizar",
+      "consent": "Um aplicativo neste computador quer se conectar ao Kitsu como {full_name}.",
+      "consent_named": "Um aplicativo neste computador, que se apresenta como \"{app_name}\", quer se conectar ao Kitsu como {full_name}.",
+      "error": "O login do aplicativo falhou. Inicie-o novamente a partir do aplicativo.",
+      "error_2fa_setup": "Configure primeiro a autenticação de dois fatores no Kitsu e depois inicie o login novamente a partir do aplicativo.",
+      "invalid_request": "Este link de login é inválido. Inicie o login novamente a partir do aplicativo.",
+      "title": "Login de aplicativo",
+      "warning": "Autorize apenas se você mesmo iniciou este login a partir do aplicativo. Ele acessará o Kitsu com as suas permissões."
+    },
     "assets": {
       "cast_in": "Distribuído em",
       "delete_error": "Ocorreu um erro ao excluir este asset. Provavelmente há dados vinculados a ele. Tem certeza de que este tipo de asset não possui nenhuma tarefa vinculada a ele?",
@@ -42,6 +52,7 @@
     },
     "asset_types": {
       "all_asset_types": "Todos os tipos de assets",
+      "all_hidden": "Todos os tipos de assets estão ocultos.",
       "create_error": "Ocorreu um erro ao salvar este tipo de asset. Tem certeza de que não há nenhum tipo de asset com nome semelhante?",
       "delete_text": "Tem certeza de que deseja remover {name} de seu banco de dados?",
       "delete_error": "Ocorreu um erro ao excluir este tipo de ativo. Provavelmente há dados vinculados a ele. Tem certeza de que este tipo de ativo não possui nenhum ativo vinculado a ele?",
@@ -63,12 +74,17 @@
     },
     "breakdown": {
       "all_assets": "Todos os assets disponíveis",
+      "copy_casting": "Copiar este casting (ctrl + V cola-o nas linhas selecionadas)",
       "edit_label": "Alterar o rótulo do asset",
       "empty": "Elenco vazio",
       "label": "Rótulo",
+      "nb_assets": "{count} asset | {count} assets",
+      "nb_occurrences": "{count} ocorrência | {count} ocorrências",
+      "nb_ready": "{ready} / {total} prontos",
       "occurrences": "Ocorrências",
       "picture_mode": "Mudar para o modo de imagem",
       "remove_from_casting": "Remover do casting",
+      "undo": "Desfazer a última alteração de casting (ctrl + Z)",
       "view_as_cards": "Ver como cartões",
       "view_as_list": "Ver como lista",
       "text_mode": "Mudar para o modo de texto",
@@ -85,10 +101,16 @@
       "fields": {
         "standby": "STDB"
       },
-      "episode_casting": "Elenco de episódios",
       "save_error": "Erro ao salvar o casting",
       "hide_library": "Ocultar biblioteca",
-      "show_library": "Exibir biblioteca"
+      "show_library": "Exibir biblioteca",
+      "filters": {
+        "all": "Todas as linhas",
+        "asset": "Filtrar por asset distribuído…",
+        "empty": "Sem casting",
+        "label": "Linhas",
+        "standby": "Em espera"
+      }
     },
     "comments": {
       "add_attachment": "Adicionar anexo",
@@ -99,6 +121,7 @@
       "comment_from_client": "Comentário do cliente",
       "edit_title": "Editar comentário",
       "empty_text": "Este comentário está vazio",
+      "action_error": "Não foi possível salvar. Tente novamente.",
       "edit_error": "Ocorreu um erro ao editar o comentário. Entre em contato com nossa equipe de suporte.",
       "error": "Ocorreu um erro ao postar o comentário",
       "no_file_attached": "Nenhum arquivo anexado",
@@ -270,6 +293,7 @@
     },
     "episodes": {
       "all_episodes": "Todos os episódios",
+      "all_hidden": "Todos os episódios estão ocultos.",
       "edit_error": "Ocorreu um erro ao salvar este episódio. Tem certeza de que não há episódio com nome semelhante?",
       "delete_error": "Ocorreu um erro ao excluir este episódio. Provavelmente há dados vinculados a ele. Tem certeza que este episódio não tem nenhuma sequência ligada a ele?",
       "delete_text": "Tem certeza de que deseja remover {name} de seu banco de dados? Todos os shots e visualizações relacionados serão excluídos. Por favor, confirme digitando o nome do episódio abaixo.",
@@ -436,6 +460,7 @@
       "history": "histórico",
       "info": "Informação",
       "or": "ou",
+      "next": "Próximo",
       "no": "Não",
       "loading": "Carregando...",
       "loading_data": "Carregando dados",
@@ -448,8 +473,10 @@
       "nb_frames": "frame | frames",
       "person": "Pessoa",
       "preview_3d_not_supported": "As visualizações 3D não são suportadas neste navegador (WebGL2 é necessário). Por favor, atualize-o para a versão mais recente.",
+      "previous": "Anterior",
       "profile": "Perfil",
       "production": "Produção",
+      "productivity": "Produtividade",
       "remove": "Remover",
       "save": "Salvar",
       "sort_by": "Ordenar por",
@@ -466,6 +493,8 @@
         "choose": "Escolher",
         "error_imported_rows": "{count} linha foi importada antes do erro. | {count} linhas foram importadas antes do erro.",
         "error_line": "Linha {line}",
+        "error_timeout": "A importação está demorando mais do que o esperado e continua em segundo plano.",
+        "error_timeout_hint": "Recarregue a página em alguns minutos para verificar o resultado antes de importar novamente.",
         "error_upload": "Um erro ocorreu no upload do seu CSV.",
         "export_file": "Exportar dados para um CSV",
         "import_file": "Importar dados de um CSV",
@@ -476,6 +505,8 @@
         "legend_missing": "Coluna esperada que não foi encontrada",
         "legend_disabled": "Linha que não será atualizada nem criada",
         "legend_overwrite": "Linha que será atualizada",
+        "legend_incomplete": "Linha sem um valor obrigatório",
+        "missing_values": "A linha {lines} não tem valor em uma coluna obrigatória ({columns}). Preencha-a ou remova-a e envie o arquivo novamente. | As linhas {lines} não têm valor em uma coluna obrigatória ({columns}). Preencha-as ou remova-as e envie o arquivo novamente.",
         "paste": "Colar",
         "paste_code": "Por favor cole aqui seus dados CSV:",
         "preview": "Prévia",
@@ -584,6 +615,7 @@
       "is_shared": "Compartilhado com toda a equipe",
       "no_results": "Nenhum resultado",
       "link": "Link",
+      "list": "Lista",
       "hours_spent": "hora gasta | horas gastas",
       "hours_expected": "hora prevista | horas previstas",
       "hours_estimated": "hora estimada | horas estimadas",
@@ -751,6 +783,8 @@
       "invite_link_error": "Ocorreu um erro ao gerar o link do convite",
       "new_person": "Adicionar um novo usuário",
       "no_task_assigned": "Não há tarefas em execução atribuídas a você",
+      "no_task_done": "Você ainda não tem tarefas validadas",
+      "no_task_pending": "Nenhuma tarefa está aguardando um feedback",
       "persons": "pessoa | pessoas",
       "project_role": "Papel do projeto",
       "running_tasks": "Tarefas em execução",
@@ -862,7 +896,7 @@
       "created_at": "Criado em:",
       "delete_text": "Tem certeza de que deseja remover {name} de seu banco de dados?",
       "delete_error": "Um erro ocorreu ao deletar a playlist.",
-      "edit_error": "Um erro ocorreu ao salvar a playlist.",
+      "edit_error": "Um erro ocorreu ao salvar a playlist. Tem certeza de que não há nenhuma playlist com nome semelhante?",
       "download_zip": "Baixar .zip",
       "failed": "Falhou",
       "for_client": "O cliente",
@@ -1036,6 +1070,8 @@
       },
       "fields": {
         "fps": "FPS",
+        "hd_bitrate_compression": "Taxa de bits dos vídeos em alta definição (Mbit/s)",
+        "hd_bitrate_short": "HD Mbit/s",
         "is_frame_in_numbering": "Iniciar o contador de frames do player no frame de entrada",
         "name": "Nome",
         "ratio": "Ratio",
@@ -1055,6 +1091,8 @@
         "code": "Nome curto",
         "is_publish_default": "Definir o widget de comentários para artistas no modo de publicação por padrão",
         "is_single_preview_per_revision": "Permitir apenas um arquivo de visualização por revisão",
+        "ld_bitrate_compression": "Taxa de bits dos vídeos em baixa definição (Mbit/s)",
+        "ld_bitrate_short": "LD Mbit/s",
         "revision_padding": "Preenchimento do número de revisão (0 = sem preenchimento)"
       },
       "metadata": {
@@ -1103,6 +1141,7 @@
       },
       "parameters": {
         "title": "Parâmetros",
+        "previews_and_comments": "Previews e comentários",
         "save": {
           "button": "Confirmar"
         }
@@ -1176,6 +1215,22 @@
         "assets": "Ativos",
         "shots": "Shots",
         "sequences": "Sequências"
+      },
+      "video": {
+        "bitrate_default": "Padrão: {value} Mbit/s",
+        "bitrate_default_max": "Padrão e máximo: {value} Mbit/s",
+        "bitrate_explanation": "Uma taxa de bits mais alta gera uma imagem mais nítida, mas também arquivos mais pesados, que demoram mais para carregar.",
+        "bitrate_max": "Máximo: {value} Mbit/s",
+        "bitrate_size": "Cerca de {size} MB por minuto",
+        "bitrates": "Taxas de bits",
+        "hd_bitrate_description": "Versão em resolução completa, reproduzida no modo HD e usada para downloads.",
+        "ld_bitrate_description": "Versão mais leve, com 1280 pixels de largura, reproduzida no modo LD.",
+        "ld_bitrate_max": "Máximo: {value} Mbit/s (taxa de bits HD)",
+        "next_uploads_only": "As alterações se aplicam apenas aos próximos envios: as visualizações existentes não são recodificadas.",
+        "restore_default": "Restaurar padrão",
+        "task_type_bitrates": "Deixe em branco para usar as taxas de bits da aba Vídeo.",
+        "task_type_ld_bitrate_max": "Máximo: a taxa de bits HD do tipo de tarefa",
+        "title": "Vídeo"
       },
       "hide_stats": "Esconder estatísticas",
       "show_stats": "Mostrar estatísticas"
@@ -1364,6 +1419,7 @@
       "library_title": "Biblioteca de tipos de tarefas"
     },
     "sequences": {
+      "all_hidden": "Todas as sequencias estão ocultas.",
       "all_sequences": "Todas as sequencias",
       "edit_error": "Ocorreu um erro ao salvar esta sequência. Tem certeza de que não há nenhuma sequência com nome semelhante?",
       "delete_text": "Tem certeza de que deseja remover {name} de seu banco de dados? Todos os shots e visualizações relacionados serão excluídos. Confirme digitando o nome da sequência abaixo.",
@@ -1391,6 +1447,8 @@
       "apply_to_prod_confirm": "Tem certeza de que deseja aplicar essa versão de programação à produção atual? Isso substituirá os valores atuais da tarefa.",
       "apply_to_prod_error": "Ocorreu um erro ao aplicar a versão de programação à produção atual.",
       "assign": "Atribuir a:",
+      "assign_error": "Não foi possível atribuir as tarefas. Tente novamente.",
+      "assign_no_fit": "{count} tarefa não coube no intervalo de datas. | {count} tarefas não couberam no intervalo de datas.",
       "confirm_move_children": "Mover esta barra vai cortar ou ajustar {count} subitem para caber nos novos limites. Continuar? | Mover esta barra vai cortar ou ajustar {count} subitens para caberem nos novos limites. Continuar?",
       "create_version": "Criar versão da programação",
       "cut_tool": "Cortar",
@@ -1435,6 +1493,7 @@
       "no_entity": "Nenhuma entidade atribuível",
       "overall_man_days": "Jornadas necessárias",
       "reset_list": "Redefinir lista",
+      "save_task_error": "Não foi possível salvar a tarefa. Tente novamente.",
       "select_task_type": "Selecione um tipo de tarefa",
       "show_assigned": "Mostrar entidades atribuídas",
       "title": "Cronograma",
@@ -1545,15 +1604,18 @@
       "show_timecode": "Mostrar entrada e saída como códigos de tempo"
     },
     "server_down": {
+      "retrying": "Kitsu continua tentando e levará você de volta à sua página assim que a API responder.",
       "text": "Entre em contato com nossa equipe de suporte ou com o administrador do seu sistema para entender o que está errado.",
       "title": "Kitsu encontrou um erro ao acessar sua API de dados."
     },
     "statistics": {
       "count": "Contagem",
+      "bars": "Barras empilhadas",
       "count_mode": "Modo de Contagem",
       "display_mode": "Modo de Exibição",
       "frames": "Frames",
       "pie": "Gráficos de pizza",
+      "heatmap": "Mapa de calor",
       "shots": "Shots",
       "data_mode": "Dados",
       "retakes": "Retakes",
@@ -1561,7 +1623,8 @@
       "all": "Todos",
       "only_running": "Somente em execução",
       "episode_status": "Status do episódio",
-      "drawings": "Desenhos"
+      "drawings": "Desenhos",
+      "validated": "validado"
     },
     "tasks": {
       "add_preview": "Adicionar prévia",
@@ -1767,6 +1830,7 @@
       "hours": "Horas",
       "month": "Mês",
       "time_spents": "Tempo gasto (horas)",
+      "week_total": "Semana: {hours} horas",
       "timelog_title": "Registro de tempo",
       "title": "Quadro de Horários",
       "year": "Ano",
@@ -1997,29 +2061,45 @@
       "send_error": "Ocorreu um erro ao enviar a mensagem."
     },
     "concepts": {
-      "add_links": "Adicionar links aos ativos",
-      "add_new_concept": "Adicionar novos conceitos",
+      "actions": {
+        "empty": "Sem links",
+        "remove_link": "Remover o vínculo",
+        "title": "Links para conceitos"
+      },
       "add_concept": "Adicionar arquivos para novos conceitos",
       "add_concept_error": "Ocorreu um erro ao adicionar conceitos.",
+      "add_links": "Adicionar links aos ativos",
+      "add_new_concept": "Adicionar novos conceitos",
       "delete_for_selection": "Excluir o conceito selecionado | Excluir os {nbSelectedConcepts} conceitos selecionados",
+      "delete_for_selection_hard_lock_text": "EXCLUIR",
+      "delete_for_selection_hard_text": "Tem certeza de que deseja remover permanentemente os conceitos selecionados? Todas as tarefas, comentários e visualizações relacionadas também serão excluídos. Confirme digitando \"EXCLUIR\" abaixo.",
+      "drop_new_concepts": "Envie novos arquivos de conceito aqui",
       "empty": "Não há conceitos para essa produção",
+      "fields": {
+        "asset": "Asset",
+        "asset_type": "Tipo de Asset",
+        "created_at": "Data de criação",
+        "entity_type": "Tipo de entidade",
+        "last_comment_date": "Último comentário",
+        "publisher": "Publicado por",
+        "updated_at": "Data de atualização"
+      },
+      "folders": {
+        "delete": "Excluir pasta",
+        "delete_error": "Ocorreu um erro ao excluir esta pasta.",
+        "delete_text": "Tem certeza de que deseja excluir a pasta {name}? Seus conceitos são mantidos e voltam para a raiz.",
+        "edit_error": "Ocorreu um erro ao salvar esta pasta. Talvez outra pasta já tenha este nome.",
+        "empty": "Esta pasta está vazia",
+        "move": "Mover para uma pasta",
+        "name": "Nome da pasta",
+        "new": "Nova pasta",
+        "none": "Sem pasta",
+        "rename": "Renomear pasta"
+      },
       "multiple_delete_error": "Ocorreu um erro ao excluir um conceito. Pode haver dados existentes vinculados a ele. Tem certeza de que não há nenhuma tarefa vinculada a um conceito selecionado?",
       "no_concept_selected": "Nenhum conceito selecionado",
       "title": "Conceitos",
-      "fields": {
-        "entity_type": "Tipo de entidade",
-        "created_at": "Data de criação",
-        "updated_at": "Data de atualização",
-        "last_comment_date": "Último comentário",
-        "publisher": "Publicado por"
-      },
-      "actions": {
-        "title": "Links para conceitos",
-        "empty": "Sem links"
-      },
-      "delete_for_selection_hard_text": "Tem certeza de que deseja remover permanentemente os conceitos selecionados? Todas as tarefas, comentários e visualizações relacionadas também serão excluídos. Confirme digitando \"EXCLUIR\" abaixo.",
-      "delete_for_selection_hard_lock_text": "EXCLUIR",
-      "drop_new_concepts": "Envie novos arquivos de conceito aqui"
+      "uploading": "Enviando conceitos"
     },
     "intro": {
       "join_discord": "Junte-se ao Discord da comunidade",
@@ -2034,7 +2114,7 @@
     },
     "preview": {
       "broken": "Esta visualização não está funcionando.",
-      "processing": "Processamento de vídeo em andamento..."
+      "processing": "Esta visualização está sendo processada..."
     },
     "studios": {
       "create_error": "Ocorreu um erro ao salvar este estúdio. Tem certeza de que não há nenhum estúdio com um nome semelhante?",
@@ -2053,6 +2133,9 @@
     },
     "days_off": {
       "title": "Dias de folga",
+      "upcoming": "Próximos",
+      "past": "Passados",
+      "nb_days": "{count} dia | {count} dias",
       "period": "Período",
       "description": "Descrição",
       "updated_at": "Data de atualização",

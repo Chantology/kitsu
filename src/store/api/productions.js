@@ -11,8 +11,13 @@ export default {
     return client.getModel('projects', productionId)
   },
 
-  getOpenProductions() {
-    return client.pget('/api/data/projects/open')
+  // The listing holds the open productions of the user's teams, all of them
+  // for an admin: unlike a read, it answers another with none rather than a
+  // refusal.
+  getListedProduction(productionId) {
+    return client
+      .pget(`/api/data/projects?id=${productionId}`)
+      .then(([production]) => production)
   },
 
   getProductionStatus() {
@@ -109,8 +114,8 @@ export default {
     })
   },
 
-  addTaskTypeToProduction(productionId, taskTypeId, priority) {
-    const data = { task_type_id: taskTypeId, priority }
+  addTaskTypeToProduction(productionId, taskTypeId, priority, bitrates = {}) {
+    const data = { task_type_id: taskTypeId, priority, ...bitrates }
     const path = `/api/data/projects/${productionId}/settings/task-types`
     return client.ppost(path, data)
   },

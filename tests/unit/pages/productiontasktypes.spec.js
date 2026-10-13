@@ -3,9 +3,16 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 import { createStore } from 'vuex'
 import { describe, expect, it, vi } from 'vitest'
 
-vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: key => key }) }))
+// Shows the interpolated values next to the key.
+vi.mock('vue-i18n', () => ({
+  useI18n: () => ({
+    t: (key, params) => (params ? `${key} ${JSON.stringify(params)}` : key)
+  })
+}))
 
+import ProductionTaskType from '@/components/pages/production/ProductionTaskType.vue'
 import ProductionTaskTypes from '@/components/pages/production/ProductionTaskTypes.vue'
+import InfoQuestionMark from '@/components/widgets/InfoQuestionMark.vue'
 import RouteSectionTabs from '@/components/widgets/RouteSectionTabs.vue'
 import SettingImporter from '@/components/widgets/SettingImporter.vue'
 
@@ -25,12 +32,25 @@ const newShotTaskType = {
 }
 const taskTypes = [assetTaskType, ...shotTaskTypes, newShotTaskType]
 
+// Renders the rows the shallow mount would otherwise drop with the list.
+const DraggableStub = {
+  props: { modelValue: { type: Array, default: () => [] } },
+  template: `<div>
+    <slot
+      name="item"
+      :element="element"
+      :key="index"
+      v-for="(element, index) in modelValue"
+    />
+  </div>`
+}
+
 const router = createRouter({
   history: createWebHashHistory(),
   routes: [{ path: '/settings', component: { template: '<div />' } }]
 })
 
-const mountComponent = async (productionType = 'short') => {
+const mountComponent = async (productionType = 'short', scheduleItems = []) => {
   const currentProduction = {
     id: 'production-1',
     production_type: productionType,
@@ -39,9 +59,14 @@ const mountComponent = async (productionType = 'short') => {
   const store = createStore({
     getters: {
       currentProduction: () => currentProduction,
-      currentScheduleItems: () => [],
+      currentScheduleItems: () => scheduleItems,
       getProductionTaskTypes: () => () => [],
       isTVShow: () => productionType === 'tvshow',
+      // An instance whose MOVIE_HIGHDEF_BITRATE is above the usual 28.
+      movieBitrateDefaults: () => ({
+        hd_bitrate_compression: 40,
+        ld_bitrate_compression: 8
+      }),
       productionAssetTaskTypes: () => [assetTaskType],
       productionEditTaskTypes: () => [],
       productionEpisodeTaskTypes: () => [],
@@ -55,7 +80,11 @@ const mountComponent = async (productionType = 'short') => {
   await router.push('/settings?section=shots')
   await router.isReady()
   const wrapper = shallowMount(ProductionTaskTypes, {
-    global: { plugins: [store, router], mocks: { $t: key => key } }
+    global: {
+      plugins: [store, router],
+      mocks: { $t: key => key },
+      stubs: { draggable: DraggableStub }
+    }
   })
   await flushPromises()
   return { store, wrapper }
@@ -92,5 +121,44 @@ describe('ProductionTaskTypes', () => {
       taskTypeId: newShotTaskType.id,
       priority: 3
     })
+  })
+
+  // The loaded items mix the task type bars with their entity bars: the row
+  // must get the task type bar, or removing the task type deletes an entity
+  // bar and leaves the task type bar behind.
+  it('hands each task type row its own bar, not an entity bar', async () => {
+    const sequenceBar = {
+      id: 'sequence-bar',
+      task_type_id: 'shot-1',
+      object_id: 'sequence-1'
+    }
+    const taskTypeBar = {
+      id: 'task-type-bar',
+      task_type_id: 'shot-1',
+      object_id: null
+    }
+    const { wrapper } = await mountComponent('short', [
+      sequenceBar,
+      taskTypeBar
+    ])
+
+    const row = wrapper
+      .findAllComponents(ProductionTaskType)
+      .find(component => component.props('taskType').id === 'shot-1')
+    expect(row.props('scheduleItem')).toEqual(taskTypeBar)
+  })
+
+  it('explains the bitrate columns and gives their maximum', async () => {
+    const { wrapper } = await mountComponent()
+    const help = maximum =>
+      `productions.video.task_type_bitrates\n\n${maximum}\n\n` +
+      'productions.video.next_uploads_only'
+
+    expect(
+      wrapper.findAllComponents(InfoQuestionMark).map(item => item.props('text'))
+    ).toEqual([
+      help('productions.video.bitrate_max {"value":40}'),
+      help('productions.video.task_type_ld_bitrate_max')
+    ])
   })
 })

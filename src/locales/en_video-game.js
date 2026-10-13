@@ -21,7 +21,7 @@
 export default {
 
   assets: {
-    casted_in_shots: 'Casted in {nbShots} maps',
+    casted_in_shots: 'Cast in {nbShots} maps',
     only_current_episode: 'Only current chapter',
     no_cast_in: 'This asset is not cast in any map.',
     fields: {
@@ -30,7 +30,6 @@ export default {
   },
 
   breakdown: {
-    episode_casting: 'Chapter casting',
     remove: {
       confirm: 'Remove asset from its chapter',
       text: 'If you remove this asset from the selected chapter, it will remove the assets in all the underlying maps. Are you sure you want to remove it?'
@@ -62,6 +61,7 @@ export default {
   },
 
   episodes: {
+    all_hidden: 'All chapters are hidden.',
     edit_error: 'An error occurred while saving this chapter. Are you sure there is no chapter with similar name?',
     delete_error: 'An error occurred while deleting this chapter. There are probably data linked to it. Are you sure this chapter has no level linked to it?',
     delete_text: 'Are you sure you want to remove {name} from your database? All related maps and previews will be deleted. Please confirm by typing the chapter name below.',
@@ -146,6 +146,7 @@ export default {
   },
 
   sequences: {
+    all_hidden: 'All levels are hidden.',
     all_sequences: 'All levels',
     edit_error: 'An error occurred while saving this level. Are you sure there is no level with a similar name?',
     delete_text: 'Are you sure you want to remove {name} from your database? All related maps and previews will be deleted. Please confirm by typing the level name below.',

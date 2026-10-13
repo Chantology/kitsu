@@ -1,5 +1,9 @@
 <template>
-  <div class="columns fixed-page edit xyz-in" xyz="fade">
+  <div
+    class="columns fixed-page edit xyz-in"
+    xyz="fade"
+    v-if="currentProduction"
+  >
     <div class="page column main-column">
       <div class="page-header flexrow">
         <router-link
@@ -78,7 +82,7 @@
               <button-simple
                 icon="edit"
                 :title="$t('edits.edit_title')"
-                @click="modals.edit = true"
+                @click="showEditModal"
                 v-if="isCurrentUserManager"
               />
             </div>
@@ -306,6 +310,12 @@ const init = async () => {
   } catch (err) {
     console.error(err)
   }
+}
+
+// Close leaves the error of the last save: opening drops it.
+const showEditModal = () => {
+  errors.edit = false
+  modals.edit = true
 }
 
 const confirmEditEdit = async form => {

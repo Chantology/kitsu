@@ -1,5 +1,15 @@
 {
   "default": {
+    "app_login": {
+      "authorize": "Engedélyezés",
+      "consent": "Egy alkalmazás ezen a számítógépen {full_name} nevében szeretne csatlakozni a Kitsuhoz.",
+      "consent_named": "Egy alkalmazás ezen a számítógépen, amely \"{app_name}\" néven mutatkozik be, {full_name} nevében szeretne csatlakozni a Kitsuhoz.",
+      "error": "Az alkalmazás bejelentkezése sikertelen. Indítsd újra az alkalmazásból.",
+      "error_2fa_setup": "Először állítsd be a kétfaktoros hitelesítést a Kitsuban, majd indítsd újra a bejelentkezést az alkalmazásból.",
+      "invalid_request": "Ez a bejelentkezési hivatkozás érvénytelen. Indítsd újra a bejelentkezést az alkalmazásból.",
+      "title": "Alkalmazás bejelentkezése",
+      "warning": "Csak akkor engedélyezd, ha te magad indítottad ezt a bejelentkezést az alkalmazásból. Az alkalmazás a te jogosultságaiddal fér hozzá a Kitsuhoz."
+    },
     "assets": {
       "cast_in": "Szerepel:",
       "delete_error": "Hiba történt az asset törlésekor. Valószínűleg adat hivatkozik rá. Biztos vagy benne, hogy ehhez az asset típushoz nem tartozik feladat?",
@@ -42,6 +52,7 @@
     },
     "asset_types": {
       "all_asset_types": "Minden asset típus",
+      "all_hidden": "Minden asset típus el van rejtve.",
       "create_error": "Hiba történt az asset típus mentésekor. Biztos, hogy nincs azonos nevű asset típus?",
       "delete_text": "Biztosan törölni akarod {name}-t az adatbázisból?",
       "delete_error": "Hiba történt az asset típus törlésekor. Valószínűleg adat hivatkozik rá. Biztos vagy benne, hogy nem tartozik asset hozzá?",
@@ -63,12 +74,17 @@
     },
     "breakdown": {
       "all_assets": "Minden rendelkezésre álló asset",
+      "copy_casting": "Casting másolása (a ctrl + V beilleszti a kijelölt sorokba)",
       "edit_label": "Asset címkéjének megváltoztatása",
       "empty": "Üres szereplista",
       "label": "Címke",
+      "nb_assets": "{count} asset | {count} asset",
+      "nb_occurrences": "{count} előfordulás | {count} előfordulás",
+      "nb_ready": "{ready} / {total} kész",
       "occurrences": "Előfordulások",
       "picture_mode": "Váltás kép módra",
       "remove_from_casting": "Eltávolítás a castingból",
+      "undo": "Az utolsó castingmódosítás visszavonása (ctrl + Z)",
       "view_as_cards": "Kártyás nézet",
       "view_as_list": "Listás nézet",
       "text_mode": "Váltás szöveges módra",
@@ -77,7 +93,6 @@
         "fixed": "fix",
         "animate": "animálni"
       },
-      "episode_casting": "Epizód szereposztás",
       "fields": {
         "standby": "STDB"
       },
@@ -88,7 +103,14 @@
         "text": "Ha eltávolítod ezt az asset-et a kijelölt epizódból, az eltávolítja az asset-eket az összes hozzá tartozó shot-ból is. Biztosan eltávolítod?"
       },
       "save_error": "Hiba történt a szereposztás mentésekor",
-      "show_library": "Könyvtár megjelenítése"
+      "show_library": "Könyvtár megjelenítése",
+      "filters": {
+        "all": "Minden sor",
+        "asset": "Szűrés szereplő asset szerint…",
+        "empty": "Casting nélkül",
+        "label": "Sorok",
+        "standby": "Készenlét"
+      }
     },
     "comments": {
       "add_attachment": "Csatolmány",
@@ -99,6 +121,7 @@
       "comment_from_client": "Hozzászólás a megrendelőtől",
       "edit_title": "Hozzászólás szerkesztése",
       "empty_text": "Ez a hozzászólás üres",
+      "action_error": "Nem sikerült menteni. Kérlek próbáld újra.",
       "edit_error": "Hiba történt a hozzászólás szerkesztésekor. Kérlek keresd fel a támogató csapatot.",
       "error": "Hiba történt a hozzászólás küldésekor",
       "no_file_attached": "Nincs csatolmány",
@@ -270,6 +293,7 @@
     },
     "episodes": {
       "all_episodes": "Mind",
+      "all_hidden": "Minden epizód el van rejtve.",
       "edit_error": "Hiba történt az epizód mentése közben. Biztos, hogy nincs megegyező nevű epizód?",
       "delete_error": "Hiba történt az epizód törlésekor. Valószínűleg adat hivatkozik rá. Biztos, hogy nem kapcsolódik szekvencia az epizódhoz?",
       "delete_text": "Biztosan törölni akarod {name}-t az adatbázisból? Minden hozzá tartozó shot és előnézet törlésre kerül. Kérlek erősítsd meg az epizód nevének begépelésével.",
@@ -436,6 +460,7 @@
       "history": "történet",
       "info": "Információ",
       "or": "vagy",
+      "next": "Következő",
       "no": "Nem",
       "loading": "Töltés...",
       "loading_data": "Adatok betöltése",
@@ -448,8 +473,10 @@
       "nb_frames": "kocka | kocka",
       "person": "Személy",
       "preview_3d_not_supported": "A 3D előnézeteket ez a böngésző nem támogatja (WebGL2 szükséges). Kérlek frissítsd a böngészőt a legújabb verzióra.",
+      "previous": "Előző",
       "profile": "Profil",
       "production": "Produkció",
+      "productivity": "Produktivitás",
       "remove": "Eltávolítás",
       "save": "Mentés",
       "sort_by": "Rendezés",
@@ -466,6 +493,8 @@
         "choose": "Kiválaszt",
         "error_imported_rows": "A hiba előtt {count} sor lett importálva. | A hiba előtt {count} sor lett importálva.",
         "error_line": "{line}. sor",
+        "error_timeout": "Az importálás a vártnál tovább tart, és a háttérben folytatódik.",
+        "error_timeout_hint": "Néhány perc múlva töltsd újra az oldalt, és ellenőrizd az eredményt, mielőtt újra importálnál.",
         "error_upload": "Hiba történt a CSV feltöltésekor.",
         "export_file": "Adatok exportálása CSV-be",
         "import_file": "Adatok importálása CSV-ből",
@@ -476,6 +505,8 @@
         "legend_missing": "Nem talált, elvárt oszlop",
         "legend_disabled": "Nem frissítendő és nem létrehozandó sor",
         "legend_overwrite": "Frissítendő sor",
+        "legend_incomplete": "Sor, amelyből hiányzik egy kötelező érték",
+        "missing_values": "Ebben a sorban nincs érték egy kötelező oszlopban ({columns}): {lines}. Töltsd ki vagy töröld, majd töltsd fel újra a fájlt. | Ezekben a sorokban nincs érték egy kötelező oszlopban ({columns}): {lines}. Töltsd ki vagy töröld őket, majd töltsd fel újra a fájlt.",
         "paste": "Beillesztés",
         "paste_code": "Ide másold a CSV adatot",
         "preview": "Előnézet",
@@ -598,6 +629,7 @@
         "timelog": "Munkaidő-napló"
       },
       "link": "Hivatkozás",
+      "list": "Lista",
       "load_more": "Több betöltése",
       "month": "Hónap",
       "move_action_bar": "Műveletsáv mozgatása",
@@ -751,6 +783,8 @@
       "invite_link_error": "Hiba történt a meghívó link generálásakor",
       "new_person": "Felhasználó hozzáadása",
       "no_task_assigned": "Nincs neked kiosztott folyamatban lévő feladat",
+      "no_task_done": "Még nincs jóváhagyott feladatod",
+      "no_task_pending": "Egy feladat sem vár visszajelzésre",
       "persons": "felhasználó | felhasználó",
       "project_role": "Projektszerep",
       "running_tasks": "Folyamatban lévő feladatok",
@@ -862,7 +896,7 @@
       "created_at": "Létrehozva:",
       "delete_text": "Biztosan törölni akarod {name}-t az adatbázisból?",
       "delete_error": "Hiba történt a lejátszási lista törlésekor.",
-      "edit_error": "Hiba történt a lejátszólista mentésekor.",
+      "edit_error": "Hiba történt a lejátszólista mentésekor. Biztos, hogy nincs hasonló nevű lejátszólista?",
       "download_zip": ".zip letöltése",
       "failed": "Sikertelen",
       "for_client": "A megrendelő",
@@ -1036,6 +1070,8 @@
       },
       "fields": {
         "fps": "FPS",
+        "hd_bitrate_compression": "Nagy felbontású videók bitrátája (Mbit/s)",
+        "hd_bitrate_short": "HD Mbit/s",
         "is_frame_in_numbering": "A lejátszó képkockaszámlálója a kezdő kockánál induljon",
         "name": "Név",
         "ratio": "Képarány",
@@ -1055,6 +1091,8 @@
         "max_retakes": "Újraforgatások maximális száma",
         "style": "Stílus",
         "is_single_preview_per_revision": "Revíziónként csak egy előnézet file engedélyezése",
+        "ld_bitrate_compression": "Alacsony felbontású videók bitrátája (Mbit/s)",
+        "ld_bitrate_short": "LD Mbit/s",
         "revision_padding": "Revíziószám kitöltése nullákkal (0 = nincs kitöltés)"
       },
       "metadata": {
@@ -1103,6 +1141,7 @@
       },
       "parameters": {
         "title": "Paraméterek",
+        "previews_and_comments": "Previewk és megjegyzések",
         "save": {
           "button": "Megerősítés"
         }
@@ -1159,6 +1198,22 @@
         "assets": "Asset-ek",
         "sequences": "Szekvenciák",
         "shots": "Shot-ok"
+      },
+      "video": {
+        "bitrate_default": "Alapértelmezett: {value} Mbit/s",
+        "bitrate_default_max": "Alapértelmezett és maximum: {value} Mbit/s",
+        "bitrate_explanation": "A magasabb bitráta élesebb képet ad, de a fájlok nagyobbak lesznek, és lassabban töltődnek be.",
+        "bitrate_max": "Maximum: {value} Mbit/s",
+        "bitrate_size": "Körülbelül {size} MB percenként",
+        "bitrates": "Bitráták",
+        "hd_bitrate_description": "Teljes felbontású változat: HD módban ez kerül lejátszásra, és ez tölthető le.",
+        "ld_bitrate_description": "Kisebb méretű, 1280 pixel széles változat: LD módban ez kerül lejátszásra.",
+        "ld_bitrate_max": "Maximum: {value} Mbit/s (HD-bitráta)",
+        "next_uploads_only": "A változtatások csak a következő feltöltéseket érintik: a meglévő előnézetek nem kerülnek újrakódolásra.",
+        "restore_default": "Alapértelmezett érték visszaállítása",
+        "task_type_bitrates": "Hagyd üresen a Videó fülön beállított bitráták használatához.",
+        "task_type_ld_bitrate_max": "Maximum: a feladattípus HD-bitrátája",
+        "title": "Videó"
       },
       "hide_stats": "Statisztika elrejtése",
       "show_stats": "Statisztika mutatása",
@@ -1364,6 +1419,7 @@
       "select_task_type": "Válassz egy feladat típust..."
     },
     "sequences": {
+      "all_hidden": "Minden szekvencia el van rejtve.",
       "all_sequences": "Minden szekvencia",
       "edit_error": "Hiba történt a szekvencia mentésekor. Biztosan nincs azonos nevű szekvencia?",
       "delete_text": "Biztosan törölni akarod {name}-t az adatbázisból? Minden hozzá tartozó shot és előnézet törlésre kerül. Kérlek erősítsd meg a szekvencia nevének begépelésével.",
@@ -1391,6 +1447,8 @@
       "apply_to_prod_confirm": "Biztosan alkalmazni akarod ezt az időbeosztás-verziót a jelenlegi produkcióra? Ez felülírja a jelenlegi feladatértékeket.",
       "apply_to_prod_error": "Hiba történt az időbeosztás-verzió jelenlegi produkcióra való alkalmazásakor.",
       "assign": "Kiosztva:",
+      "assign_error": "Nem sikerült kiosztani a feladatokat. Kérlek próbáld újra.",
+      "assign_no_fit": "{count} feladat nem fért bele a dátumtartományba. | {count} feladat nem fért bele a dátumtartományba.",
       "confirm_move_children": "A sáv mozgatása levágja vagy elmozdítja {count} alelemet, hogy az új határok közé férjen. Folytatod? | A sáv mozgatása levágja vagy elmozdítja {count} alelemet, hogy az új határok közé férjenek. Folytatod?",
       "create_version": "Időbeosztás-verzió létrehozása",
       "cut_tool": "Vágás",
@@ -1435,6 +1493,7 @@
       "no_entity": "Nincs kiosztható elem",
       "overall_man_days": "Munkanap",
       "reset_list": "Lista visszaállítása",
+      "save_task_error": "Nem sikerült menteni a feladatot. Kérlek próbáld újra.",
       "select_task_type": "Válassz feladat típust",
       "show_assigned": "Kiosztott elemek megjelenítése",
       "title": "Időbeosztás",
@@ -1545,15 +1604,18 @@
       "wrong_file_duration": "Az egyik feltöltött videófájl hossza nem egyezik a jelenlegi shot várt hosszával."
     },
     "server_down": {
+      "retrying": "Kitsu tovább próbálkozik, és visszavisz az oldaladra, amint az API válaszol.",
       "text": "Kérlek vedd fel a kapcsolatot a támogató csapatunkkal vagy a rendszergazdáddal, hogy kiderüljön, mi a probléma.",
       "title": "Kitsu hibába ütközött az adat API elérésekor."
     },
     "statistics": {
       "count": "Darab",
+      "bars": "Halmozott sávok",
       "count_mode": "Darab",
       "display_mode": "Megjelenítés",
       "frames": "Kocka",
       "pie": "Kördiagram",
+      "heatmap": "Hőtérkép",
       "shots": "Shot-ok",
       "data_mode": "Adat",
       "retakes": "Újraforgatás",
@@ -1561,7 +1623,8 @@
       "all": "Mind",
       "drawings": "Rajzok",
       "episode_status": "Epizód állapot",
-      "only_running": "Csak folyamatban lévő"
+      "only_running": "Csak folyamatban lévő",
+      "validated": "érvényesítve"
     },
     "tasks": {
       "add_preview": "Előnézet hozzáadása",
@@ -1767,6 +1830,7 @@
       "hours": "óra",
       "month": "Hónap",
       "time_spents": "Eltöltött idő (óra)",
+      "week_total": "Hét: {hours} óra",
       "timelog_title": "Munkaidő-napló",
       "title": "Időtáblák",
       "year": "Év",
@@ -1848,6 +1912,7 @@
     "concepts": {
       "actions": {
         "empty": "Nincs hivatkozás",
+        "remove_link": "Hivatkozás eltávolítása",
         "title": "Hivatkozások a koncepciókhoz"
       },
       "add_concept": "File-ok hozzáadása új koncepciókhoz",
@@ -1860,15 +1925,30 @@
       "drop_new_concepts": "Húzd ide az új koncepció file-okat",
       "empty": "Nincs koncepció ebben a produkcióban",
       "fields": {
+        "asset": "Asset",
+        "asset_type": "Asset típus",
         "created_at": "Létrehozás dátuma",
         "entity_type": "Elem típusa",
         "last_comment_date": "Utolsó hozzászólás",
         "publisher": "Közzétette",
         "updated_at": "Frissítés dátuma"
       },
+      "folders": {
+        "delete": "Mappa törlése",
+        "delete_error": "Hiba történt a mappa törlése közben.",
+        "delete_text": "Biztosan törli a(z) {name} mappát? A koncepciói megmaradnak, és visszakerülnek a gyökérbe.",
+        "edit_error": "Hiba történt a mappa mentése közben. Lehet, hogy egy másik mappa már ezt a nevet viseli.",
+        "empty": "Ez a mappa üres",
+        "move": "Áthelyezés mappába",
+        "name": "Mappa neve",
+        "new": "Új mappa",
+        "none": "Nincs mappa",
+        "rename": "Mappa átnevezése"
+      },
       "multiple_delete_error": "Hiba történt egy koncepció törlésekor. Valószínűleg adat hivatkozik rá. Biztos, hogy nincs feladat rendelve a kiválasztott koncepcióhoz?",
       "no_concept_selected": "Nincs koncepció kijelölve",
-      "title": "Koncepciók"
+      "title": "Koncepciók",
+      "uploading": "Koncepciók feltöltése"
     },
     "board": {
       "empty": "Nincs megjeleníthető elem a táblán: nincs folyamatban lévő feladatod, a keresésed nem adott találatot, vagy nincs feladat állapot engedélyezve a szerepedhez a produkció beállításaiban.",
@@ -2060,7 +2140,7 @@
     },
     "preview": {
       "broken": "Ez az előnézet hibás.",
-      "processing": "Video feldolgozás folyamatban..."
+      "processing": "Ez az előnézet feldolgozás alatt áll..."
     },
     "bots": {
       "active_bots": "aktív bot | aktív bot",
@@ -2086,6 +2166,9 @@
     },
     "days_off": {
       "add": "Szabadnap hozzáadása",
+      "upcoming": "Közelgő",
+      "past": "Korábbi",
+      "nb_days": "{count} nap | {count} nap",
       "confirm_day_offs": "Ezeknek a szabadnapoknak a beállítása kitörli az érintett napokra beírt összes munkaórát. Biztosan folytatod?",
       "confirm_unset_day_offs": "Jelenleg szabadnapok vannak beállítva {start} és {end} között. Biztosan eltávolítod ezt az időszakot?",
       "delete": "Szabadnap törlése",

@@ -7,6 +7,18 @@
     <td class="short-name">
       {{ taskType.short_name }}
     </td>
+    <td class="bitrate" v-for="key in BITRATE_KEYS" :key="key">
+      <input
+        class="input"
+        type="number"
+        min="1"
+        :max="bitrateCeiling(key)"
+        :placeholder="inheritedBitrate(key)"
+        :title="$t(`productions.fields.${key}`)"
+        :value="link[key] ?? ''"
+        @change="onBitrateChange(key, $event.target)"
+      />
+    </td>
     <td class="remove">
       <button
         class="button"
@@ -23,6 +35,7 @@ import moment from 'moment'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useStore } from 'vuex'
 
+import { clampBitrates } from '@/lib/productions'
 import { parseDate } from '@/lib/time'
 import { GripVerticalIcon } from 'lucide-vue-next'
 
@@ -33,7 +46,9 @@ const props = defineProps({
   scheduleItem: { required: true, type: Object }
 })
 
-const emit = defineEmits(['date-changed', 'remove'])
+const emit = defineEmits(['bitrates-changed', 'date-changed', 'remove'])
+
+const BITRATE_KEYS = ['hd_bitrate_compression', 'ld_bitrate_compression']
 
 const store = useStore()
 
@@ -42,6 +57,38 @@ const endDate = ref(null)
 const silent = ref(true)
 
 const currentProduction = computed(() => store.getters.currentProduction)
+const bitrateDefaults = computed(() => store.getters.movieBitrateDefaults)
+const link = computed(
+  () => currentProduction.value.task_type_links?.[props.taskType.id] || {}
+)
+
+const bitrateCeiling = key =>
+  key === 'hd_bitrate_compression'
+    ? bitrateDefaults.value.hd_bitrate_compression
+    : link.value.hd_bitrate_compression ||
+      currentProduction.value.hd_bitrate_compression ||
+      bitrateDefaults.value.hd_bitrate_compression
+
+// The bitrate the task type gets while its own is empty: Zou encodes the low
+// definition version within the high definition bitrate.
+const inheritedBitrate = key =>
+  Math.min(
+    currentProduction.value[key] || bitrateDefaults.value[key],
+    bitrateCeiling(key)
+  )
+
+const onBitrateChange = (key, input) => {
+  const bitrates = clampBitrates(
+    { ...link.value, [key]: input.value },
+    {
+      inheritedHd: currentProduction.value.hd_bitrate_compression,
+      max: bitrateDefaults.value.hd_bitrate_compression
+    }
+  )
+  // A change event skips the checks of the browser: show what is saved.
+  input.value = bitrates[key] ?? ''
+  emit('bitrates-changed', { taskType: props.taskType, ...bitrates })
+}
 
 // eslint-disable-next-line no-unused-vars
 const productionTimeRange = computed(() => ({
@@ -116,6 +163,15 @@ watch(
 
 .priority {
   padding-left: 2rem;
+}
+
+.bitrate {
+  min-width: 120px;
+  width: 120px;
+
+  input {
+    width: 100px;
+  }
 }
 
 .grab {

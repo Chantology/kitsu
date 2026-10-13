@@ -798,8 +798,10 @@ const mutations = {
     const episode = cache.episodeMap.get(newEpisode.id)
     const episodeFromMain = state.episodes.find(e => e.id === newEpisode.id)
     if (episode) {
-      Object.assign(episode, newEpisode)
-      Object.assign(episodeFromMain, newEpisode)
+      const copyNewEpisode = { ...newEpisode }
+      copyNewEpisode.data = { ...episode.data, ...newEpisode.data }
+      Object.assign(episode, copyNewEpisode)
+      Object.assign(episodeFromMain, copyNewEpisode)
       state.displayedEpisodes = state.displayedEpisodes.map(stateEpisode => {
         if (stateEpisode.id === newEpisode.id) {
           return { ...episode }
@@ -1015,7 +1017,9 @@ const mutations = {
 
   [DELETE_TASK_END](state, task) {
     const episode = cache.episodeMap.get(task.entity_id)
-    if (episode) {
+    // loadEpisodes fills the map without tasks, unlike
+    // loadEpisodesWithTasks.
+    if (episode?.tasks) {
       const validations = new Map(episode.validations)
       validations.delete(task.task_type_id)
       delete episode.validations

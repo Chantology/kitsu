@@ -2,6 +2,7 @@
 import { execSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 
+import { compileScript, compileTemplate, parse } from '@vue/compiler-sfc'
 import { describe, expect, it } from 'vitest'
 
 // In <script setup>, template resolution camelizes a tag before it capitalizes
@@ -43,13 +44,39 @@ const shadowedTags = source => {
   )
 }
 
-const files = execSync('git ls-files "src/**/*.vue"', { encoding: 'utf8' })
+// A name the template reads but <script setup> does not bind compiles to
+// `_ctx.name`, undefined at runtime: a click handler that does nothing, a prop
+// that falls back to its default. Names starting with `$` are the instance
+// globals ($t, $route, $store, ...).
+const unboundNames = (file, source) => {
+  const { descriptor } = parse(source, { filename: file })
+  if (!descriptor.scriptSetup || !descriptor.template) return []
+  const { bindings } = compileScript(descriptor, {
+    id: file,
+    inlineTemplate: false
+  })
+  const { code } = compileTemplate({
+    filename: file,
+    id: file,
+    source: descriptor.template.content,
+    compilerOptions: { bindingMetadata: bindings, prefixIdentifiers: true }
+  })
+  const names = [...code.matchAll(/_ctx\.([A-Za-z_$][\w$]*)/g)].map(
+    match => match[1]
+  )
+  return [...new Set(names)].filter(
+    name => !name.startsWith('$') && !(name in bindings)
+  )
+}
+
+const files = execSync('git ls-files ":(glob)src/**/*.vue"', { encoding: 'utf8' })
   .split('\n')
   .filter(Boolean)
 
 describe('script setup bindings', () => {
   it('finds the components to scan', () => {
     expect(files.length).toBeGreaterThan(100)
+    expect(files).toContain('src/App.vue')
   })
 
   it('never shadows a component tag with a setup function', () => {
@@ -60,4 +87,24 @@ describe('script setup bindings', () => {
 
     expect(offenders).toEqual([])
   })
+
+  // Parsing every template takes seconds, and the whole suite running
+  // alongside it pushes that past the 5s default: the check grows with the
+  // codebase, so it gets a timeout of its own rather than failing the run
+  // on a machine that happens to be busy.
+  it(
+    'binds every name a template reads',
+    () => {
+      const offenders = files
+        .map(file => ({
+          file,
+          names: unboundNames(file, readFileSync(file, 'utf8'))
+        }))
+        .filter(entry => entry.names.length > 0)
+        .map(entry => `${entry.file}: ${entry.names.join(', ')}`)
+
+      expect(offenders).toEqual([])
+    },
+    30000
+  )
 })

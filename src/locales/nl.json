@@ -1,5 +1,15 @@
 {
   "default": {
+    "app_login": {
+      "authorize": "Autoriseren",
+      "consent": "Een applicatie op deze computer wil verbinding maken met Kitsu als {full_name}.",
+      "consent_named": "Een applicatie op deze computer, die zichzelf \"{app_name}\" noemt, wil verbinding maken met Kitsu als {full_name}.",
+      "error": "Het inloggen van de applicatie is mislukt. Start het opnieuw vanuit de applicatie.",
+      "error_2fa_setup": "Stel eerst tweestapsverificatie in Kitsu in en start daarna het inloggen opnieuw vanuit de applicatie.",
+      "invalid_request": "Deze inloglink is ongeldig. Start het inloggen opnieuw vanuit de applicatie.",
+      "title": "Inloggen van applicatie",
+      "warning": "Autoriseer alleen als je dit inloggen zelf vanuit de applicatie hebt gestart. De applicatie krijgt toegang tot Kitsu met jouw rechten."
+    },
     "assets": {
       "cast_in": "Opgenomen in",
       "delete_error": "Er is een fout opgetreden bij het verwijderen van deze asset. Er is waarschijnlijk data aan gekoppeld. Weet je zeker dat er geen taak aan dit assettype is gekoppeld?",
@@ -42,6 +52,7 @@
     },
     "asset_types": {
       "all_asset_types": "Alle assettypes",
+      "all_hidden": "Alle assettypes zijn verborgen.",
       "create_error": "Er is een fout opgetreden bij het opslaan van dit assettype. Weet je zeker dat er geen assettype bestaat met dezelfde naam?",
       "delete_text": "Weet je zeker dat je {name} uit de database wilt verwijderen?",
       "delete_error": "Er is een fout opgetreden bij het verwijderen van dit asset-type. Er zijn waarschijnlijk assets aan verbonden. Weet u zeker dat er geen assets aan dit asset-type verbonden zijn?",
@@ -63,12 +74,17 @@
     },
     "breakdown": {
       "all_assets": "Alle beschikbare assets",
+      "copy_casting": "Deze casting kopiëren (ctrl + V plakt deze op de geselecteerde regels)",
       "edit_label": "Asset label aanpassen",
       "empty": "Lege casting",
       "label": "Label",
+      "nb_assets": "{count} asset | {count} assets",
+      "nb_occurrences": "{count} voorkomen | {count} voorkomens",
+      "nb_ready": "{ready} / {total} klaar",
       "occurrences": "Voorkomens",
       "picture_mode": "Wissel naar galerij modus",
       "remove_from_casting": "Uit de casting verwijderen",
+      "undo": "Laatste castingwijziging ongedaan maken (ctrl + Z)",
       "view_as_cards": "Als kaarten weergeven",
       "view_as_list": "Als lijst weergeven",
       "text_mode": "Wissel naar tekst modus",
@@ -85,10 +101,16 @@
       "fields": {
         "standby": "STDB"
       },
-      "episode_casting": "Casting van de aflevering",
       "save_error": "Fout bij het opslaan van casting",
       "hide_library": "Bibliotheek verbergen",
-      "show_library": "Bibliotheek weergeven"
+      "show_library": "Bibliotheek weergeven",
+      "filters": {
+        "all": "Alle regels",
+        "asset": "Filteren op gecast asset…",
+        "empty": "Zonder casting",
+        "label": "Regels",
+        "standby": "Stand-by"
+      }
     },
     "comments": {
       "add_attachment": "Bijlage toevoegen",
@@ -99,6 +121,7 @@
       "comment_from_client": "Commentaar van klant",
       "edit_title": "Commentaar aanpassen",
       "empty_text": "Deze comment is leeg.",
+      "action_error": "Opslaan mislukt. Probeer het opnieuw.",
       "edit_error": "Er is een fout opgetreden bij het aanpassen van het commentaar. Contacteer ons support team.",
       "error": "Er is een fout opgetreden bij het plaatsen van het commentaar.",
       "no_file_attached": "Geen preview gekoppeld.",
@@ -270,6 +293,7 @@
     },
     "episodes": {
       "all_episodes": "Alle afleveringen",
+      "all_hidden": "Alle afleveringen zijn verborgen.",
       "edit_error": "Er is een fout opgetreden tijdens het opslaan van de aflevering. Weet je zeker dat er geen aflevering bestaat met dezelfde naam?",
       "delete_error": "Er is een fout opgetreden tijdens het verwijderen van deze aflevering. Waarschijnlijk is er nog data aan gekoppeld. Weet je zeker dat er geen sequentie aan deze aflevering is gekoppeld?",
       "delete_text": "Weet je zeker dat je {name} wilt verwijderen uit de database? Alle gerelateerde shots en previews worden verwijderd. Bevestig met het typen van de aflevering naam hieronder.",
@@ -436,6 +460,7 @@
       "history": "geschiedenis",
       "info": "Informatie",
       "or": "of",
+      "next": "Volgende",
       "no": "Nee",
       "loading": "Laden...",
       "loading_data": "Data laden",
@@ -448,8 +473,10 @@
       "nb_frames": "frame | frames",
       "person": "Persoon",
       "preview_3d_not_supported": "3D-previews worden niet ondersteund in deze browser (WebGL2 is vereist). Werk je browser bij naar de nieuwste versie.",
+      "previous": "Vorige",
       "profile": "Profiel",
       "production": "Productie",
+      "productivity": "Productiviteit",
       "remove": "Verwijderen",
       "save": "Opslaan",
       "sort_by": "Sorteren op",
@@ -466,6 +493,8 @@
         "choose": "Kies",
         "error_imported_rows": "{count} regel is geïmporteerd vóór de fout. | {count} regels zijn geïmporteerd vóór de fout.",
         "error_line": "Regel {line}",
+        "error_timeout": "De import duurt langer dan verwacht en loopt op de achtergrond verder.",
+        "error_timeout_hint": "Herlaad de pagina over een paar minuten om het resultaat te controleren voordat je opnieuw importeert.",
         "error_upload": "Er is een fout opgetreden tijdens het uploaden van de CSV.",
         "export_file": "Data naar CSV exporteren",
         "import_file": "Data uit CSV importeren",
@@ -476,6 +505,8 @@
         "legend_missing": "Verwachte kolom die niet is gevonden",
         "legend_disabled": "Regel die niet wordt bijgewerkt of aangemaakt",
         "legend_overwrite": "Regel die wordt bijgewerkt",
+        "legend_incomplete": "Regel waarin een verplichte waarde ontbreekt",
+        "missing_values": "Regel {lines} heeft geen waarde in een verplichte kolom ({columns}). Vul de regel aan of verwijder hem, en upload het bestand daarna opnieuw. | De regels {lines} hebben geen waarde in een verplichte kolom ({columns}). Vul ze aan of verwijder ze, en upload het bestand daarna opnieuw.",
         "paste": "Plakken",
         "paste_code": "Plak hier uw CSV data",
         "preview": "Preview",
@@ -584,6 +615,7 @@
       "is_shared": "Gedeeld met het hele team",
       "no_results": "Geen resultaten",
       "link": "Link",
+      "list": "Lijst",
       "hours_spent": "uur besteed | uren besteed",
       "hours_expected": "verwacht uur | verwachte uren",
       "hours_estimated": "uur geschat | uren geschat",
@@ -751,6 +783,8 @@
       "invite_link_error": "Er is een fout opgetreden tijdens het genereren van de uitnodigingslink",
       "new_person": "Voeg een nieuwe gebruiker toe",
       "no_task_assigned": "Er zijn geen lopende taken aan jou toegewezen",
+      "no_task_done": "Je hebt nog geen goedgekeurde taken",
+      "no_task_pending": "Er wacht geen taak op feedback",
       "persons": "persoon | personen",
       "project_role": "Projectrol",
       "running_tasks": "Lopende taken",
@@ -862,7 +896,7 @@
       "created_at": "Gecreëerd op:",
       "delete_text": "Weet je zeker dat je {name} uit de database wilt verwijderen?",
       "delete_error": "Er is een fout opgetreden tijdens het verwijderen van de playlist.",
-      "edit_error": "Er is een fout opgetreden tijdens het opslaan van de playlist.",
+      "edit_error": "Er is een fout opgetreden tijdens het opslaan van de playlist. Weet je zeker dat er geen playlist met een vergelijkbare naam bestaat?",
       "download_zip": "Download .zip",
       "failed": "Mislukt",
       "for_client": "De klant",
@@ -1036,6 +1070,8 @@
       },
       "fields": {
         "fps": "FPS",
+        "hd_bitrate_compression": "Bitrate van video's in hoge resolutie (Mbit/s)",
+        "hd_bitrate_short": "HD Mbit/s",
         "is_frame_in_numbering": "De framenteller van de speler bij de frame-in laten starten",
         "name": "Naam",
         "ratio": "Ratio",
@@ -1055,6 +1091,8 @@
         "code": "Korte naam",
         "is_publish_default": "Stel commentaarwidget voor artiesten standaard in op publiceermodus",
         "is_single_preview_per_revision": "Slechts één previewbestand per revisie toestaan",
+        "ld_bitrate_compression": "Bitrate van video's in lage resolutie (Mbit/s)",
+        "ld_bitrate_short": "LD Mbit/s",
         "revision_padding": "Opvulling revisienummer (0 = geen opvulling)"
       },
       "metadata": {
@@ -1103,6 +1141,7 @@
       },
       "parameters": {
         "title": "Parameters",
+        "previews_and_comments": "Previews en opmerkingen",
         "save": {
           "button": "Bevestigen"
         }
@@ -1176,6 +1215,22 @@
         "assets": "Assets",
         "shots": "Opnamen",
         "sequences": "Sequenties"
+      },
+      "video": {
+        "bitrate_default": "Standaard: {value} Mbit/s",
+        "bitrate_default_max": "Standaard en maximum: {value} Mbit/s",
+        "bitrate_explanation": "Een hogere bitrate zorgt voor een scherper beeld, maar ook voor zwaardere bestanden die langzamer laden.",
+        "bitrate_max": "Maximum: {value} Mbit/s",
+        "bitrate_size": "Ongeveer {size} MB per minuut",
+        "bitrates": "Bitrates",
+        "hd_bitrate_description": "Versie in volledige resolutie, afgespeeld in HD-modus en gebruikt voor downloads.",
+        "ld_bitrate_description": "Lichtere versie, 1280 pixels breed, afgespeeld in LD-modus.",
+        "ld_bitrate_max": "Maximum: {value} Mbit/s (HD-bitrate)",
+        "next_uploads_only": "Wijzigingen gelden alleen voor nieuwe uploads: bestaande previews worden niet opnieuw gecodeerd.",
+        "restore_default": "Standaard herstellen",
+        "task_type_bitrates": "Laat leeg om de bitrates van het tabblad Video te gebruiken.",
+        "task_type_ld_bitrate_max": "Maximum: de HD-bitrate van het taaktype",
+        "title": "Video"
       },
       "hide_stats": "Verberg statistieken",
       "show_stats": "Toon statistieken"
@@ -1364,6 +1419,7 @@
       "library_title": "Taaktype Bibliotheek"
     },
     "sequences": {
+      "all_hidden": "Alle sequenties zijn verborgen.",
       "all_sequences": "Alle sequenties",
       "edit_error": "Er is een fout opgetreden bij het opslaan van deze sequentie. Weet je zeker dat er geen sequentie is met een vergelijkbare naam?",
       "delete_text": "Weet je zeker dat je {name} uit de database wilt verwijderen? Alle gerelateerde opnamen en previews worden verwijderd. Bevestig door de naam van de sequentie hieronder te typen.",
@@ -1391,6 +1447,8 @@
       "apply_to_prod_confirm": "Weet je zeker dat je deze planningsversie wilt toepassen op de huidige productie? Dit overschrijft de huidige taakwaarden.",
       "apply_to_prod_error": "Er is een fout opgetreden tijdens het toepassen van de versie van de planning op de huidige productie.",
       "assign": "Toewijzen aan:",
+      "assign_error": "Kon de taken niet toewijzen. Probeer het opnieuw.",
+      "assign_no_fit": "{count} taak paste niet in het datumbereik. | {count} taken pasten niet in het datumbereik.",
       "confirm_move_children": "Het verplaatsen van deze balk zal {count} subitem bijsnijden of verschuiven om binnen de nieuwe grenzen te passen. Doorgaan? | Het verplaatsen van deze balk zal {count} subitems bijsnijden of verschuiven om binnen de nieuwe grenzen te passen. Doorgaan?",
       "create_version": "Schemaversie maken",
       "cut_tool": "Knippen",
@@ -1435,6 +1493,7 @@
       "no_entity": "Geen toewijsbare entiteit",
       "overall_man_days": "Mandagen",
       "reset_list": "Lijst resetten",
+      "save_task_error": "Kon de taak niet opslaan. Probeer het opnieuw.",
       "select_task_type": "Selecteer een taaktype...",
       "show_assigned": "Toegewezen entiteiten weergeven",
       "title": "Planning",
@@ -1545,15 +1604,18 @@
       "show_timecode": "Toon in en uit als tijdcodes"
     },
     "server_down": {
+      "retrying": "Kitsu blijft het proberen en brengt je terug naar je pagina zodra de API antwoordt.",
       "text": "Neem contact op met ons ondersteuningsteam of je systeembeheerder om te begrijpen wat er mis gaat.",
       "title": "Kitsu heeft een fout aangetroffen bij het bereiken van de gegevens-API"
     },
     "statistics": {
       "count": "Aantallen",
+      "bars": "Gestapelde balken",
       "count_mode": "Aantal",
       "display_mode": "Weergave",
       "frames": "Frames",
       "pie": "Taartdiagram",
+      "heatmap": "Heatmap",
       "shots": "Opnames",
       "data_mode": "Data",
       "retakes": "Heropnamen",
@@ -1561,7 +1623,8 @@
       "all": "Alles",
       "only_running": "Alleen lopend",
       "episode_status": "Aflevering status",
-      "drawings": "Tekeningen"
+      "drawings": "Tekeningen",
+      "validated": "gevalideerd"
     },
     "tasks": {
       "add_preview": "Bestanden toevoegen voor een nieuwe previewrevisie",
@@ -1767,6 +1830,7 @@
       "hours": "uren",
       "month": "Maand",
       "time_spents": "Bestede tijd (uren)",
+      "week_total": "Week: {hours} uur",
       "timelog_title": "Tijdlog",
       "title": "Urenstaten",
       "year": "Jaar",
@@ -1997,29 +2061,45 @@
       "send_error": "Er is een fout opgetreden bij het verzenden van het bericht."
     },
     "concepts": {
-      "add_links": "Koppelingen naar assets toevoegen",
-      "add_new_concept": "Nieuwe concepten toevoegen",
+      "actions": {
+        "empty": "Geen links",
+        "remove_link": "Koppeling verwijderen",
+        "title": "Koppelingen naar concepten"
+      },
       "add_concept": "Bestanden toevoegen voor nieuwe concepten",
       "add_concept_error": "Er is een fout opgetreden tijdens het toevoegen van concepten.",
+      "add_links": "Koppelingen naar assets toevoegen",
+      "add_new_concept": "Nieuwe concepten toevoegen",
       "delete_for_selection": "Verwijder het geselecteerde concept | Verwijder de {nbSelectedConcepts} geselecteerde concepten",
+      "delete_for_selection_hard_lock_text": "WISSEN",
+      "delete_for_selection_hard_text": "Weet je zeker dat je de geselecteerde concepten definitief wilt verwijderen? Alle gerelateerde taken, opmerkingen en voorvertoningen worden ook verwijderd. Bevestig dit door hieronder 'WISSEN' te typen.",
+      "drop_new_concepts": "Drop hier nieuwe conceptbestanden",
       "empty": "Er zijn geen concepten voor deze productie",
+      "fields": {
+        "asset": "Asset",
+        "asset_type": "Assettype",
+        "created_at": "Aanmaakdatum",
+        "entity_type": "Type entiteit",
+        "last_comment_date": "Laatste opmerking",
+        "publisher": "Gepubliceerd door",
+        "updated_at": "Bijwerkdatum"
+      },
+      "folders": {
+        "delete": "Map verwijderen",
+        "delete_error": "Er is een fout opgetreden bij het verwijderen van deze map.",
+        "delete_text": "Weet je zeker dat je de map {name} wilt verwijderen? De concepten blijven behouden en gaan terug naar de hoofdmap.",
+        "edit_error": "Er is een fout opgetreden bij het opslaan van deze map. Mogelijk heeft een andere map deze naam al.",
+        "empty": "Deze map is leeg",
+        "move": "Verplaatsen naar een map",
+        "name": "Mapnaam",
+        "new": "Nieuwe map",
+        "none": "Geen map",
+        "rename": "Map hernoemen"
+      },
       "multiple_delete_error": "Er is een fout opgetreden bij het verwijderen van een concept. Er kunnen bestaande gegevens aan gekoppeld zijn. Weet je zeker dat er geen taak is gekoppeld aan een geselecteerd concept?",
       "no_concept_selected": "Geen concept geselecteerd",
       "title": "Concepten",
-      "fields": {
-        "entity_type": "Type entiteit",
-        "created_at": "Aanmaakdatum",
-        "updated_at": "Bijwerkdatum",
-        "last_comment_date": "Laatste opmerking",
-        "publisher": "Gepubliceerd door"
-      },
-      "actions": {
-        "title": "Koppelingen naar concepten",
-        "empty": "Geen links"
-      },
-      "delete_for_selection_hard_text": "Weet je zeker dat je de geselecteerde concepten definitief wilt verwijderen? Alle gerelateerde taken, opmerkingen en voorvertoningen worden ook verwijderd. Bevestig dit door hieronder 'WISSEN' te typen.",
-      "delete_for_selection_hard_lock_text": "WISSEN",
-      "drop_new_concepts": "Drop hier nieuwe conceptbestanden"
+      "uploading": "Concepten uploaden"
     },
     "intro": {
       "join_discord": "Word lid van de community-Discord",
@@ -2034,7 +2114,7 @@
     },
     "preview": {
       "broken": "Deze preview is kapot.",
-      "processing": "Video wordt verwerkt..."
+      "processing": "Deze preview wordt verwerkt..."
     },
     "studios": {
       "create_error": "Er is een fout opgetreden tijdens het opslaan van deze studio. Weet u zeker dat er geen studio is met een vergelijkbare naam?",
@@ -2053,6 +2133,9 @@
     },
     "days_off": {
       "title": "Vrije dagen",
+      "upcoming": "Gepland",
+      "past": "Afgelopen",
+      "nb_days": "{count} dag | {count} dagen",
       "period": "Periode",
       "description": "Beschrijving",
       "updated_at": "Bijwerkdatum",

@@ -1,5 +1,9 @@
 <template>
-  <div class="columns fixed-page asset xyz-in" xyz="fade">
+  <div
+    class="columns fixed-page asset xyz-in"
+    xyz="fade"
+    v-if="currentProduction"
+  >
     <div class="page column main-column">
       <div class="page-header flexrow">
         <router-link
@@ -102,7 +106,7 @@
               <button-simple
                 icon="edit"
                 :title="$t('assets.edit_title')"
-                @click="modals.edit = true"
+                @click="showEditModal"
                 v-if="isCurrentUserManager"
               />
             </div>
@@ -385,10 +389,9 @@
           />
           <div class="concept-list mt1" v-if="filteredLinkedConcepts.length">
             <concept-card
-              class="concept"
-              :class="{ selected: currentConcept?.id === concept.id }"
               :key="'concept-' + concept.id"
               :concept="concept"
+              :selected="currentConcept?.id === concept.id"
               @click="selectConcept(concept)"
               v-for="concept in filteredLinkedConcepts"
             />
@@ -649,7 +652,7 @@ const filteredLinkedConcepts = computed(() =>
   currentConceptStatus.value
     ? linkedConcepts.value.filter(
         concept =>
-          concept.tasks[0].task_status_id === currentConceptStatus.value
+          concept.tasks[0]?.task_status_id === currentConceptStatus.value
       )
     : linkedConcepts.value
 )
@@ -743,6 +746,12 @@ const shotPath = shot => ({
   },
   query: { section: 'casting' }
 })
+
+// Close leaves the error of the last save: opening drops it.
+const showEditModal = () => {
+  errors.edit = false
+  modals.edit = true
+}
 
 const confirmEditAsset = async form => {
   const data = { ...form, id: currentAsset.value.id }
@@ -919,10 +928,11 @@ h2.subtitle {
 
 .concept-list {
   color: var(--text);
-  display: flex;
-  flex-wrap: wrap;
-  padding-bottom: 1em;
-  gap: 10px;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  // room for the selection ring and the hover lift of the cards
+  padding: 4px 4px 1em;
 }
 
 .casting-card {
@@ -1162,19 +1172,6 @@ h2.subtitle {
 
 .news-column {
   max-height: 85%;
-}
-
-.concept {
-  border: 5px solid transparent;
-  cursor: pointer;
-  transition: border 0.2s linear;
-  &:hover {
-    border: 5px solid var(--background-selectable);
-  }
-}
-
-.selected {
-  border: 5px solid var(--background-selected);
 }
 
 .drawer-close,

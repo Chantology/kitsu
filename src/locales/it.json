@@ -1,5 +1,15 @@
 {
   "default": {
+    "app_login": {
+      "authorize": "Autorizza",
+      "consent": "Un'applicazione su questo computer vuole connettersi a Kitsu come {full_name}.",
+      "consent_named": "Un'applicazione su questo computer, che si presenta come \"{app_name}\", vuole connettersi a Kitsu come {full_name}.",
+      "error": "L'accesso dell'applicazione non è riuscito. Riavvialo dall'applicazione.",
+      "error_2fa_setup": "Configura prima l'autenticazione a due fattori in Kitsu, poi riavvia l'accesso dall'applicazione.",
+      "invalid_request": "Questo link di accesso non è valido. Riavvia l'accesso dall'applicazione.",
+      "title": "Accesso dell'applicazione",
+      "warning": "Autorizza solo se hai avviato tu stesso questo accesso dall'applicazione. Accederà a Kitsu con i tuoi permessi."
+    },
     "assets": {
       "cast_in": "Presente in",
       "delete_error": "Si è verificato un errore durante l'eliminazione di questo asset. Potrebbero esserci dati esistenti attualmente collegati. Sei sicuro che a questo tipo di asset non sia collegato nessun task?",
@@ -42,6 +52,7 @@
     },
     "asset_types": {
       "all_asset_types": "Tutti i tipi di asset",
+      "all_hidden": "Tutti i tipi di asset sono nascosti.",
       "create_error": "Si è verificato un errore durante il salvataggio di questo tipo di asset. Sei sicuro che non esista già un tipo di asset con un nome simile?",
       "delete_text": "Sei sicuro di voler rimuovere {name} dal database?",
       "delete_error": "Si è verificato un errore durante l'eliminazione di questo tipo di asset. Potrebbero esserci dati esistenti attualmente collegati. Sei sicuro che a questo tipo di asset non sia collegato nessun asset?",
@@ -63,12 +74,17 @@
     },
     "breakdown": {
       "all_assets": "Tutti gli asset disponibili",
+      "copy_casting": "Copia questo casting (ctrl + V lo incolla nelle righe selezionate)",
       "edit_label": "Cambia l'etichetta dell'asset",
       "empty": "Casting vuoto",
       "label": "Etichetta",
+      "nb_assets": "{count} asset | {count} asset",
+      "nb_occurrences": "{count} occorrenza | {count} occorrenze",
+      "nb_ready": "{ready} / {total} pronti",
       "occurrences": "Occorrenze",
       "picture_mode": "Passa alla modalità immagini",
       "remove_from_casting": "Rimuovi dal casting",
+      "undo": "Annulla l'ultima modifica del casting (ctrl + Z)",
       "view_as_cards": "Visualizza come schede",
       "view_as_list": "Visualizza come elenco",
       "text_mode": "Passa alla modalità testo",
@@ -85,10 +101,16 @@
       "fields": {
         "standby": "Stand by"
       },
-      "episode_casting": "Casting dell'episodio",
       "save_error": "Errore durante il salvataggio del casting",
       "hide_library": "Nascondi la libreria",
-      "show_library": "Mostra la libreria"
+      "show_library": "Mostra la libreria",
+      "filters": {
+        "all": "Tutte le righe",
+        "asset": "Filtra per asset nel casting…",
+        "empty": "Senza casting",
+        "label": "Righe",
+        "standby": "In attesa"
+      }
     },
     "comments": {
       "add_attachment": "Aggiungi un allegato",
@@ -99,6 +121,7 @@
       "comment_from_client": "Commento del cliente",
       "edit_title": "Modifica commento",
       "empty_text": "Questo commento è vuoto",
+      "action_error": "Impossibile salvare. Riprova.",
       "edit_error": "Si è verificato un errore durante la modifica del commento. Contatta il nostro team di supporto.",
       "error": "Si è verificato un errore durante la pubblicazione del commento",
       "no_file_attached": "Nessuna anteprima allegata",
@@ -270,6 +293,7 @@
     },
     "episodes": {
       "all_episodes": "Tutti",
+      "all_hidden": "Tutti gli episodi sono nascosti.",
       "edit_error": "Si è verificato un errore durante il salvataggio dell'episodio. Sei sicuro che non esista un episodio con un nome simile?",
       "delete_error": "Si è verificato un errore durante l'eliminazione di questo episodio. Potrebbero esserci dati attualmente collegati. Sei sicuro che questo episodio non abbia sequenze collegate?",
       "delete_text": "Sei sicuro di voler rimuovere {name} dal tuo database? Verranno eliminati anche tutti gli shot e le anteprime associati. Conferma digitando il nome dell'episodio qui sotto.",
@@ -438,6 +462,7 @@
       "history": "cronologia",
       "info": "Informazioni",
       "or": "o",
+      "next": "Successivo",
       "no": "No",
       "loading": "Caricamento...",
       "loading_data": "Caricamento dei dati",
@@ -450,8 +475,10 @@
       "nb_frames": "fotogramma | fotogrammi",
       "person": "Persona",
       "preview_3d_not_supported": "Le anteprime 3D non sono supportate da questo browser (è richiesto WebGL2). Aggiornalo all'ultima versione.",
+      "previous": "Precedente",
       "profile": "Profilo",
       "production": "Produzione",
+      "productivity": "Produttività",
       "remove": "Rimuovi",
       "save": "Salva",
       "sort_by": "Ordina per",
@@ -468,6 +495,8 @@
         "choose": "Scegli",
         "error_imported_rows": "{count} riga è stata importata prima dell'errore. | {count} righe sono state importate prima dell'errore.",
         "error_line": "Riga {line}",
+        "error_timeout": "L'importazione sta richiedendo più tempo del previsto e prosegue in background.",
+        "error_timeout_hint": "Ricarica la pagina tra qualche minuto per verificare il risultato prima di importare di nuovo.",
         "error_upload": "Si è verificato un errore durante il caricamento del file CSV.",
         "export_file": "Esporta dati in CSV",
         "import_file": "Importa dati da CSV",
@@ -478,6 +507,8 @@
         "legend_missing": "Colonna attesa ma non trovata",
         "legend_disabled": "Riga che non verrà aggiornata né creata",
         "legend_overwrite": "Riga che verrà aggiornata",
+        "legend_incomplete": "Riga a cui manca un valore obbligatorio",
+        "missing_values": "La riga {lines} non ha alcun valore in una colonna obbligatoria ({columns}). Completala o rimuovila, poi carica di nuovo il file. | Le righe {lines} non hanno alcun valore in una colonna obbligatoria ({columns}). Completale o rimuovile, poi carica di nuovo il file.",
         "paste": "Incolla",
         "paste_code": "Incolla qui i dati CSV:",
         "preview": "Anteprima",
@@ -587,6 +618,7 @@
       "is_shared": "Condiviso con tutto il team",
       "no_results": "Nessun risultato",
       "link": "Link",
+      "list": "Elenco",
       "hours_spent": "ora impiegata | ore impiegate",
       "hours_expected": "ora prevista | ore previste",
       "hours_estimated": "ora stimata | ore stimate",
@@ -751,6 +783,8 @@
       "invite_link_error": "Si è verificato un errore durante la generazione del link di invito",
       "new_person": "Aggiungi un nuovo utente",
       "no_task_assigned": "Non ci sono task in corso assegnati a te",
+      "no_task_done": "Non hai ancora attività validate",
+      "no_task_pending": "Nessuna attività è in attesa di un feedback",
       "persons": "utente | utenti",
       "project_role": "Ruolo di progetto",
       "running_tasks": "Task in corso",
@@ -862,7 +896,7 @@
       "created_at": "Creata il:",
       "delete_text": "Sei sicuro di voler rimuovere {name} dal database?",
       "delete_error": "Si è verificato un errore durante l'eliminazione della playlist.",
-      "edit_error": "Si è verificato un errore durante il salvataggio della playlist.",
+      "edit_error": "Si è verificato un errore durante il salvataggio della playlist. Sei sicuro che non esista già una playlist con un nome simile?",
       "download_zip": "Scarica .zip",
       "failed": "Non riuscita",
       "for_client": "Il cliente",
@@ -1019,7 +1053,7 @@
       "current": "Produzione selezionata",
       "delete_text": "Sei sicuro di voler rimuovere {name} dal database? Conferma digitando nel campo di testo il nome della produzione da eliminare.",
       "delete_error": "Si è verificato un errore durante l'eliminazione di questa produzione. Potrebbero esserci dati esistenti attualmente collegati a essa. Sei sicuro che questa produzione non abbia task, shot o asset collegati? Kitsu non consente di eliminare le produzioni. Se non vuoi più vedere la produzione, puoi invece chiuderla.",
-      "edit_title": "Modifica",
+      "edit_title": "Modifica produzione",
       "new_production": "Aggiungi una produzione",
       "number": "produzione | produzioni",
       "open_productions": "Le mie produzioni",
@@ -1036,6 +1070,8 @@
       },
       "fields": {
         "fps": "FPS",
+        "hd_bitrate_compression": "Bitrate dei video ad alta definizione (Mbit/s)",
+        "hd_bitrate_short": "HD Mbit/s",
         "is_frame_in_numbering": "Avvia il contatore dei fotogrammi del player dal fotogramma in",
         "name": "Nome",
         "ratio": "Proporzioni",
@@ -1055,6 +1091,8 @@
         "code": "Nome breve",
         "is_publish_default": "Imposta il widget dei commenti degli artisti in modalità pubblicazione per impostazione predefinita",
         "is_single_preview_per_revision": "Consenti un solo file di anteprima per revisione",
+        "ld_bitrate_compression": "Bitrate dei video a bassa definizione (Mbit/s)",
+        "ld_bitrate_short": "LD Mbit/s",
         "revision_padding": "Padding del numero di revisione (0 = nessun padding)"
       },
       "metadata": {
@@ -1103,6 +1141,7 @@
       },
       "parameters": {
         "title": "Parametri",
+        "previews_and_comments": "Preview e commenti",
         "save": {
           "button": "Conferma"
         }
@@ -1176,6 +1215,22 @@
         "assets": "Asset",
         "shots": "Shot",
         "sequences": "Sequenze"
+      },
+      "video": {
+        "bitrate_default": "Predefinito: {value} Mbit/s",
+        "bitrate_default_max": "Predefinito e massimo: {value} Mbit/s",
+        "bitrate_explanation": "Un bitrate più alto dà un'immagine più nitida, ma file più pesanti e più lenti da caricare.",
+        "bitrate_max": "Massimo: {value} Mbit/s",
+        "bitrate_size": "Circa {size} MB al minuto",
+        "bitrates": "Bitrate",
+        "hd_bitrate_description": "Versione a piena risoluzione, riprodotta in modalità HD e usata per i download.",
+        "ld_bitrate_description": "Versione più leggera, larga 1280 pixel, riprodotta in modalità LD.",
+        "ld_bitrate_max": "Massimo: {value} Mbit/s (bitrate HD)",
+        "next_uploads_only": "Le modifiche si applicano solo ai prossimi caricamenti: le anteprime esistenti non vengono ricodificate.",
+        "restore_default": "Ripristina il valore predefinito",
+        "task_type_bitrates": "Lascia vuoto per usare i bitrate della scheda Video.",
+        "task_type_ld_bitrate_max": "Massimo: il bitrate HD del tipo di task",
+        "title": "Video"
       },
       "hide_stats": "Nascondi statistiche",
       "show_stats": "Mostra statistiche"
@@ -1364,6 +1419,7 @@
       "library_title": "Libreria dei tipi di task"
     },
     "sequences": {
+      "all_hidden": "Tutte le sequenze sono nascoste.",
       "all_sequences": "Tutte le sequenze",
       "edit_error": "Si è verificato un errore durante il salvataggio di questa sequenza. Sei sicuro che non esista già una sequenza con un nome simile?",
       "delete_text": "Sei sicuro di voler rimuovere {name} dal database? Verranno eliminati anche tutti gli shot e le anteprime collegati. Conferma digitando il nome della sequenza qui sotto.",
@@ -1391,6 +1447,8 @@
       "apply_to_prod_confirm": "Sei sicuro di voler applicare questa versione della pianificazione alla produzione corrente? I valori attuali dei task verranno sovrascritti.",
       "apply_to_prod_error": "Si è verificato un errore durante l'applicazione della versione della pianificazione alla produzione corrente.",
       "assign": "Assegna a:",
+      "assign_error": "Impossibile assegnare i task. Riprova.",
+      "assign_no_fit": "{count} task non è rientrato nell'intervallo di date. | {count} task non sono rientrati nell'intervallo di date.",
       "confirm_move_children": "Spostare questa barra ritaglierà o sposterà {count} sotto-elemento per adattarlo ai nuovi limiti. Vuoi continuare? | Spostare questa barra ritaglierà o sposterà {count} sotto-elementi per adattarli ai nuovi limiti. Vuoi continuare?",
       "create_version": "Crea una versione della pianificazione",
       "cut_tool": "Taglia",
@@ -1435,6 +1493,7 @@
       "no_entity": "Nessuna entità assegnabile",
       "overall_man_days": "Giorni-persona",
       "reset_list": "Reimposta la lista",
+      "save_task_error": "Impossibile salvare il task. Riprova.",
       "select_task_type": "Seleziona un tipo di task",
       "show_assigned": "Mostra le entità assegnate",
       "title": "Pianificazione",
@@ -1545,15 +1604,18 @@
       "show_timecode": "Mostra in e out come timecode"
     },
     "server_down": {
+      "retrying": "Kitsu continua a riprovare e ti riporterà alla tua pagina non appena l'API risponderà.",
       "text": "Contatta il nostro team di supporto o il tuo amministratore di sistema per capire cosa non va.",
       "title": "Kitsu ha riscontrato un errore durante l'accesso alla sua API dei dati"
     },
     "statistics": {
       "count": "Conteggi",
+      "bars": "Barre in pila",
       "count_mode": "Conteggio",
       "display_mode": "Visualizzazione",
       "frames": "Fotogrammi",
       "pie": "Grafici a torta",
+      "heatmap": "Mappa di calore",
       "shots": "Shot",
       "data_mode": "Dati",
       "retakes": "Retake",
@@ -1561,7 +1623,8 @@
       "all": "Tutti",
       "only_running": "Solo in corso",
       "episode_status": "Stato dell'episodio",
-      "drawings": "Disegni"
+      "drawings": "Disegni",
+      "validated": "validato"
     },
     "tasks": {
       "add_preview": "Aggiungi file per una nuova revisione dell'anteprima",
@@ -1767,6 +1830,7 @@
       "hours": "ore",
       "month": "Mese",
       "time_spents": "Tempo impiegato (ore)",
+      "week_total": "Settimana: {hours} ore",
       "timelog_title": "Registro ore",
       "title": "Timesheet",
       "year": "Anno",
@@ -1997,29 +2061,45 @@
       "send_error": "Si è verificato un errore durante l'invio del messaggio."
     },
     "concepts": {
-      "add_links": "Aggiungi link agli asset",
-      "add_new_concept": "Aggiungi nuovi concept",
+      "actions": {
+        "empty": "Nessun link",
+        "remove_link": "Rimuovi il collegamento",
+        "title": "Link ai concept"
+      },
       "add_concept": "Aggiungi file per i nuovi concept",
       "add_concept_error": "Si è verificato un errore durante l'aggiunta dei concept.",
+      "add_links": "Aggiungi link agli asset",
+      "add_new_concept": "Aggiungi nuovi concept",
       "delete_for_selection": "Elimina il concept selezionato | Elimina i {nbSelectedConcepts} concept selezionati",
+      "delete_for_selection_hard_lock_text": "ELIMINA",
+      "delete_for_selection_hard_text": "Sei sicuro di voler rimuovere definitivamente i concept selezionati? Anche tutti i task, i commenti e le anteprime associati verranno eliminati. Conferma digitando \"ELIMINA\" qui sotto.",
+      "drop_new_concepts": "Trascina qui i file dei nuovi concept",
       "empty": "Non ci sono concept per questa produzione",
+      "fields": {
+        "asset": "Asset",
+        "asset_type": "Tipo di asset",
+        "created_at": "Data di creazione",
+        "entity_type": "Tipo di entità",
+        "last_comment_date": "Ultimo commento",
+        "publisher": "Pubblicato da",
+        "updated_at": "Data di aggiornamento"
+      },
+      "folders": {
+        "delete": "Elimina cartella",
+        "delete_error": "Si è verificato un errore durante l'eliminazione di questa cartella.",
+        "delete_text": "Vuoi davvero eliminare la cartella {name}? I suoi concept vengono conservati e tornano alla radice.",
+        "edit_error": "Si è verificato un errore durante il salvataggio di questa cartella. Un'altra cartella potrebbe avere già questo nome.",
+        "empty": "Questa cartella è vuota",
+        "move": "Sposta in una cartella",
+        "name": "Nome della cartella",
+        "new": "Nuova cartella",
+        "none": "Nessuna cartella",
+        "rename": "Rinomina cartella"
+      },
       "multiple_delete_error": "Si è verificato un errore durante l'eliminazione di un concept. Potrebbero esserci dati esistenti attualmente collegati. Sei sicuro che nessun task sia collegato a un concept selezionato?",
       "no_concept_selected": "Nessun concept selezionato",
       "title": "Concept",
-      "fields": {
-        "entity_type": "Tipo di entità",
-        "created_at": "Data di creazione",
-        "updated_at": "Data di aggiornamento",
-        "last_comment_date": "Ultimo commento",
-        "publisher": "Pubblicato da"
-      },
-      "actions": {
-        "title": "Link ai concept",
-        "empty": "Nessun link"
-      },
-      "delete_for_selection_hard_text": "Sei sicuro di voler rimuovere definitivamente i concept selezionati? Anche tutti i task, i commenti e le anteprime associati verranno eliminati. Conferma digitando \"ELIMINA\" qui sotto.",
-      "delete_for_selection_hard_lock_text": "ELIMINA",
-      "drop_new_concepts": "Trascina qui i file dei nuovi concept"
+      "uploading": "Caricamento dei concept"
     },
     "intro": {
       "join_discord": "Unisciti al Discord della community",
@@ -2034,7 +2114,7 @@
     },
     "preview": {
       "broken": "Questa anteprima è danneggiata.",
-      "processing": "Elaborazione video in corso..."
+      "processing": "Questa anteprima è in fase di elaborazione..."
     },
     "studios": {
       "create_error": "Si è verificato un errore durante il salvataggio di questo studio. Sei sicuro che non esista già uno studio con un nome simile?",
@@ -2053,6 +2133,9 @@
     },
     "days_off": {
       "title": "Giorni di ferie",
+      "upcoming": "In arrivo",
+      "past": "Passati",
+      "nb_days": "{count} giorno | {count} giorni",
       "period": "Periodo",
       "description": "Descrizione",
       "updated_at": "Data di aggiornamento",

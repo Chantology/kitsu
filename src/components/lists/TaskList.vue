@@ -263,7 +263,7 @@
                 step="any"
                 type="number"
                 :value="formatDuration(task.estimation, false)"
-                @change="updateEstimation($event.target.value)"
+                @change="updateEstimation($event.target, task)"
                 v-if="isInDepartment(task) && selectionGrid[task.id]"
               />
               <template v-else>
@@ -456,7 +456,7 @@ import {
 } from '@/lib/descriptors'
 import { getTaskHref } from '@/lib/path'
 import {
-  daysToMinutes,
+  durationToMinutes,
   formatSimpleDate,
   getDatesFromStartDate,
   getDatesFromEndDate,
@@ -484,8 +484,7 @@ import ValidationTag from '@/components/widgets/ValidationTag.vue'
 const { t } = useI18n()
 const router = useRouter()
 const store = useStore()
-const { formatDuration, formatDisplayDate, isDurationInHours, organisation } =
-  useFormat()
+const { formatDuration, formatDisplayDate, organisation } = useFormat()
 
 // Props / Emits
 const props = defineProps({
@@ -740,10 +739,15 @@ const applyToSelection = buildData => {
   })
 }
 
-const updateEstimation = duration => {
-  const estimation = isDurationInHours.value
-    ? duration * 60
-    : daysToMinutes(organisation.value, duration)
+// "1." left in the field is no number and reads as an emptied field, which
+// saved an estimation of 0, and a negative number saved a negative one: the
+// stored one comes back instead. An emptied field still saves 0.
+const updateEstimation = (input, task) => {
+  if (input.validity.badInput || input.valueAsNumber < 0) {
+    input.value = formatDuration(task.estimation, false)
+    return
+  }
+  const estimation = durationToMinutes(organisation.value, input.value)
 
   updateTasksEstimation({ estimation })
 }
@@ -867,9 +871,10 @@ const selectTask = (event, index, task) => {
     event.target &&
     // Dirty hack needed to make date picker and inputs work properly
     (['INPUT', 'LABEL', 'SELECT', 'TEXTAREA'].includes(event.target.nodeName) ||
+      // Icons should not trigger selection (an SVG className is no string)
+      event.target instanceof SVGElement ||
       // Combo box should not trigger selection
       event.target.className.indexOf('selected-line') >= 0 ||
-      event.target.className.indexOf('down-icon') >= 0 ||
       event.target.className.indexOf('flexrow') >= 0 ||
       event.target.className.indexOf('c-mask') >= 0 ||
       event.target.className.indexOf('option-line') >= 0 ||
