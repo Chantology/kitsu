@@ -13,25 +13,16 @@ lead dev:
    — any bar can be cut into pieces, so interruptions (vacation, waiting on
    client feedback) show as real gaps, and each piece moves on its own.
 
-## Two branches, two different asks
-
-| Branch | What it has | What we need from testing |
-|---|---|---|
-| `schedule/cut-tool-testing` (this branch) | Features 1 + 2 | **Open UX feedback.** The cut tool's behaviour for edge cases (see *Worth being nasty about*) is not settled — tell us what feels wrong, not just what's broken. |
-| `schedule/task-type-filter` | Everything in this branch, plus a task-type visibility filter on the schedule toolbar | **Correctness review.** This one is closer to being proposed for `main` — the filter itself is small and the ask is "does it work / did we miss a case", not open design debate. |
-
-Both branches need the same Zou branch underneath. Pick whichever Kitsu branch
-matches what you're being asked to look at; everything below applies to both
-except the *Task-type filter* section, which only exists on
-`schedule/task-type-filter`.
-
 ## What to check out
 
 | Repo | Branch |
 |---|---|
-| Kitsu | `schedule/cut-tool-testing` or `schedule/task-type-filter` (see table above) |
+| Kitsu | `schedule/cut-tool-testing` |
 | Zou | `schedule/add-schedule-segments` |
 | Gazu | nothing — no Gazu changes exist yet (see *Known gaps*) |
+
+Both are kept merged with their upstream `main`, so you can check them out
+against a current Kitsu and Zou rather than a months-old snapshot.
 
 **The Kitsu branch does not work without the Zou branch.** The cut tool stores
 pieces in a new `schedule_segment` table, so without the backend every cut fails
@@ -160,9 +151,11 @@ which level of bar, whether it was already cut, and whether a reload changes the
 symptom. Two bugs in this feature took several rounds to pin down because the
 repro path was ambiguous.
 
-Frontend checks: `npm run test:unit` (1378 tests) and `npx eslint src/`.
+Frontend checks: `npm run test:unit` (3778 tests) and `npm run lint`.
 Backend: `DB_DATABASE=zoudb-test py.test tests/blueprints/crud/test_schedule_segment.py`
-(17 tests).
+(17 tests). The rest of the Zou suite has failures that belong to `main` and
+this environment, not to this branch: compare against a run on `main` before
+reporting one.
 
 ## For whoever submits this upstream
 
@@ -173,8 +166,11 @@ The branches are already shaped as independent submissions:
 | 1 | Kitsu | `schedule/decouple-window-from-estimation` | Flexible timelines. Frontend only, no migration, no new UI, mostly deletions. |
 | 2 | Zou | `schedule/add-schedule-segments` | `ScheduleSegment` model, migration, CRUD + project route, sync entries, tests. |
 | 3 | Kitsu | `schedule/render-schedule-segments` | Cut tool. Stacked on 1, depends on 2. |
-| 4 | Kitsu | `schedule/task-type-filter` | Task-type visibility filter. Stacked on 3 — closer to submission-ready than the cut tool itself; see the branch table above. |
-| 5 | Gazu | — | Not written. |
+| 4 | Gazu | — | Not written. |
+
+The task-type visibility filter that used to sit on top of this work is
+already in Kitsu's `main`, so it is no longer part of what there is to test
+here.
 
 Before submitting #3, its history is worth squashing: it is one feature commit
 followed by fixes found during testing (most recently, department bars not
