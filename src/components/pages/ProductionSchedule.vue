@@ -1755,6 +1755,30 @@ const toggleCutDay = (ranges, day) => {
   }, [])
 }
 
+const saveOwnerSpan = async owner => {
+  if (owner.type === 'Task') {
+    await saveTaskChanged(owner)
+  } else {
+    await updateScheduleItem(owner)
+  }
+}
+
+// A cut that takes the first or last day off a bar trims it, so its pieces
+// stop spanning the dates the bar itself carries. Those dates are what the
+// task list and every export read, so they follow the pieces rather than
+// keeping the span the bar had before it was cut.
+const syncOwnerToSegments = async owner => {
+  if (!owner.segments.length) return
+  const start = moment.min(owner.segments.map(piece => piece.startDate))
+  const end = moment.max(owner.segments.map(piece => piece.endDate))
+  if (start.isSame(owner.startDate) && end.isSame(owner.endDate)) return
+  owner.startDate = start.clone()
+  owner.endDate = end.clone()
+  // Only ever a trim, and the fit above grows bars rather than shrinking
+  // them, so there is nothing for the parents to follow here.
+  await saveOwnerSpan(owner)
+}
+
 // Rows are replaced rather than edited in place: the intermediate states of
 // a partial rewrite would trip the backend's overlap check.
 const rewriteSegments = async (owner, desired) => {
@@ -1826,6 +1850,7 @@ const onBarCut = async (owner, day) => {
     }
 
     await rewriteSegments(owner, desired)
+    await syncOwnerToSegments(owner)
   } finally {
     cuttingOwnerIds.delete(owner.id)
   }
@@ -1908,11 +1933,7 @@ const saveSegmentChanged = async segment => {
   ])
   clearDragOrigin(segment)
 
-  if (owner.type === 'Task') {
-    await saveTaskChanged(owner)
-  } else {
-    await updateScheduleItem(owner)
-  }
+  await saveOwnerSpan(owner)
 }
 
 const confirmChildMove = async () => {

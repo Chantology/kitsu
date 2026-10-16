@@ -1855,4 +1855,95 @@ describe('ProductionSchedule page', () => {
       }
     )
   })
+
+  // A cut that takes the first or last day off a bar trims it: the pieces no
+  // longer span the dates the task itself carries, and the task list reads
+  // those dates rather than the pieces.
+  describe('cut tool', () => {
+    const segmentActions = () => ({
+      loadScheduleSegments: vi.fn(() => []),
+      createScheduleSegment: vi.fn((context, range) => ({
+        id: `segment-${range.start_date}`,
+        ...range
+      })),
+      deleteScheduleSegment: vi.fn(),
+      updateScheduleSegment: vi.fn()
+    })
+
+    const buildCuttableTask = () => ({
+      type: 'Task',
+      id: 'task-1',
+      entity: { id: 'shot-1', name: 'sh020' },
+      estimation: 8 * 60,
+      assignees: [],
+      startDate: day('2026-10-06'),
+      endDate: day('2026-11-02'),
+      segments: []
+    })
+
+    const cutBar = async (wrapper, owner, cutDay) => {
+      findSchedule(wrapper).vm.$emit('bar-cut', owner, cutDay)
+      await flushPromises()
+    }
+
+    it('saves the task dates a cut trimmed off its end', async () => {
+      const { storeActions, wrapper } = await mountPage({
+        actions: segmentActions()
+      })
+      const task = buildCuttableTask()
+
+      await cutBar(wrapper, task, '2026-11-02')
+
+      expect(format(task.endDate)).toBe('2026-11-01')
+      expect(payloadsOf(storeActions.updateTask)[0].data).toMatchObject({
+        start_date: '2026-10-06',
+        due_date: '2026-11-01'
+      })
+    })
+
+    it('saves the task dates a cut trimmed off its start', async () => {
+      const { storeActions, wrapper } = await mountPage({
+        actions: segmentActions()
+      })
+      const task = buildCuttableTask()
+
+      await cutBar(wrapper, task, '2026-10-06')
+
+      expect(format(task.startDate)).toBe('2026-10-07')
+      expect(payloadsOf(storeActions.updateTask)[0].data).toMatchObject({
+        start_date: '2026-10-07',
+        due_date: '2026-11-02'
+      })
+    })
+
+    it('leaves the task dates alone when a cut only opens a gap', async () => {
+      const { storeActions, wrapper } = await mountPage({
+        actions: segmentActions()
+      })
+      const task = buildCuttableTask()
+
+      await cutBar(wrapper, task, '2026-10-20')
+
+      expect(format(task.startDate)).toBe('2026-10-06')
+      expect(format(task.endDate)).toBe('2026-11-02')
+      expect(storeActions.updateTask).not.toHaveBeenCalled()
+    })
+
+    it('saves the bar dates a cut trimmed off a schedule item', async () => {
+      const { storeActions, wrapper } = await mountPage({
+        actions: segmentActions()
+      })
+      const bar = rowsOf(wrapper)[0]
+      bar.startDate = day('2026-10-06')
+      bar.endDate = day('2026-11-02')
+      bar.segments = []
+
+      await cutBar(wrapper, bar, '2026-11-02')
+
+      expect(format(bar.endDate)).toBe('2026-11-01')
+      expect(payloadsOf(storeActions.saveScheduleItem)[0].end_date).toBe(
+        '2026-11-01'
+      )
+    })
+  })
 })
