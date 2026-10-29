@@ -18,6 +18,10 @@
       @cancel="hidePreviewFile"
       @change="showPreviewFile"
     />
+
+    <!-- Popups teleport here, not next to the router-view: Vue looks past a
+         single teleport for the node after a page. -->
+    <div id="theme-popups" />
   </div>
 </template>
 
@@ -76,7 +80,6 @@ const isDataLoading = computed(() => store.getters.isDataLoading)
 const isSavingCommentPreview = computed(
   () => store.getters.isSavingCommentPreview
 )
-const mainConfig = computed(() => store.getters.mainConfig)
 const personMap = computed(() => store.getters.personMap)
 const previewFileIdToShow = computed(() => store.getters.previewFileIdToShow)
 const previewFileIdsToBrowse = computed(
@@ -153,14 +156,41 @@ const isUnreadableComment = eventData => {
   return isClientAuthor === false
 }
 
-const setupDarkTheme = () => {
-  const darkTheme = localStorage.getItem('dark-theme')
+const isSharedPlaylistPage = () =>
+  window.location.pathname.startsWith('/playlists/shared/')
+
+// A stored theme flag, null when unset or when the browser blocks the storage.
+const getStoredTheme = key => {
+  try {
+    const value = localStorage.getItem(key)
+    return value === 'true' || value === 'false' ? value === 'true' : null
+  } catch {
+    return null
+  }
+}
+
+// The config answers after the first render: the page starts with the
+// user's choice, else with the studio default the last config left, and
+// shared playlists are always dark. index.html paints the same theme before
+// the app loads.
+const applyStartupTheme = () => {
   store.commit(
     'TOGGLE_DARK_THEME',
-    darkTheme === 'true' ||
-      (darkTheme !== 'false' &&
-        Boolean(mainConfig.value?.dark_theme_by_default))
+    isSharedPlaylistPage() ||
+      (getStoredTheme('dark-theme') ??
+        getStoredTheme('dark-theme-default') ??
+        false)
   )
+}
+
+// A failed config comes as {} and keeps the startup theme.
+const setupDarkTheme = config => {
+  if (config.dark_theme_by_default === undefined) return
+  const isDefaultDark = Boolean(config.dark_theme_by_default)
+  localPreferences.setBoolPreference('dark-theme-default', isDefaultDark)
+  if (getStoredTheme('dark-theme') === null && !isSharedPlaylistPage()) {
+    store.commit('TOGGLE_DARK_THEME', isDefaultDark)
+  }
 }
 
 const setupCrisp = config => {
@@ -189,7 +219,13 @@ const setupAuthChannel = () => {
   const channel = auth.getBroadcastChannel()
   if (!channel) return
   channel.onmessage = async event => {
-    if (route.name !== 'login' && event.data === 'logout') {
+    // A shared playlist tab has no session to purge, and the redirect would
+    // carry its share token to the login page, where Crisp loads.
+    if (
+      route.name !== 'login' &&
+      !isSharedPlaylistPage() &&
+      event.data === 'logout'
+    ) {
       // Another tab logged out: purge this tab's session too, otherwise
       // store and socket keep the previous user's data. Navigate first:
       // purging while the current page is still mounted crashes the
@@ -430,7 +466,9 @@ const socketEvents = {
 
   // Zou does not send again the events emitted while the socket was down.
   connect: () => {
-    store.dispatch('refreshProcessingPreviewFiles').catch(console.error)
+    store
+      .dispatch('refreshProcessingPreviewFiles')
+      .catch(errors.logRequestFailure)
   },
 
   'task:delete': eventData => {
@@ -608,7 +646,7 @@ const socketEvents = {
       nextTick(() => {
         store
           .dispatch('loadTask', { taskId: eventData.task_id })
-          .catch(console.error)
+          .catch(errors.logRequestFailure)
       })
     }
   },
@@ -682,6 +720,9 @@ Object.entries(socketEvents).forEach(([event, handler]) =>
 // Watchers
 // --------------------------------------------------------------------------
 
+// Before the immediate watcher below, so the first frame has the theme.
+applyStartupTheme()
+
 watch(
   isDarkTheme,
   () => {
@@ -714,7 +755,7 @@ watch(
 
 onMounted(async () => {
   const config = await store.dispatch('setMainConfig')
-  setupDarkTheme()
+  setupDarkTheme(config)
   setupCrisp(config)
   setupSentry(config)
   setupAuthChannel()
@@ -1293,27 +1334,6 @@ input.input:focus {
   border-radius: 2em;
 }
 
-.datepicker {
-  .input {
-    border-radius: 10px;
-
-    &::placeholder {
-      color: $light-grey;
-    }
-
-    &.is-small {
-      font-size: 1em;
-      padding: 0.5em;
-      height: 2.3em;
-      width: 100px;
-    }
-
-    &.invalid {
-      border-color: $red;
-    }
-  }
-}
-
 .button:focus {
   box-shadow: none;
 }
@@ -1551,8 +1571,18 @@ textarea.input:focus {
   min-height: 0;
 }
 
-.page-header,
-.page-header.level {
+// a landscape phone gets the 44px topbar (see Topbar.vue)
+@media screen and (max-height: 500px) and (orientation: landscape) {
+  .fixed-page {
+    padding-top: 44px;
+  }
+
+  .page {
+    padding-top: 54px;
+  }
+}
+
+.page-header {
   margin-top: 2em;
   margin-bottom: 0;
 }
@@ -2766,17 +2796,6 @@ th.validation-cell {
   border-radius: 50%;
 }
 
-@media screen and (max-width: 768px) {
-  .level-left + .level-right {
-    display: flex;
-    justify-content: left;
-  }
-
-  .level-item:not(:last-child) {
-    margin-bottom: 0;
-  }
-}
-
 @media (min-width: 500px) {
   .container {
     margin: 0 auto;
@@ -2857,8 +2876,10 @@ th.validation-cell {
 }
 // Opt-in card layout for data tables on mobile. Cells carrying a data-label
 // become a "label / value" line, .card-head cells stack on top as plain
-// blocks, every other cell is hidden.
-@media screen and (max-width: 768px) {
+// blocks, every other cell is hidden. Landscape phones, wider than 768px,
+// get them too.
+@media screen and (max-width: 768px),
+  screen and (max-height: 500px) and (orientation: landscape) {
   .datatable.datatable--cards {
     background: transparent;
     display: block;

@@ -5,6 +5,9 @@
       dark: true,
       'full-height': !isAddingEntity || isLoading,
       'movie-full-screen': isMediaFullScreen,
+      phone: isPhone,
+      'phone-full-screen': isPhoneFullScreen,
+      'phone-landscape': isPhoneLandscape,
       'playlist-player': true
     }"
     tabindex="-1"
@@ -49,6 +52,19 @@
       />
 
       <div class="filler"></div>
+      <!-- The client has no download menu: the zip, its one download, is
+           offered up front. Zou builds it while it answers, so a new tab
+           shows the wait. -->
+      <a
+        class="button playlist-button topbar-button flexrow-item full-button client-download"
+        :href="zipDlPath"
+        target="_blank"
+        rel="noopener noreferrer"
+        v-if="isCurrentUserClient && !isLoading && !isFullMode"
+      >
+        <download-icon class="icon" />
+        {{ $t('playlists.download_zip') }}
+      </a>
       <button-simple
         class="playlist-button topbar-button flexrow-item"
         :text="$t('playlists.actions.exit_play_full')"
@@ -85,7 +101,7 @@
           class="playlist-button topbar-button flexrow-item full-button"
           icon="plus"
           :text="addEntitiesText"
-          @click="$emit('show-add-entities')"
+          @click="onAddEntitiesClicked"
           :active="isAddingEntity || isFullMode"
           v-if="!isLoading"
         />
@@ -132,7 +148,7 @@
           :style="{
             position: isComparisonOverlay ? 'absolute' : 'relative'
           }"
-          :entities="entityListToCompare"
+          :entities="comparisonViewerEntities"
           :is-hd="isHd"
           :is-repeating="isRepeating"
           :muted="true"
@@ -216,7 +232,7 @@
             class="picture-preview"
             :background-color="pictureBackgroundColor"
             :big="true"
-            :default-height="pictureDefaultHeight"
+            :default-height="mediaHeight"
             :full-screen="fullScreen"
             :light="false"
             :margin-bottom="0"
@@ -237,7 +253,12 @@
             controls
             loop
             muted
-            v-if="isComparing && isMovieComparison"
+            v-if="
+              isComparing &&
+              isMovieComparison &&
+              !isCurrentPreviewMovie &&
+              !isCurrentPreviewFile
+            "
           />
           <span
             class="picture-preview"
@@ -269,6 +290,7 @@
           @max-duration-update="onMaxDurationUpdate"
           @metadata-loaded="onMetadataLoaded"
           @panzoom-changed="onPanZoomChanged"
+          @play-failed="onMoviePlayFailed"
           @play-next="onPlayNext"
           @repeat="onVideoRepeated"
           @video-loaded="onVideoLoaded"
@@ -295,28 +317,32 @@
           ref="sound-player"
           class="sound-player"
           :file-name="currentPreviewFileName"
+          :is-muted="isMuted"
           :preview-url="currentPreviewDlPath"
-          :full-screen="fullScreen"
-          @play-ended="pause"
+          :volume="volume"
+          @duration-changed="onSoundDurationChanged"
+          @play-ended="onSoundEnded"
+          @play-failed="onSoundPlayFailed"
+          @time-update="onSoundTimeUpdate"
           v-if="isCurrentPreviewSound && !isLoading"
         />
 
         <pdf-viewer
           ref="pdf-player"
           :preview="currentPreview"
-          :default-height="pictureDefaultHeight"
+          :default-height="mediaHeight"
           v-if="isCurrentPreviewPdf && !isLoading"
         />
 
         <markdown-viewer
           :preview="currentPreview"
-          :default-height="pictureDefaultHeight"
+          :default-height="mediaHeight"
           v-if="isCurrentPreviewMarkdown && !isLoading"
         />
 
         <diff-viewer
           :preview="currentPreview"
-          :default-height="pictureDefaultHeight"
+          :default-height="mediaHeight"
           v-if="isCurrentPreviewDiff && !isLoading"
         />
 
@@ -354,7 +380,7 @@
           <multi-picture-viewer
             ref="picture-player"
             :background-color="pictureBackgroundColor"
-            :default-height="pictureDefaultHeight"
+            :default-height="mediaHeight"
             :full-screen="fullScreen"
             :light="false"
             :margin-bottom="0"
@@ -405,11 +431,7 @@
             :interactive="isOverlayInteractive"
             :wheel-target="mainMediaElement"
             @resized="onMainCanvasResized"
-            v-show="
-              !isCurrentPreviewFile &&
-              isAnnotationsDisplayed &&
-              !isCurrentPreviewModel
-            "
+            v-show="isCurrentPreviewAnnotatable && isAnnotationsDisplayed"
           />
         </div>
       </div>
@@ -426,7 +448,10 @@
         :silent="isCommentsHidden"
         :task="task"
         :player="playerProxy"
-        :show-assignees="isCurrentTaskManager || isCurrentTaskSupervisor"
+        :show-assignees="
+          !isPhone && (isCurrentTaskManager || isCurrentTaskSupervisor)
+        "
+        :style="mediaHeight ? { height: `${mediaHeight}px` } : null"
         @comment-added="onCommentAdded"
         @time-code-clicked="onTimeCodeClicked"
         v-show="!isCommentsHidden"
@@ -444,13 +469,7 @@
       :is-full-mode="isFullMode"
       :is-full-screen="fullScreen || isEntitiesHidden"
       :movie-dimensions="movieDimensions"
-      :nb-frames="
-        isCurrentPreviewMovie
-          ? nbFrames
-          : isCurrentPreviewPicture && currentEntity.preview_nb_frames
-            ? currentEntity.preview_nb_frames
-            : Math.round(2 * fps)
-      "
+      :nb-frames="entityProgressNbFrames"
       :handle-in="
         playlist.for_entity === 'shot' && currentPreviewIndex === 0
           ? handleIn
@@ -488,19 +507,21 @@
       v-if="playlist.id && !isAddingEntity"
     >
       <div class="flexrow flexrow-item comparison-buttons" v-if="tempMode">
-        <span
-          class="flexrow-item time-indicator"
-          :title="$t('playlists.actions.entity_index')"
-        >
-          {{ entityList.length > 0 ? playingEntityIndex + 1 : 0 }}
-        </span>
-        <span class="flexrow-item time-indicator"> / </span>
-        <span
-          class="flexrow-item time-indicator mr1"
-          :title="$t('playlists.actions.entities_number')"
-        >
-          {{ entityList.length }}
-        </span>
+        <template v-if="!isPhone">
+          <span
+            class="flexrow-item time-indicator"
+            :title="$t('playlists.actions.entity_index')"
+          >
+            {{ entityList.length > 0 ? playingEntityIndex + 1 : 0 }}
+          </span>
+          <span class="flexrow-item time-indicator"> / </span>
+          <span
+            class="flexrow-item time-indicator mr1"
+            :title="$t('playlists.actions.entities_number')"
+          >
+            {{ entityList.length }}
+          </span>
+        </template>
 
         <button-simple
           class="button playlist-button flexrow-item"
@@ -530,25 +551,31 @@
         :is-playing="isPlaying"
         :is-repeating="isRepeating"
         :is-sound="isCurrentPreviewSound"
-        :max-duration="maxDuration"
+        :max-duration="playbackMaxDuration"
         :nb-frames="nbFrames"
+        :phone="isPhone"
         v-model:current-3-d-animation="objectModel.currentAnimation"
         v-model:is-hd="isHd"
         v-model:is-muted="isMuted"
         v-model:is-show-annotations-while-playing="
           isShowAnnotationsWhilePlaying
         "
-        v-model:is-waveform-displayed="isWaveformDisplayed"
+        :is-waveform-displayed="
+          isCurrentUserClient ? undefined : isWaveformDisplayed
+        "
+        @update:is-waveform-displayed="isWaveformDisplayed = $event"
         v-model:speed="speed"
         v-model:volume="volume"
         @play-pause-clicked="onPlayPauseClicked"
         @repeat-clicked="onRepeatClicked"
-        @toggle-sound-clicked="onToggleSoundClicked"
       >
         <template #extra-controls>
           <div
             class="separator"
-            v-if="isCurrentPreviewPicture || currentEntityPreviewLength > 1"
+            v-if="
+              !isPhone &&
+              (isCurrentPreviewPicture || currentEntityPreviewLength > 1)
+            "
           ></div>
 
           <div
@@ -597,22 +624,30 @@
             >
               <arrow-up-right-icon class="icon is-small" />
             </a>
-            <div class="separator" v-if="!isCurrentPreviewPicture"></div>
+            <div
+              class="separator"
+              v-if="!isPhone && !isCurrentPreviewPicture"
+            ></div>
           </div>
 
-          <div class="separator" v-if="!isFullMode"></div>
+          <div class="separator" v-if="!isFullMode && !isPhone"></div>
           <button-simple
             class="playlist-button flexrow-item"
             :title="$t('playlists.actions.change_task_type')"
             icon="check"
             @click="showTaskTypeModal"
-            v-if="!tempMode && !isFullMode"
+            v-if="!tempMode && !isFullMode && !isCurrentUserClient"
           />
         </template>
       </player-playback-bar>
       <div
         class="flexrow flexrow-item comparison-buttons"
-        v-if="(isCurrentPreviewMovie || isCurrentPreviewPicture) && !isFullMode"
+        v-if="
+          (isCurrentPreviewMovie || isCurrentPreviewPicture) &&
+          !isFullMode &&
+          !isPhone &&
+          !isCurrentUserClient
+        "
       >
         <player-comparison-bar
           :comparison-mode-options="comparisonModeOptions"
@@ -646,7 +681,8 @@
         v-if="
           (isCurrentUserManager || isCurrentUserSupervisor) &&
           tempMode &&
-          canSave
+          canSave &&
+          !isPhone
         "
       >
         <div class="separator"></div>
@@ -663,7 +699,9 @@
         :background-options="backgroundOptions"
         :full-screen="fullScreen"
         :is-3-d-model="isCurrentPreviewModel"
-        :is-annotations-displayed="isAnnotationsDisplayed"
+        :is-annotations-displayed="
+          isCurrentUserClient ? undefined : isAnnotationsDisplayed
+        "
         :is-comments-hidden="isCommentsHidden"
         :is-concept="false"
         :is-drawing="isDrawing"
@@ -675,6 +713,7 @@
         :is-zoom-pan="false"
         :object-background-url="objectBackgroundUrl"
         :pencil-color="pencilColor"
+        :phone="isPhone"
         :pencil-palette="pencilPalette"
         :pencil-width="pencilWidth"
         :production-backgrounds="productionBackgrounds"
@@ -687,7 +726,8 @@
         v-model:is-environment-skybox="isEnvironmentSkybox"
         v-model:is-eraser-mode-on="isEraserModeOn"
         v-model:is-laser-mode-on="isLaserModeOn"
-        v-model:is-onion-skin-on="isOnionSkinOn"
+        :is-onion-skin-on="isCurrentUserClient ? undefined : isOnionSkinOn"
+        @update:is-onion-skin-on="isOnionSkinOn = $event"
         v-model:onion-skin-frames="onionSkinFrames"
         v-model:picture-background-color="pictureBackgroundColor"
         v-model:is-shape-mode="isShapeMode"
@@ -717,11 +757,12 @@
         :active="!isEntitiesHidden"
         @click="onFilmClicked"
         icon="film"
+        v-if="!isPhone || isPhoneLandscape"
       />
       <div
         class="flexrow-item playlist-button"
         style="position: relative"
-        v-if="!tempMode"
+        v-if="!tempMode && !isPhone"
       >
         <div
           :class="{
@@ -818,7 +859,7 @@
           :title="$t('playlists.actions.download')"
           icon="download"
           @click="toggleDlButtons"
-          v-if="!isCurrentUserArtist"
+          v-if="!isCurrentUserArtist && !isCurrentUserClient"
         />
       </div>
 
@@ -827,7 +868,7 @@
         :title="$t('playlists.actions.fullscreen')"
         @click="onFullscreenClicked"
         icon="maximize"
-        v-if="isFullScreenEnabled"
+        v-if="isPhone || isFullScreenEnabled"
       />
     </div>
 
@@ -949,7 +990,9 @@ import { useI18n } from 'vue-i18n'
 import { useStore } from 'vuex'
 import WaveSurfer from 'wavesurfer.js'
 
-import { useFullScreen } from '@/composables/fullScreen'
+import { getFullScreenElement, useFullScreen } from '@/composables/fullScreen'
+import { isBehindModal } from '@/composables/modal'
+import { usePhoneLayout } from '@/composables/phoneLayout'
 import { useAnnotation } from '@/composables/players/annotation'
 import { useAnnotationBroadcast } from '@/composables/players/annotationBroadcast'
 import { useAnnotationCursor } from '@/composables/players/annotationCursor'
@@ -969,7 +1012,8 @@ import {
   buildAnnotationSnapshotTitle,
   drawSnapshotTitle,
   isMoviePreview,
-  isPicturePreview
+  isPicturePreview,
+  isSoundPreview
 } from '@/lib/preview'
 import { formatDisplayDate, formatTimeOfDay } from '@/lib/time'
 import {
@@ -977,6 +1021,7 @@ import {
   floorToFrame,
   formatFrame,
   formatTime,
+  formatToTimecode,
   frameStartTime,
   getEntityFrameStart,
   roundToFrame
@@ -1120,6 +1165,9 @@ let playingPictureTimeout = null
 let autoHideTimer = null
 const playerTimeouts = new Set()
 let wavesurfer = null
+let waveformLoadTimeout = null
+// Frame clicked on the playlist bar for a sound not decoded yet.
+let pendingSoundFrame = null
 // Annotation painted by the show-annotations-while-playing path; reset
 // wherever the canvas is cleared outside that path.
 let lastShownWhilePlaying = null
@@ -1137,9 +1185,17 @@ const framesSeenOfPicture = ref(1)
 
 const currentBackground = ref(null)
 const currentPreviewIndex = ref(0)
-const currentTime = ref('00:00.000')
+const currentTime = ref('00:00:00:00')
 const { currentTimeRaw, isHd, isMuted, isPlaying, isRepeating, speed, volume } =
   usePlayerTransport()
+// Set before the watchers: a quality change warms the movies again.
+isHd.value = Boolean(store.getters.organisation?.hd_by_default)
+// only the temporary playlist reviews on phones: the playlist page stays
+const phoneLayout = usePhoneLayout()
+const isPhone = computed(() => props.tempMode && phoneLayout.isPhone.value)
+const isPhoneLandscape = computed(
+  () => props.tempMode && phoneLayout.isPhoneLandscape.value
+)
 const handleIn = ref(0)
 const handleOut = ref(0)
 const hasActiveShareLinks = ref(false)
@@ -1152,13 +1208,14 @@ const isDrawing = ref(false)
 const isEntitiesHidden = ref(false)
 const isEnvironmentSkybox = ref(false)
 const isFullMode = ref(false)
+const isPhoneFullScreen = ref(false)
 const isLaserModeOn = ref(false)
 const isObjectBackground = ref(false)
 const isShowAnnotationsWhilePlaying = ref(false)
 const isTyping = ref(false)
 const isWaveformDisplayed = ref(false)
 const isWireframe = ref(false)
-const maxDuration = ref('00:00.000')
+const maxDuration = ref('00:00:00:00')
 const maxDurationRaw = ref(0)
 const movieDimensions = ref({ width: 0, height: 0 })
 const objectBackgroundUrl = ref(null)
@@ -1170,10 +1227,12 @@ const objectModel = ref({
 const onNextTimeUpdateActions = ref([])
 const pencilPalette = ref(['huge', 'big', 'medium', 'small', 'tiny'])
 const pictureBackgroundColor = ref('#000000')
-const pictureDefaultHeight = ref(0)
+const mediaHeight = ref(0)
 const playingEntityIndex = ref(0)
 const playlistDuration = ref(0)
 const playlistProgress = ref(0)
+// Zou keeps no duration for a sound: it comes from the decoded file.
+const soundDuration = ref(0)
 // Frame -> entity lookup for the strip. Non-reactive on purpose: one
 // entry per frame of the whole playlist made Vue proxy tens of
 // thousands of objects; consumers re-render on the shallowRef swap.
@@ -1219,7 +1278,6 @@ const isCurrentUserManager = computed(() => store.getters.isCurrentUserManager)
 const isCurrentUserSupervisor = computed(
   () => store.getters.isCurrentUserSupervisor
 )
-const organisation = computed(() => store.getters.organisation)
 const personMap = computed(() => store.getters.personMap)
 const previewFileMap = computed(() => store.getters.previewFileMap)
 const previewFileStatusMap = computed(() => store.getters.previewFileStatusMap)
@@ -1262,6 +1320,10 @@ const {
   isSound: isCurrentPreviewSound,
   isTransparentPicture: isCurrentPreviewTransparentPicture
 } = useMediaKind(extension)
+// Annotations go on movies and pictures only, as in the task panel.
+const isCurrentPreviewAnnotatable = computed(
+  () => isCurrentPreviewMovie.value || isCurrentPreviewPicture.value
+)
 
 // Computed — entity & preview state
 
@@ -1456,6 +1518,25 @@ const nbFrames = computed(() => {
   return Math.round(duration * fps.value)
 })
 
+const entityProgressNbFrames = computed(() => {
+  if (isCurrentPreviewMovie.value) return nbFrames.value
+  if (isCurrentPreviewSound.value && soundDuration.value) {
+    return Math.round(soundDuration.value * fps.value)
+  }
+  if (isCurrentPreviewPicture.value && currentEntity.value?.preview_nb_frames) {
+    return currentEntity.value.preview_nb_frames
+  }
+  return Math.round(2 * fps.value)
+})
+
+// The duration of a movie stays for the way back to it: the decoder that
+// holds the movie does not send it again.
+const playbackMaxDuration = computed(() =>
+  isCurrentPreviewSound.value
+    ? formatTime(soundDuration.value, fps.value)
+    : maxDuration.value
+)
+
 const frameNumber = computed(() => {
   if (isCurrentPreviewPicture.value) {
     return framesSeenOfPicture.value - 1
@@ -1506,6 +1587,13 @@ const isMovieComparison = computed(
 
 const isPictureComparison = computed(() =>
   isPicturePreview(currentPreviewToCompare.value?.extension)
+)
+
+// Closed, the comparison viewer gets no entities: hidden, it would go on
+// downloading its movies, and load others on an HD switch or in the next
+// playlist.
+const comparisonViewerEntities = computed(() =>
+  isComparing.value ? entityListToCompare.value : []
 )
 
 // True when the two viewers are laid out side-by-side in the
@@ -1784,7 +1872,11 @@ watch(onionSkinFrames, value =>
 
 // FullScreen composable
 
-const { fullScreen, toggle: toggleFullScreen } = useFullScreen({
+const {
+  fullScreen,
+  exit: exitFullScreen,
+  toggle: toggleFullScreen
+} = useFullScreen({
   container,
   onChange: () => {
     resetHeight()
@@ -1893,14 +1985,20 @@ const { isAltHeld } = usePreviewShortcuts({
   onPlayPause: () => togglePlayPause(),
   onPrevAnnotation: () => onPreviousDrawingClicked(),
   onNextAnnotation: () => onNextDrawingClicked(),
-  onAnnotate: () => onAnnotateClicked(),
-  onErase: () => onEraseClicked(),
+  onAnnotate: () => {
+    if (isCurrentPreviewAnnotatable.value) onAnnotateClicked()
+  },
+  onErase: () => {
+    if (isCurrentPreviewAnnotatable.value) onEraseClicked()
+  },
   onUndo: () => undoLastAction(),
   onRedo: () => redoLastAction(),
   onPrevPreview: () => onPlayPreviousEntityClicked(),
   onNextPreview: () => onPlayNextEntityClicked(),
   onCopy: () => copyAnnotations(),
-  onPaste: () => pasteAnnotations(),
+  onPaste: () => {
+    if (isCurrentPreviewAnnotatable.value) pasteAnnotations()
+  },
   onToggleOverlay: () => toggleFullOverlayComparison()
 })
 
@@ -2015,6 +2113,15 @@ const hideBars = () => {
 }
 
 // Modal handling
+
+// The panel to add entities belongs to the page, outside the full screen.
+const onAddEntitiesClicked = () => {
+  if (fullScreen.value) {
+    exitFullScreen()
+    if (props.isAddingEntity) return
+  }
+  emit('show-add-entities')
+}
 
 const showDeleteModal = () => {
   modals.value.delete = true
@@ -2327,6 +2434,11 @@ const playEntity = (entityIndex, updateFullPlaylist = true, frame = -1) => {
   clearCanvas()
   framesSeenOfPicture.value = 1
   playingEntityIndex.value = entityIndex
+  // A frame clicked on the playlist bar waits for the sound's duration.
+  pendingSoundFrame =
+    entity && isSoundPreview(entity.preview_file_extension) && frame > 0
+      ? frame
+      : null
   if (entity && isMoviePreview(entity.preview_file_extension)) {
     // The handles otherwise stay those of the previous entity until its
     // metadata loads, and a playing switch seeked on them.
@@ -2363,6 +2475,8 @@ const playEntity = (entityIndex, updateFullPlaylist = true, frame = -1) => {
     nextTick(() => {
       rawPlayer.value?.loadEntity(entityIndex, 0, true)
     })
+    // The comparison shows movies only: its movie would play on, hidden.
+    rawPlayerComparison.value?.pause()
     // Unlike movies, pictures have no time-update channel driving the
     // playlist playhead: jump it to the entity's slot here, even while
     // playing. Strip clicks/drags pass updateFullPlaylist=false and keep
@@ -2377,21 +2491,29 @@ const playEntity = (entityIndex, updateFullPlaylist = true, frame = -1) => {
     }
     const ann = getAnnotation(0)
     if (!isPlaying.value) loadAnnotation(ann)
-    if (wasDrawing) {
+    // Only a picture takes the pencil back: past a sound or a document, it
+    // stays off.
+    if (wasDrawing && isPicturePreview(entity?.preview_file_extension)) {
       setPlayerTimeout(() => {
+        if (!isCurrentPreviewAnnotatable.value) return
         isDrawing.value = true
         setAnnotationDrawingMode(true)
       }, 100)
     }
-    // Entities without any preview borrow the picture timer so continuous
-    // playback holds their slot and then moves on instead of stalling.
-    if (
-      isPlaying.value &&
-      entity &&
-      (isPicturePreview(entity.preview_file_extension) ||
-        !entity.preview_file_id)
-    ) {
-      playPicture()
+    if (isPlaying.value && entity) {
+      if (isSoundPreview(entity.preview_file_extension)) {
+        // The sound viewer gets its new file on the next render. A build holds
+        // the movies only, and plays its own sound.
+        if (!isFullMode.value) nextTick(playSound)
+      } else if (
+        // Entities without any preview borrow the picture timer so
+        // continuous playback holds their slot and then moves on instead
+        // of stalling.
+        isPicturePreview(entity.preview_file_extension) ||
+        !entity.preview_file_id
+      ) {
+        playPicture()
+      }
     }
   }
   scrollToEntity(playingEntityIndex.value)
@@ -2449,6 +2571,19 @@ const updateComparisonAnchor = () => {
   anchor.style.height = `${height}px`
 }
 
+// A sound has no frames of its own: the keys step it by a frame of the
+// playlist, up to the start of its last frame like a movie.
+const seekSoundFrame = frame => {
+  const lastFrame = Math.round(soundDuration.value * fps.value) - 1
+  if (lastFrame < 0) return
+  const target = Math.min(Math.max(frame, 0), lastFrame)
+  soundPlayer.value?.setCurrentTime(target / fps.value)
+}
+
+// The tolerance keeps a time read back from a frame seek on that frame.
+const currentSoundFrame = () =>
+  Math.floor(currentTimeRaw.value * fps.value + 0.001)
+
 const goPreviousFrame = () => {
   clearCanvas()
   if (isFullMode.value) {
@@ -2467,6 +2602,8 @@ const goPreviousFrame = () => {
     }
     previousFrameTime = previousFrame / fps.value
     setFullPlayerTime(previousFrameTime)
+  } else if (isCurrentPreviewSound.value) {
+    seekSoundFrame(currentSoundFrame() - 1)
   } else {
     if (!rawPlayer.value) return
     rawPlayer.value.goPreviousFrame()
@@ -2492,6 +2629,8 @@ const goNextFrame = () => {
     }
     nextFrameTime = nextFrame / fps.value
     setFullPlayerTime(nextFrameTime)
+  } else if (isCurrentPreviewSound.value) {
+    seekSoundFrame(currentSoundFrame() + 1)
   } else {
     if (!rawPlayer.value) return
     const nextFrameTime =
@@ -2517,7 +2656,12 @@ const goNextFrame = () => {
 // loading the drawing would pause it. A picture and the movie of the full
 // mode stay as they are.
 const goToFrame = frame => {
-  if (!isCurrentPreviewMovie.value || isFullMode.value) return
+  if (isFullMode.value) return
+  if (isCurrentPreviewSound.value) {
+    seekSoundFrame(frame)
+    return
+  }
+  if (!isCurrentPreviewMovie.value) return
   if (isPlaying.value) rawPlayer.value?.setCurrentFrame(frame)
   else onProgressChanged(frame)
 }
@@ -2581,9 +2725,16 @@ const onScrubEnd = () => {
 }
 
 const onProgressChanged = (frame, updatePlaylistProgress = true) => {
+  // The sound tells its new time back, and onSoundTimeUpdate moves the bars.
+  if (isCurrentPreviewSound.value) {
+    soundPlayer.value?.setCurrentTime(frame * frameDuration.value)
+    return
+  }
   clearCanvas()
   if (isCurrentPreviewPicture.value) {
     framesSeenOfPicture.value = frame + 1
+    // The timer counts from the frame it starts on.
+    if (isPlaying.value) playPicture()
   } else {
     rawPlayer.value.setCurrentFrame(frame)
     syncComparisonPlayer()
@@ -2696,12 +2847,38 @@ const onRepeatClicked = () => {
   updateRoomStatus()
 }
 
-const onToggleSoundClicked = () => {
-  clearFocus()
-  isMuted.value = !isMuted.value
+// phones review on the go: comments open, low definition whatever the
+// studio default, and no entity strip next to the media in landscape
+const applyPhoneDefaults = () => {
+  isCommentsHidden.value = false
+  isHd.value = false
+  if (isPhoneLandscape.value) isEntitiesHidden.value = true
+}
+
+// iPhones cannot put an element full screen: phones fill the modal with
+// the media instead, and get their panels back on the way out.
+let panelsBeforePhoneFullScreen = null
+const togglePhoneFullScreen = () => {
+  if (isPhoneFullScreen.value) {
+    isCommentsHidden.value = panelsBeforePhoneFullScreen.isCommentsHidden
+    isEntitiesHidden.value = panelsBeforePhoneFullScreen.isEntitiesHidden
+    isPhoneFullScreen.value = false
+  } else {
+    panelsBeforePhoneFullScreen = {
+      isCommentsHidden: isCommentsHidden.value,
+      isEntitiesHidden: isEntitiesHidden.value
+    }
+    isCommentsHidden.value = true
+    isEntitiesHidden.value = true
+    isPhoneFullScreen.value = true
+  }
 }
 
 const onFullscreenClicked = () => {
+  if (isPhone.value) {
+    togglePhoneFullScreen()
+    return
+  }
   if (fullScreen.value) {
     removeTypeArea()
   } else {
@@ -2795,11 +2972,7 @@ const getPreviousAnnotationTime = time => {
 }
 
 const onCommentClicked = () => {
-  const height = videoContainer.value.offsetHeight
   isCommentsHidden.value = !isCommentsHidden.value
-  if (!isCommentsHidden.value && taskInfoRef.value?.$el) {
-    taskInfoRef.value.$el.style.height = `${height}px`
-  }
   triggerResize()
   nextTick(() => {
     taskInfoRef.value?.focusCommentTextarea()
@@ -2830,7 +3003,7 @@ const onFrameUpdate = frame => {
   const isChromium = !!window.chrome
   const change = isChromium ? 0.0001 : 0
   currentTimeRaw.value = frame * frameDuration.value + change
-  currentTime.value = formatTime(currentTimeRaw.value, fps.value)
+  currentTime.value = formatToTimecode(frame, fps.value)
   updateProgressBar()
   if (isShowAnnotationsWhilePlaying.value) {
     const ann = getAnnotation(currentTimeRaw.value)
@@ -2846,7 +3019,14 @@ const onFrameUpdate = frame => {
       }
     }
   }
-  if (props.playlist && isPlaying.value) {
+  // A picture moves on with its own timer, not on the frame count of a
+  // movie, and so does a movie of no length, which cannot be read.
+  if (
+    props.playlist &&
+    isPlaying.value &&
+    isCurrentPreviewMovie.value &&
+    nbFrames.value > 0
+  ) {
     const hasHandles =
       ['shot', 'edit', 'episode'].includes(props.playlist.for_entity) &&
       currentPreviewIndex.value === 0 &&
@@ -2901,11 +3081,11 @@ const onMaxDurationUpdate = duration => {
   if (Number.isFinite(duration) && duration > 0) {
     duration = floorToFrame(duration, fps.value)
     maxDurationRaw.value = duration
-    maxDuration.value = formatTime(duration, fps.value)
+    maxDuration.value = formatToTimecode(nbFrames.value, fps.value)
     resetHandles()
   } else {
     maxDurationRaw.value = 0
-    maxDuration.value = '00.00.000'
+    maxDuration.value = '00:00:00:00'
   }
 }
 
@@ -2921,9 +3101,18 @@ const onMouseMove = () => {
   }
 }
 
+// A movie that cannot be read keeps its slot on the strip.
+const getHeldFrames = entityIndex =>
+  isCurrentPreviewMovie.value
+    ? entityList.value[entityIndex]?.playlist_nb_frames
+    : framesPerImage.value[entityIndex]
+
+// Play goes on from the frame shown, like a movie, unless it is the last.
 const playPicture = () => {
   if (playingPictureTimeout) clearTimeout(playingPictureTimeout)
-  framesSeenOfPicture.value = 1
+  if (framesSeenOfPicture.value >= getHeldFrames(playingEntityIndex.value)) {
+    framesSeenOfPicture.value = 1
+  }
   isPlaying.value = true
   playingPictureTimeout = setTimeout(() => {
     continuePlayingPlaylist(
@@ -2937,6 +3126,64 @@ const playSound = () => {
   if (playingPictureTimeout) clearTimeout(playingPictureTimeout)
   isPlaying.value = true
   if (isCurrentPreviewSound.value) soundPlayer.value?.play()
+}
+
+// A sound has no time update to chain the playlist on, like a movie does:
+// its end does it.
+const onSoundEnded = () => {
+  if (!isPlaying.value) return
+  if (isRepeating.value) playSound()
+  else onPlayNextEntity()
+}
+
+// A sound that cannot be read keeps its slot like an entity without
+// preview, then the playlist moves on.
+const onSoundPlayFailed = () => {
+  if (isPlaying.value) playPicture()
+}
+
+// The viewer tells it only for a movie it plays, before the playlist knows it
+// plays.
+const onMoviePlayFailed = () => {
+  if (isCurrentPreviewMovie.value) playPicture()
+}
+
+// The playlist bar gives a sound the fixed slot of an entity without
+// duration: the sound is spread over it.
+const slotFrameToSoundTime = frame => {
+  const slotFrames = currentEntity.value?.playlist_nb_frames
+  return slotFrames ? (frame / slotFrames) * soundDuration.value : 0
+}
+
+const soundTimeToSlotTime = time => {
+  const slotFrames = currentEntity.value?.playlist_nb_frames || 0
+  return soundDuration.value
+    ? ((time / soundDuration.value) * slotFrames) / fps.value
+    : 0
+}
+
+// A duration of 0 starts each load: the time restarts with the sound.
+const onSoundDurationChanged = duration => {
+  soundDuration.value = duration
+  if (!duration) {
+    currentTimeRaw.value = 0
+    currentTime.value = formatTime(0, fps.value)
+  }
+  if (duration && pendingSoundFrame !== null) {
+    soundPlayer.value?.setCurrentTime(slotFrameToSoundTime(pendingSoundFrame))
+    pendingSoundFrame = null
+  }
+}
+
+const onSoundTimeUpdate = time => {
+  if (!isCurrentPreviewSound.value) return
+  currentTimeRaw.value = time
+  currentTime.value = formatTime(time, fps.value)
+  progress.value?.updateProgressBar(time * fps.value)
+  if (!isFullMode.value && currentEntity.value) {
+    playlistProgress.value =
+      currentEntity.value.start_duration + soundTimeToSlotTime(time)
+  }
 }
 
 const playModel = () => {
@@ -3287,7 +3534,7 @@ const clearPlayer = () => {
   rawPlayer.value?.clear()
   if (isComparing.value) rawPlayerComparison.value?.clear()
   maxDurationRaw.value = 0
-  maxDuration.value = '00:00.000'
+  maxDuration.value = '00:00:00:00'
 }
 
 const resetPictureCanvas = async () => {
@@ -3370,6 +3617,9 @@ const onFocusToggle = event => {
     '.preview-player, .playlist-player'
   )
   if (closestPlayer && closestPlayer !== container.value) return
+  // An open modal keeps its own Shift+Tab, unless it holds the player, like
+  // the temporary playlist one.
+  if (isBehindModal(container.value)) return
   const active = document.activeElement
   // Walk up from active to find an .add-comment ancestor — handles
   // multiple AddComment instances cleanly. If active is inside any
@@ -3384,10 +3634,26 @@ const onFocusToggle = event => {
   // one in a collapsed side panel, another in the visible one). Pick
   // the first visible & enabled textarea — focus on a hidden one is a
   // no-op and leaves the user stuck where they were.
+  // The browser shows the element in full screen alone: a box of the page
+  // behind it would take the keys out of sight.
+  const root = getFullScreenElement() ?? document
   const commentTextarea = Array.from(
-    document.querySelectorAll('.add-comment textarea')
+    root.querySelectorAll('.add-comment textarea')
   ).find(ta => ta.offsetParent !== null && !ta.disabled)
-  if (!commentTextarea) return
+  if (!commentTextarea) {
+    // As the comments button, which the annotation bar shows.
+    if (
+      fullScreen.value &&
+      isCommentsHidden.value &&
+      !readOnly.value &&
+      !isFullMode.value
+    ) {
+      event.preventDefault()
+      event.stopPropagation()
+      onCommentClicked()
+    }
+    return
+  }
   event.preventDefault()
   event.stopPropagation()
   // Focus synchronously and once more on the next tick to outlast
@@ -3669,13 +3935,14 @@ const onPlayerPlayingEntityChange = entityIndex => {
 }
 
 const continuePlayingPlaylist = (entityIndex, startMs) => {
-  const fpi = framesPerImage.value[entityIndex]
+  const fpi = getHeldFrames(entityIndex)
   const durationToWaitMs = (fpi * 1000) / fps.value
   const durationWaited = Date.now() - startMs
   if (!isPlaying.value) return
   if (durationWaited < durationToWaitMs) {
+    // The tolerance keeps a picture played on from a frame on that frame.
     framesSeenOfPicture.value = Math.max(
-      Math.floor((durationWaited / 1000) * fps.value),
+      Math.floor((durationWaited / 1000) * fps.value + 0.001),
       1
     )
     playingPictureTimeout = setTimeout(() => {
@@ -3694,6 +3961,7 @@ const continuePlayingPlaylist = (entityIndex, startMs) => {
     })
   } else {
     currentPreviewIndex.value++
+    pendingSoundFrame = null
     nextTick(() => {
       // A still-image sub-preview can be followed by a video sub-preview.
       // Play the whole clip from its start instead of rescheduling the image
@@ -3875,34 +4143,55 @@ const moveSelectedEntity = (entityToMove, toMoveIndex, targetIndex) => {
 const isTypingNote = () =>
   Boolean(fabricCanvas.value?.getActiveObject()?.isEditing)
 
+// The media takes what the header, the entity strip and the bars leave of
+// the available height.
+const getMediaHeight = availableHeight => {
+  let height = availableHeight
+  if (playlistedEntities.value) height -= playlistedEntities.value.offsetHeight
+  // Hidden bars leave the flow (see the .movie-full-screen styles), so
+  // they take no height from the media.
+  if (!isMediaFullScreen.value) {
+    height -= header.value ? header.value.offsetHeight : 0
+    if (buttonBar.value) height -= buttonBar.value.offsetHeight
+    if (progress.value?.$el) height -= progress.value.$el.offsetHeight
+    if (playlistProgressRef.value?.$el) {
+      height -= playlistProgressRef.value.$el.offsetHeight
+    }
+  }
+  if (isWaveformDisplayed.value && isCurrentPreviewMovie.value) height -= 60
+  return height
+}
+
+// The modal takes the whole screen on phones. In portrait the page scrolls
+// and the media takes a 16/9 box; in landscape or full screen it takes what
+// the bars leave.
+const getPhoneMediaHeight = () => {
+  if (isPhoneLandscape.value || isPhoneFullScreen.value) {
+    return getMediaHeight(window.innerHeight)
+  }
+  return Math.round(((videoContainer.value?.offsetWidth || 0) * 9) / 16)
+}
+
 const resetHeight = () => {
   nextTick(() => {
-    let height = window.innerHeight - 90
-    if (!props.tempMode) {
-      height = container.value ? container.value.offsetHeight : 0
+    let height
+    if (isPhone.value) {
+      height = getPhoneMediaHeight()
+    } else if (props.tempMode) {
+      height = getMediaHeight(window.innerHeight - 90)
+    } else {
+      height = getMediaHeight(
+        container.value ? container.value.offsetHeight : 0
+      )
     }
-    if (playlistedEntities.value)
-      height -= playlistedEntities.value.offsetHeight
-    // Hidden bars leave the flow (see the .movie-full-screen styles), so
-    // they take no height from the media.
-    if (!isMediaFullScreen.value) {
-      height -= header.value ? header.value.offsetHeight : 0
-      if (buttonBar.value) height -= buttonBar.value.offsetHeight
-      if (progress.value?.$el) height -= progress.value.$el.offsetHeight
-      if (playlistProgressRef.value?.$el) {
-        height -= playlistProgressRef.value.$el.offsetHeight
-      }
-    }
-    if (isWaveformDisplayed.value && isCurrentPreviewMovie.value) height -= 60
 
     if (videoContainer.value) videoContainer.value.style.height = `${height}px`
-    if (taskInfoRef.value?.$el && !isCommentsHidden.value) {
-      taskInfoRef.value.$el.style.height = `${height}px`
-    }
     if (fullPlaylistPlayer.value) {
       fullPlaylistPlayer.value.style.height = `${height}px`
     }
-    pictureDefaultHeight.value = height
+    // The comment panel binds this height: it is an async component, so a
+    // DOM write here would miss it on the first sizing.
+    mediaHeight.value = height
     rawPlayer.value?.resetHeight(height)
     if (isComparing.value && rawPlayerComparison.value) {
       rawPlayerComparison.value.resetHeight(height)
@@ -4062,10 +4351,12 @@ const configureFullPlayer = () => {
   fullPlaylistPlayer.value.addEventListener('ended', onFullPlayerEnded)
 }
 
+// A frame clicked on a sound not decoded yet is no frame of another file.
 const onPreviousPreviewClicked = () => {
   const index = currentPreviewIndex.value - 1
   currentPreviewIndex.value =
     index < 0 ? currentEntityPreviewLength.value - 1 : index
+  pendingSoundFrame = null
   updateRoomStatus()
 }
 
@@ -4073,6 +4364,7 @@ const onNextPreviewClicked = () => {
   const index = currentPreviewIndex.value + 1
   currentPreviewIndex.value =
     index > currentEntityPreviewLength.value - 1 ? 0 : index
+  pendingSoundFrame = null
   updateRoomStatus()
 }
 
@@ -4106,6 +4398,13 @@ const onProgressPlaylistChanged = frameNumberValue => {
   } else {
     if (isCurrentPreviewPicture.value) {
       framesSeenOfPicture.value = frame + 1
+    } else if (isCurrentPreviewSound.value) {
+      // A sound still being decoded takes the last frame clicked once decoded.
+      if (soundDuration.value) {
+        soundPlayer.value?.setCurrentTime(slotFrameToSoundTime(frame))
+      } else {
+        pendingSoundFrame = frame
+      }
     } else {
       setCurrentTimeRaw(frame / fps.value)
     }
@@ -4120,8 +4419,6 @@ const configureWaveForm = () => {
       container: '#waveform',
       waveColor: '#00B242',
       progressColor: '#008732',
-      backend: 'MediaElement',
-      mediaType: 'video',
       height: 60,
       fillParent: true,
       minPxPerSec: 1
@@ -4131,8 +4428,18 @@ const configureWaveForm = () => {
     })
     // 'interaction' fires only on a user click or drag, never on the
     // seekTo() that keeps the waveform in sync with the video, so it needs
-    // no re-entrancy guard and works while playing.
-    wavesurfer.on('interaction', time => setCurrentTimeRaw(time))
+    // no re-entrancy guard and works while playing. wavesurfer.js 8 sends it
+    // from a click handler that only logs what throws: a failure is thrown
+    // again outside, where Sentry still catches it.
+    wavesurfer.on('interaction', time => {
+      try {
+        setCurrentTimeRaw(time)
+      } catch (err) {
+        setTimeout(() => {
+          throw err
+        })
+      }
+    })
   } catch (err) {
     console.error(err)
   }
@@ -4142,9 +4449,16 @@ const loadWaveForm = () => {
   if (isWaveformDisplayed.value && isCurrentPreviewMovie.value) {
     if (rawPlayer.value?.currentPlayer?.src) {
       try {
-        if (wavesurfer) wavesurfer.destroy()
+        if (wavesurfer) {
+          wavesurfer.destroy()
+          // configureWaveForm may set none up: no container, or a throw.
+          wavesurfer = null
+        }
         configureWaveForm()
-        setTimeout(() => {
+        // The load still pending from a switch less than 100 ms ago would
+        // fetch the movie a second time, into this new waveform.
+        clearTimeout(waveformLoadTimeout)
+        waveformLoadTimeout = setTimeout(() => {
           // Destroyed meanwhile: the player closed, or moved on to a
           // preview that is no movie.
           if (!wavesurfer) return
@@ -4518,11 +4832,21 @@ const onKeyDown = event => {
   } else if (event.code === 'Home') {
     goToFrame(0)
   } else if (event.code === 'End') {
-    goToFrame(nbFrames.value - 1)
+    goToFrame(entityProgressNbFrames.value - 1)
   }
 }
 
+let lastWindowWidth = window.innerWidth
+
 const onWindowResize = () => {
+  // The keyboard of a phone shrinks the height only, as the reviewer
+  // types: the media keeps its size, only the drawings come back, which
+  // resetHeight cleared before its own resize event.
+  if (isPhone.value && window.innerWidth === lastWindowWidth) {
+    setPlayerTimeout(() => resizeAnnotations(), 200)
+    return
+  }
+  lastWindowWidth = window.innerWidth
   const now = new Date().getTime()
   if (now - lastResizeCall > 100) {
     lastResizeCall = now
@@ -4580,6 +4904,21 @@ watch(isAnnotationsDisplayed, () => {
   resetCanvasVisibility()
   if (!isRoomSilent) updateRoomStatus()
 })
+
+// A tool left on by a movie would draw over a sound or a document, where
+// nothing shows the drawing again. It waits for the render: the next entity
+// shows no file until the file index of the previous one goes back to 0.
+watch(
+  isCurrentPreviewAnnotatable,
+  () => {
+    if (isCurrentPreviewAnnotatable.value) return
+    if (isDrawing.value) onAnnotateClicked()
+    else if (isTyping.value) onTypeClicked()
+    else if (isEraserModeOn.value) onEraseClicked()
+    else if (isShapeMode.value) onShapeModeClicked()
+  },
+  { flush: 'post' }
+)
 
 watch(isDrawing, () => {
   setAnnotationDrawingMode(isDrawing.value)
@@ -4659,8 +4998,8 @@ watch(playingEntityIndex, () => {
     })
   } else if (wavesurfer && isWaveformDisplayed.value) {
     wavesurfer.destroy()
-    // Null it like loadWaveForm does, or the next load double-destroys
-    // the dead instance inside its try and skips rebuilding the waveform.
+    // Null it like loadWaveForm does: the playback seek sync and a load
+    // still pending skip a missing waveform, not a destroyed one.
     wavesurfer = null
   }
   if (currentEntity.value) {
@@ -4877,7 +5216,10 @@ watch(
 watch(
   () => props.isAddingEntity,
   () => {
-    nextTick(() => updateProgressBar())
+    // The add button leaves the full screen once the panel shows: the media
+    // gets sized while the panel hides it.
+    if (props.isAddingEntity) nextTick(() => updateProgressBar())
+    else resetHeight()
   }
 )
 
@@ -4927,13 +5269,33 @@ watch(isFullMode, () => {
 watch(volume, () => {
   rawPlayer.value?.setVolume(volume.value)
   preferences.setPreference('player:volume', volume.value)
+  // The task panel shares both keys: a mute another player stored must not
+  // outlive a volume set here.
+  preferences.setPreference('player:muted', isMuted.value)
 })
 
-watch(isCommentsHidden, () => {
-  if (isCurrentPreviewSound.value) soundPlayer.value?.redraw()
+watch(isMuted, () => {
+  preferences.setPreference('player:muted', isMuted.value)
+  // An unmute may give back the volume the player already has, which stores
+  // nothing: the 0 of the mute would come back on the next visit.
+  if (!isMuted.value) preferences.setPreference('player:volume', volume.value)
 })
 
 watch(isMediaFullScreen, () => resetHeight())
+
+// a rotation lays the phone out again: the strip folds in landscape
+watch(isPhoneLandscape, isLandscape => {
+  if (isPhoneFullScreen.value) togglePhoneFullScreen()
+  isEntitiesHidden.value = isLandscape
+  resetHeight()
+})
+
+watch(isPhoneFullScreen, () => resetHeight())
+
+watch(isPhone, phone => {
+  if (phone) applyPhoneDefaults()
+  resetHeight()
+})
 
 watch(speed, () => {
   const rates = [0.25, 0.5, 1, 1.5, 2]
@@ -4942,23 +5304,29 @@ watch(speed, () => {
   updateRoomStatus()
 })
 
+watch(isHd, () => warmMovies())
+
 // Lifecycle
 
-// The server fills its movie cache on first read: ask it for the first
-// clips as soon as the list is known, so playback never starts cold.
+// The server fills its movie cache on first read: ask it for the next
+// clips, from the one on screen, as soon as the list or the quality is
+// known, so playback never starts cold.
 let stopMovieWarmup = null
 const warmMovies = () => {
   if (stopMovieWarmup) stopMovieWarmup()
-  stopMovieWarmup = warmPlaylistMovies(entityList.value, {
-    isHd: isHd.value
-  })
+  const index = playingEntityIndex.value
+  const list = entityList.value
+  stopMovieWarmup = warmPlaylistMovies(
+    [...list.slice(index), ...list.slice(0, index)],
+    { isHd: isHd.value }
+  )
 }
 
 onMounted(() => {
   if (isMounted) return
   isScrubbing.value = false
   if (isCurrentUserClient.value) isCommentsHidden.value = false
-  isHd.value = Boolean(organisation.value?.hd_by_default)
+  if (isPhone.value) applyPhoneDefaults()
   entityList.value = props.entities ? props.entities : []
   warmMovies()
   startProgressiveRender()
@@ -4966,6 +5334,8 @@ onMounted(() => {
   room.value.id = props.playlist?.id
   room.value.localId = uuidv4()
   nextTick(() => {
+    // The player can close within the tick it opened in.
+    if (!isMounted) return
     window.addEventListener('keydown', onKeyDown, false)
     window.addEventListener('resize', onWindowResize)
     if (container.value) {
@@ -4999,7 +5369,15 @@ onMounted(() => {
 
   resetPencilConfiguration()
 
-  volume.value = preferences.getIntPreference('player:volume', volume.value)
+  // As in the task panel, a muted visit leaves aside the stored volume: it
+  // is the 0 the mute set. Unmuted, a stored 0 is what an unmute left before
+  // it stored its volume: the default stands in.
+  isMuted.value = preferences.getBoolPreference('player:muted')
+  if (!isMuted.value) {
+    volume.value =
+      preferences.getIntPreference('player:volume', volume.value) ||
+      volume.value
+  }
   nextTick(() => {
     rawPlayer.value?.setVolume(volume.value)
   })
@@ -5010,6 +5388,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  isMounted = false
   if (stopMovieWarmup) stopMovieWarmup()
   endAnnotationSaving()
   cancelProgressiveRender()
@@ -5038,6 +5417,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('keydown', onFocusToggle, true)
   leaveRoom()
   $socket.off('preview-file:annotation-update', onPreviewFileAnnotationUpdate)
+  clearTimeout(waveformLoadTimeout)
   if (wavesurfer) {
     wavesurfer.destroy()
     wavesurfer = null
@@ -5322,6 +5702,116 @@ const playerProxy = {
   }
 }
 
+// Phones (see usePhoneLayout). Portrait: one scrolling column, the compact
+// entity strip on top and the comments under the bars. Landscape: the
+// comments beside the media. The in-page full screen hides both panels.
+.playlist-player.phone {
+  // one line of controls: the kept ones fit a 375px screen
+  // three groups, the same gap between them: shots, playback, drawing
+  .playlist-footer {
+    height: auto;
+    padding: 0 4px;
+
+    > .comparison-buttons {
+      margin-right: 12px;
+    }
+
+    :deep(.time-indicator) {
+      margin: 0 0 0 4px;
+    }
+  }
+
+  // the review happens here: export and revision publishing wait for the
+  // desktop, the status tab of the comment form stays alone
+  .task-info-column :deep(.export-combo),
+  .task-info-column :deep(.add-comment .tab-row) {
+    display: none;
+  }
+
+  // the global .dark .box .title paints the modal titles
+  .task-info-column :deep(.title) {
+    background: transparent;
+  }
+
+  .playlist-footer :deep(.button),
+  .playlist-footer .playlist-button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .task-info-column {
+    max-width: none;
+    min-width: 0;
+  }
+}
+
+.playlist-player.phone:not(.phone-landscape) {
+  overflow-y: auto;
+
+  // the row of the media and the comments hands its children to the column
+  > .filler {
+    display: contents;
+  }
+
+  .video-container {
+    flex: none;
+  }
+
+  // the column scrolls: the panels keep their size instead of shrinking
+  .task-info-column {
+    flex: none;
+    order: 1;
+    width: 100%;
+  }
+
+  .playlisted-entities {
+    flex: none;
+    height: auto;
+    min-height: 0;
+    order: -1;
+    padding-bottom: 0.4em;
+
+    // one size for every card, whatever the title or the picture ratio
+    // the hidden drop areas used to space the cards
+    .playlisted-wrapper {
+      flex: none;
+      margin-right: 0.5em;
+    }
+
+    :deep(.playlisted-entity) {
+      min-width: 0;
+      width: 100px;
+    }
+
+    // the thumbnail sizes itself inline
+    :deep(.thumbnail-picture) {
+      height: 50px !important;
+      max-width: none !important;
+      object-fit: cover;
+      width: 100% !important;
+    }
+
+    :deep(.entity-title) {
+      max-width: none;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    :deep(.preview-choice),
+    :deep(.preview-meta),
+    :deep(.remove-button),
+    :deep(.drop-area) {
+      display: none;
+    }
+  }
+}
+
+.playlist-player.phone-landscape .task-info-column {
+  flex: none;
+  width: 40%;
+}
+
 .comparison-missing {
   padding: 6px 10px;
   border: 1px solid $dark-grey;
@@ -5500,6 +5990,15 @@ const playerProxy = {
 .full-button {
   &:hover {
     border: 1px solid var(--text);
+  }
+}
+
+.playlist-player .playlist-button.client-download {
+  font-weight: 600;
+  padding: 0.5em 1.2em;
+
+  .icon {
+    margin-right: 0.5em;
   }
 }
 

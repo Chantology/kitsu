@@ -4,6 +4,7 @@ import {
   renderComment,
   renderFileSize,
   renderMarkdown,
+  replaceTimeWithTimecode,
   safeUrl
 } from '@/lib/render'
 
@@ -111,6 +112,46 @@ describe('render', () => {
     expect(result).not.toContain('value')
   })
 
+  test('renderMarkdown - emoji shortcodes', () => {
+    expect(renderMarkdown('Good :smile: and :+1:').trim()).toEqual(
+      '<p>Good 😄 and 👍</p>'
+    )
+    expect(renderMarkdown(':SMILE: :heart_eyes: :100: :-1:').trim()).toEqual(
+      '<p>😄 😍 💯 👎</p>'
+    )
+    expect(renderMarkdown(':smile::wink: x:smile:y').trim()).toEqual(
+      '<p>😄😉 x😄y</p>'
+    )
+  })
+
+  test('renderMarkdown - emoji shortcodes in formatting, links and blocks', () => {
+    expect(
+      renderMarkdown('**:smile:** _:wink:_ [:tada:](https://a.test)').trim()
+    ).toEqual(
+      '<p><strong>😄</strong> <em>😉</em> <a href="https://a.test">🎉</a></p>'
+    )
+    expect(renderMarkdown('- item :tada:\n> quote :smile:').trim()).toEqual(
+      '<ul>\n<li>item 🎉</li>\n</ul>\n' +
+        '<blockquote>\n<p>quote 😄</p>\n</blockquote>'
+    )
+  })
+
+  test('renderMarkdown - no emoji in code, URLs, escapes or unknown names', () => {
+    expect(renderMarkdown('Code `:smile:` here').trim()).toEqual(
+      '<p>Code <code>:smile:</code> here</p>'
+    )
+    expect(renderMarkdown('```\n:smile:\n```').trim()).toEqual(
+      '<pre><code>:smile:\n</code></pre>'
+    )
+    expect(renderMarkdown('See https://a.test/:smile:/x').trim()).toEqual(
+      '<p>See <a href="https://a.test/:smile:/x">https://a.test/:smile:/x</a></p>'
+    )
+    expect(renderMarkdown('\\:smile\\:').trim()).toEqual('<p>:smile:</p>')
+    expect(renderMarkdown(':unknown: at 10:30:00').trim()).toEqual(
+      '<p>:unknown: at 10:30:00</p>'
+    )
+  })
+
   test('renderFileSize', () => {
     let size = 1200000
     let result = renderFileSize(size)
@@ -119,4 +160,18 @@ describe('render', () => {
     result = renderFileSize(size)
     expect(result.trim()).toEqual('1.2G')
   })
+
+  // SMPTE: frame 31 is the first frame of the second second at 30 fps.
+  test.each([
+    [1, 30, 'v2 00:00:00:00 (1)'],
+    [31, 30, 'v2 00:00:01:00 (31)'],
+    [1201, 30, 'v2 00:00:40:00 (1201)'],
+    [1441, 24, 'v2 00:01:00:00 (1441)'],
+    [26, 25, 'v2 00:00:01:00 (26)']
+  ])(
+    'replaceTimeWithTimecode labels frame %i at %i fps',
+    (frame, fps, text) => {
+      expect(replaceTimeWithTimecode('@frame', 2, frame, fps)).toBe(text)
+    }
+  )
 })

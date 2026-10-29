@@ -1,4 +1,7 @@
+import assetsApi from '@/store/api/assets'
+import playlistsApi from '@/store/api/playlists'
 import productionsApi from '@/store/api/productions'
+import shotsApi from '@/store/api/shots'
 import { sortProductions, sortByName } from '@/lib/sorting'
 
 import assetTypeStore from '@/store/modules/assettypes'
@@ -37,6 +40,7 @@ import {
   PRODUCTION_REMOVE_BACKGROUND,
   PRODUCTION_UPDATE_DEFAULT_BACKGROUND,
   PRODUCTION_ADD_TASK_TYPE,
+  PRODUCTION_SET_TASK_STATUS_LINK,
   PRODUCTION_SET_TASK_TYPE_LINK,
   PRODUCTION_REMOVE_TASK_TYPE,
   PRODUCTION_ADD_TASK_STATUS,
@@ -421,6 +425,24 @@ const getters = {
     })
   },
 
+  // Only an explicit false hides: null or a missing flag means visible.
+  getClientAccess: (state, getters, rootState, rootGetters) => id => {
+    const production = state.productionMap.get(id)
+    const isClient = rootGetters.isCurrentUserClient
+    const isOn = flag => !isClient || production?.[flag] !== false
+    return {
+      isStatsVisible: isOn('is_client_stats_visible'),
+      isTaskListVisible: isOn('is_client_task_list_visible'),
+      isTaskPanelVisible: isOn('is_client_task_panel_visible'),
+      isTaskTypeVisible: taskTypeId =>
+        !isClient ||
+        production?.task_type_links?.[taskTypeId]?.is_client_visible !== false
+    }
+  },
+
+  clientAccess: (state, getters) =>
+    getters.getClientAccess(getters.currentProduction?.id),
+
   currentProduction: state => {
     if (state.currentProduction) {
       return state.currentProduction
@@ -472,6 +494,23 @@ const getters = {
 }
 
 const actions = {
+  // The client home: the entities with their tasks and the latest playlists
+  // of a production, left out of the page caches.
+  async loadProductionOverview(context, production) {
+    const { production_type: productionType } = production
+    const [shots, assets, episodes, playlists] = await Promise.all([
+      productionType === 'assets' ? [] : shotsApi.getShots(production),
+      productionType === 'shots'
+        ? []
+        : assetsApi.getAssets(production, null, true),
+      productionType === 'tvshow' ? shotsApi.getEpisodes(production) : [],
+      playlistsApi.getPlaylists(production, null, null, 'updated_at', 1)
+    ])
+    // Zou types the shots but not the assets.
+    const typedAssets = assets.map(asset => ({ ...asset, type: 'Asset' }))
+    return { entities: [...shots, ...typedAssets], episodes, playlists }
+  },
+
   async loadProductionStatus({ commit }) {
     commit(LOAD_PRODUCTION_STATUS_START)
     try {
@@ -660,6 +699,38 @@ const actions = {
           production,
           taskTypeId,
           ...bitrates
+        })
+      })
+  },
+
+  setTaskTypeClientVisibility(
+    { commit, state },
+    { taskTypeId, isClientVisible }
+  ) {
+    const production = state.currentProduction
+    return productionsApi
+      .setTaskTypeClientVisibility(production.id, taskTypeId, isClientVisible)
+      .then(() => {
+        commit(PRODUCTION_SET_TASK_TYPE_LINK, {
+          production,
+          taskTypeId,
+          is_client_visible: isClientVisible
+        })
+      })
+  },
+
+  setTaskStatusClientAllowed(
+    { commit, state },
+    { taskStatusId, isClientAllowed }
+  ) {
+    const production = state.currentProduction
+    return productionsApi
+      .setTaskStatusClientAllowed(production.id, taskStatusId, isClientAllowed)
+      .then(() => {
+        commit(PRODUCTION_SET_TASK_STATUS_LINK, {
+          production,
+          taskStatusId,
+          is_client_allowed: isClientAllowed
         })
       })
   },
@@ -979,6 +1050,22 @@ const actions = {
     return productionsApi.getProductionStats()
   },
 
+  getPreviewAccount(_, productionId) {
+    return productionsApi.getPreviewAccount(productionId)
+  },
+
+  createPreviewAccount(_, productionId) {
+    return productionsApi.createPreviewAccount(productionId)
+  },
+
+  setPreviewAccountOpen(_, { productionId, isOpen }) {
+    return productionsApi.setPreviewAccountOpen(productionId, isOpen)
+  },
+
+  deletePreviewAccount(_, productionId) {
+    return productionsApi.deletePreviewAccount(productionId)
+  },
+
   saveLastProductionRoute({ commit }, route) {
     this.commit(SAVE_LAST_PRODUCTION_ROUTE, route)
   }
@@ -1206,6 +1293,17 @@ const mutations = {
     if (!production.task_type_links) production.task_type_links = {}
     production.task_type_links[taskTypeId] = {
       ...production.task_type_links[taskTypeId],
+      ...link
+    }
+  },
+
+  [PRODUCTION_SET_TASK_STATUS_LINK](
+    state,
+    { production, taskStatusId, ...link }
+  ) {
+    if (!production.task_statuses_link) production.task_statuses_link = {}
+    production.task_statuses_link[taskStatusId] = {
+      ...production.task_statuses_link[taskStatusId],
       ...link
     }
   },

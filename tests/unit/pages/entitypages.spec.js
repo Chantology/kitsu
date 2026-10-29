@@ -19,6 +19,7 @@ vi.mock('vue-router', async importOriginal => ({
   useRoute: () => routeHolder.route
 }))
 
+import i18n from '@/lib/i18n'
 import assetStore from '@/store/modules/assets'
 import editStore from '@/store/modules/edits'
 import episodeStore from '@/store/modules/episodes'
@@ -39,12 +40,14 @@ import EntityOutputFiles from '@/components/pages/entities/EntityOutputFiles.vue
 import ButtonSimple from '@/components/widgets/ButtonSimple.vue'
 import ComboboxStatus from '@/components/widgets/ComboboxStatus.vue'
 import ConceptCard from '@/components/widgets/ConceptCard.vue'
+import PageSubtitle from '@/components/widgets/PageSubtitle.vue'
 
 const production = { id: 'production-1' }
 
 const pages = [
   {
     name: 'Asset',
+    listAction: 'loadAssets',
     page: Asset,
     entityParam: 'asset_id',
     listRoute: 'assets',
@@ -54,6 +57,7 @@ const pages = [
   },
   {
     name: 'Edit',
+    listAction: 'loadEdits',
     page: Edit,
     entityParam: 'edit_id',
     listRoute: 'edits',
@@ -72,6 +76,7 @@ const pages = [
   },
   {
     name: 'Sequence',
+    listAction: 'loadSequencesWithTasks',
     page: Sequence,
     entityParam: 'sequence_id',
     listRoute: 'sequences',
@@ -81,6 +86,7 @@ const pages = [
   },
   {
     name: 'Shot',
+    listAction: 'loadShots',
     page: Shot,
     entityParam: 'shot_id',
     listRoute: 'shots',
@@ -98,7 +104,8 @@ const mountPage = async (
   currentProduction,
   actions = {},
   getters = {},
-  query = {}
+  query = {},
+  $t = key => key
 ) => {
   routeHolder.route = reactive({
     params: { production_id: production.id, [entityParam]: 'entity-1' },
@@ -111,6 +118,10 @@ const mountPage = async (
     getters: {
       assetMetadataDescriptors: () => [],
       assetSearchText: () => '',
+      clientAccess: () => ({
+        isTaskPanelVisible: true,
+        isTaskTypeVisible: () => true
+      }),
       currentEpisode: () => null,
       currentProduction: state => state.currentProduction,
       editMetadataDescriptors: () => [],
@@ -138,6 +149,7 @@ const mountPage = async (
       loadAsset: loadAction,
       loadAssetCastIn: loadAction,
       loadAssetCasting: loadAction,
+      loadAssets: loadAction,
       loadEdits: loadAction,
       loadEpisodeCasting: loadAction,
       loadEpisodesWithTasks: loadAction,
@@ -146,13 +158,14 @@ const mountPage = async (
       loadSequencesWithTasks: loadAction,
       loadShot: loadAction,
       loadShotCasting: loadAction,
+      loadShots: loadAction,
       ...actions
     }
   })
   const wrapper = shallowMount(page, {
     global: {
       plugins: [store],
-      mocks: { $route: routeHolder.route, $t: key => key },
+      mocks: { $route: routeHolder.route, $t },
       stubs: { RouterLink: RouterLinkStub }
     }
   })
@@ -251,6 +264,56 @@ describe.each(pages)(
   }
 )
 
+// The pages whose arrows walk a list of the store, which may be the one of
+// another episode: an entity loaded by id, a list loaded elsewhere.
+describe.each(pages.filter(({ listAction }) => listAction))(
+  '$name page, list of the page',
+  ({ entityMap, entityParam, listAction, name, page }) => {
+    afterEach(() => {
+      entityMap.clear()
+    })
+
+    // A sequence loaded with its tasks is not loaded again by the page.
+    const entity = fields => ({
+      id: 'entity-1',
+      name: 'E01',
+      tasks: [],
+      validations: new Map(),
+      ...fields
+    })
+
+    // The list loaded carries its own object for the entity, the one the
+    // store updates from then on.
+    test('takes its entity from the list it loads for the arrows', async () => {
+      entityMap.set('entity-1', entity())
+      const loadList = vi.fn(() => {
+        entityMap.set('entity-1', entity({ name: 'E01 bis' }))
+        return Promise.resolve()
+      })
+      const { wrapper } = await mountPage(page, entityParam, production, {
+        [listAction]: loadList
+      })
+
+      expect(loadList).toHaveBeenCalledTimes(1)
+      expect(wrapper.find('.entity-title').text()).toContain('E01 bis')
+    })
+
+    test('keeps the list the store holds for its episode', async () => {
+      entityMap.set('entity-1', entity())
+      const loadList = vi.fn(() => Promise.resolve())
+      await mountPage(
+        page,
+        entityParam,
+        production,
+        { [listAction]: loadList },
+        { [`${name.toLowerCase()}sLoadingKey`]: () => `${production.id}/` }
+      )
+
+      expect(loadList).not.toHaveBeenCalled()
+    })
+  }
+)
+
 // Every page whose entity can carry output files lists them in a tab.
 describe.each(pages.filter(({ name }) => ['Asset', 'Edit', 'Shot'].includes(name)))(
   '$name page, output files',
@@ -268,6 +331,25 @@ describe.each(pages.filter(({ name }) => ['Asset', 'Edit', 'Shot'].includes(name
       expect(wrapper.findComponent(EntityOutputFiles).props('entity')).toMatchObject({
         id: 'entity-1'
       })
+    })
+  }
+)
+
+describe.each(pages.filter(({ name }) => ['Asset', 'Edit', 'Shot'].includes(name)))(
+  '$name page, task panel client setting',
+  ({ entityParam, page }) => {
+    const panel = isTaskPanelVisible => ({
+      clientAccess: () => ({ isTaskPanelVisible, isTaskTypeVisible: () => true })
+    })
+
+    test('renders no task info when the panel is hidden', async () => {
+      const { wrapper } = await mountPage(page, entityParam, production, {}, panel(false))
+      expect(wrapper.findComponent({ name: 'TaskInfo' }).exists()).toBe(false)
+    })
+
+    test('renders the task info otherwise', async () => {
+      const { wrapper } = await mountPage(page, entityParam, production, {}, panel(true))
+      expect(wrapper.findComponent({ name: 'TaskInfo' }).exists()).toBe(true)
     })
   }
 )
@@ -314,5 +396,38 @@ describe('Asset page, concepts', () => {
         .findAllComponents(ConceptCard)
         .map(card => card.props('concept').id)
     ).toEqual(['concept-1'])
+  })
+})
+
+describe('Asset page, casting', () => {
+  afterEach(() => {
+    assetStore.cache.assetMap.clear()
+  })
+
+  test.each([
+    ['Cast in 1 shot', 1],
+    ['Cast in 3 shots', 3]
+  ])('titles its casting "%s"', async (title, nbShots) => {
+    assetStore.cache.assetMap.set('entity-1', {
+      id: 'entity-1',
+      name: 'Tree',
+      tasks: [],
+      castInShotsBySequence: [
+        Array.from({ length: nbShots }, (_, index) => ({ id: `shot-${index}` }))
+      ]
+    })
+    const { wrapper } = await mountPage(
+      Asset,
+      'asset_id',
+      production,
+      {},
+      {},
+      { section: 'casting' },
+      (key, named) => i18n.global.t(key, named)
+    )
+
+    expect(
+      wrapper.find('.casting-title').findComponent(PageSubtitle).props('text')
+    ).toBe(title)
   })
 })

@@ -6,7 +6,11 @@ import { createStore } from 'vuex'
 vi.mock('@/composables/desktopNotifications', () => ({
   useDesktopNotifications: vi.fn()
 }))
-vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: key => key }) }))
+vi.mock('vue-i18n', () => ({
+  useI18n: () => ({
+    t: (key, values) => (values ? `${key}:${JSON.stringify(values)}` : key)
+  })
+}))
 
 // The component reads the route of useRoute(): each mount hands it the same
 // object as the $route mock, which tests move to simulate navigations.
@@ -77,6 +81,7 @@ const makeStore = (getterOverrides = {}) => {
   const store = createStore({
     state: () => ({}),
     getters: {
+      clientAccess: () => ({ isStatsVisible: true, isTaskListVisible: true }),
       currentEpisode: () => null,
       currentProduction: () => null,
       episodes: () => [],
@@ -171,6 +176,76 @@ describe('Topbar.vue', () => {
   afterEach(() => {
     if (wrapper) wrapper.unmount()
     vi.clearAllMocks()
+  })
+
+  it('titles the home of a client with the productions of the studio', async () => {
+    expect(wrapper.find('.page-title').exists()).toBe(false)
+    const { store: clientStore } = makeStore({
+      isCurrentUserClient: () => true
+    })
+    const client = shallowMount(Topbar, {
+      global: {
+        config: { globalProperties: { $socket: socketMock } },
+        plugins: [clientStore, makeRouter()],
+        mocks: { $t: key => key, $route: mockRoute({ path: '/', name: 'open-productions', params: {}, query: {}, fullPath: '/' }) },
+        stubs: { GlobalSearchField: true, NotificationBell: true, PeopleAvatar: true, ShortcutModal: true }
+      }
+    })
+    await nextTick()
+    expect(client.find('.page-title').text()).toBe(
+      'productions.home.studio_productions:{"studio":"Test Studio"}'
+    )
+    client.unmount()
+  })
+
+  describe('client access sections', () => {
+    const sectionValues = async (getters = {}) => {
+      const { store: sectionStore } = makeStore({
+        currentProduction: () => ({ id: 'production-1', production_type: 'tvshow' }),
+        isCurrentUserClient: () => true,
+        isTVShow: () => true,
+        productionEditTaskTypes: () => [],
+        ...getters
+      })
+      const topbar = shallowMount(Topbar, {
+        global: {
+          config: { globalProperties: { $socket: socketMock } },
+          plugins: [sectionStore, makeRouter()],
+          mocks: { $t: key => key, $route: mockRoute({ path: '/', name: 'open-productions', params: {}, query: {}, fullPath: '/' }) },
+          stubs: { GlobalSearchField: true, NotificationBell: true, PeopleAvatar: true, ShortcutModal: true }
+        }
+      })
+      await nextTick()
+      const values = topbar.vm.sectionOptions.map(option => option.value)
+      topbar.unmount()
+      return values
+    }
+
+    it('lists the entities and stats when everything is visible', async () => {
+      const values = await sectionValues()
+      expect(values).toEqual(
+        expect.arrayContaining(['playlists', 'assets', 'shots', 'sequence-stats', 'episode-stats', 'assetTypes'])
+      )
+    })
+
+    it('drops the entity entries when the task list is hidden', async () => {
+      const values = await sectionValues({
+        clientAccess: () => ({ isStatsVisible: true, isTaskListVisible: false })
+      })
+      expect(values).not.toContain('assets')
+      expect(values).not.toContain('shots')
+      expect(values).toEqual(['playlists', 'sequence-stats', 'episode-stats', 'assetTypes'])
+    })
+
+    it('drops the stat entries when the stats are hidden', async () => {
+      const values = await sectionValues({
+        clientAccess: () => ({ isStatsVisible: false, isTaskListVisible: true })
+      })
+      expect(values).toContain('shots')
+      expect(values).not.toContain('sequence-stats')
+      expect(values).not.toContain('episode-stats')
+      expect(values).not.toContain('assetTypes')
+    })
   })
 
   // Artists land on pages without production: the fallback production of the
@@ -660,6 +735,59 @@ describe('Topbar.vue', () => {
 
         expect(actions.setCurrentEpisode).not.toHaveBeenCalled()
         expect(replaceSpy).not.toHaveBeenCalled()
+        wrapper.unmount()
+      })
+    })
+
+    // A production switch loads the episodes, and so does an episode change
+    // before the list is in. The API client reports a failed request: a bug
+    // is left to Sentry.
+    describe('failed load of the episodes', () => {
+      const loads = [
+        ['on a production switch', vm => vm.configureProduction('production-1')],
+        ['on an episode change', vm => vm.configureEpisode()]
+      ]
+
+      it.each(loads)('logs a failed request %s', async (_label, load) => {
+        const consoleError = vi
+          .spyOn(console, 'error')
+          .mockImplementation(() => {})
+        const { wrapper, actions } = mountFor('sequences', 'episode-1', {
+          holdEpisodes: true
+        })
+        const failure = new Error('Request has been terminated')
+        errors.markRequestFailure(failure)
+        actions.loadEpisodes.mockRejectedValueOnce(failure)
+
+        const rejections = await recordUnhandledRejections(async () => {
+          load(wrapper.vm)
+          await flushPromises()
+        })
+
+        expect(rejections).toEqual([])
+        expect(consoleError).toHaveBeenCalledWith(failure)
+        consoleError.mockRestore()
+        wrapper.unmount()
+      })
+
+      it.each(loads)('leaves a bug %s to Sentry', async (_label, load) => {
+        const consoleError = vi
+          .spyOn(console, 'error')
+          .mockImplementation(() => {})
+        const { wrapper, actions } = mountFor('sequences', 'episode-1', {
+          holdEpisodes: true
+        })
+        const bug = new TypeError('Cannot read properties of undefined')
+        actions.loadEpisodes.mockRejectedValueOnce(bug)
+
+        const rejections = await recordUnhandledRejections(async () => {
+          load(wrapper.vm)
+          await flushPromises()
+        })
+
+        expect(rejections).toEqual([bug])
+        expect(consoleError).not.toHaveBeenCalledWith(bug)
+        consoleError.mockRestore()
         wrapper.unmount()
       })
     })

@@ -202,6 +202,10 @@ const actions = {
     return tasksApi.getTasks(filters)
   },
 
+  countTasks({}, filters) {
+    return tasksApi.countTasks(filters)
+  },
+
   loadOpenTasks({}, filters) {
     return tasksApi.getOpenTasks(filters)
   },
@@ -1153,6 +1157,20 @@ const mutations = {
       project_name: task.project.name,
       entity_type_name: task.entity_type.name
     })
+    // The links to the task page read the episode id, or fall back on the
+    // episode the user browsed last. Zou nests the episode of a shot or a
+    // sequence; the task lists take an edit's parent and an asset's source (a
+    // shot made from a scene has that scene for source).
+    const isAsset = !['Edit', 'Episode', 'Sequence', 'Shot'].includes(
+      task.entity_type.name
+    )
+    if (task.episode) {
+      task.episode_id = task.episode.id
+    } else if (task.entity_type.name === 'Edit' && task.entity.parent_id) {
+      task.episode_id = task.entity.parent_id
+    } else if (isAsset && task.entity.source_id) {
+      task.episode_id = task.entity.source_id
+    }
     if (task.entity_type.name === 'Shot') {
       if (task.episode) {
         task.entity_name = `${task.episode.name} / ${task.sequence.name} / ${task.entity.name}`
@@ -1810,9 +1828,6 @@ const mutations = {
   },
 
   [SET_UPLOAD_PROGRESS](state, { name, percent }) {
-    if (!state.uploadProgress.name) {
-      state.uploadProgress.name = percent
-    }
     state.uploadProgress[name] = percent
   },
 

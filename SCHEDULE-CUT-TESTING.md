@@ -22,7 +22,11 @@ lead dev:
 | Gazu | nothing — no Gazu changes exist yet (see *Known gaps*) |
 
 Both are kept merged with their upstream `main`, so you can check them out
-against a current Kitsu and Zou rather than a months-old snapshot.
+against a current Kitsu and Zou rather than a months-old snapshot. That
+includes the schedule rework of [PR #2266](https://github.com/cgwire/kitsu/pull/2266)
+(toolbar panel, batch planning, export, shift drag, per-row rendering): the
+cut tool and the flexible timelines are rebuilt on top of it, so what you see
+is the current schedule page, not the one that preceded it.
 
 **The Kitsu branch does not work without the Zou branch.** The cut tool stores
 pieces in a new `schedule_segment` table, so without the backend every cut fails
@@ -151,7 +155,7 @@ which level of bar, whether it was already cut, and whether a reload changes the
 symptom. Two bugs in this feature took several rounds to pin down because the
 repro path was ambiguous.
 
-Frontend checks: `npm run test:unit` (3778 tests) and `npm run lint`.
+Frontend checks: `npm run test:unit` (5094 tests) and `npm run lint`.
 Backend: `DB_DATABASE=zoudb-test py.test tests/blueprints/crud/test_schedule_segment.py`
 (17 tests). The rest of the Zou suite has failures that belong to `main` and
 this environment, not to this branch: compare against a run on `main` before

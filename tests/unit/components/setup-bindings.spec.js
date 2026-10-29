@@ -88,23 +88,16 @@ describe('script setup bindings', () => {
     expect(offenders).toEqual([])
   })
 
-  // Parsing every template takes seconds, and the whole suite running
-  // alongside it pushes that past the 5s default: the check grows with the
-  // codebase, so it gets a timeout of its own rather than failing the run
-  // on a machine that happens to be busy.
-  it(
-    'binds every name a template reads',
-    () => {
-      const offenders = files
-        .map(file => ({
-          file,
-          names: unboundNames(file, readFileSync(file, 'utf8'))
-        }))
-        .filter(entry => entry.names.length > 0)
-        .map(entry => `${entry.file}: ${entry.names.join(', ')}`)
+  // Compiles every component: past the default timeout under coverage or load.
+  it('binds every name a template reads', { timeout: 30000 }, () => {
+    const offenders = files
+      .map(file => ({
+        file,
+        names: unboundNames(file, readFileSync(file, 'utf8'))
+      }))
+      .filter(entry => entry.names.length > 0)
+      .map(entry => `${entry.file}: ${entry.names.join(', ')}`)
 
-      expect(offenders).toEqual([])
-    },
-    30000
-  )
+    expect(offenders).toEqual([])
+  })
 })

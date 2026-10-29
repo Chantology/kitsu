@@ -1,25 +1,37 @@
-import { flushPromises, shallowMount } from '@vue/test-utils'
+import { flushPromises, mount, shallowMount } from '@vue/test-utils'
 import process from 'node:process'
 import { ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { createStore } from 'vuex'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import auth from '@/lib/auth'
 import errors from '@/lib/errors'
 import i18n, { loadLocaleMessages } from '@/lib/i18n'
 
 import App from '@/App.vue'
+import MetadataTextarea from '@/components/cells/MetadataTextarea.vue'
 
 import { recordUnhandledRejections } from './fixtures/unhandled-rejections'
 
 let wrapper = null
 
-const mountApp = async ({ actions, getters, mutations }) => {
+const Page = { template: '<div />' }
+
+const mountApp = async ({ actions, getters, mutations, path = '/' }) => {
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [{ path: '/', component: { template: '<div />' } }]
+    routes: [
+      { path: '/', component: Page },
+      { path: '/login', name: 'login', component: Page },
+      {
+        path: '/playlists/shared/:token',
+        name: 'shared-playlist',
+        component: Page
+      }
+    ]
   })
-  router.push('/')
+  router.push(path)
   await router.isReady()
 
   const store = createStore({
@@ -43,7 +55,7 @@ const mountApp = async ({ actions, getters, mutations }) => {
     }
   })
   await flushPromises()
-  return { socket }
+  return { router, socket }
 }
 
 const emitSocketEvent = (socket, event, eventData) => {
@@ -68,6 +80,7 @@ describe('App', () => {
         .spyOn(console, 'error')
         .mockImplementation(() => {})
       const error = Object.assign(new Error('HTTP 404'), { status: 404 })
+      errors.markRequestFailure(error)
 
       const { socket } = await mountApp({
         actions: { loadTask: () => Promise.reject(error) },
@@ -80,6 +93,24 @@ describe('App', () => {
 
       expect(rejections).toEqual([])
       expect(consoleError).toHaveBeenCalledWith(error)
+    })
+
+    it('leaves a bug in the task reload after a task update to Sentry', async () => {
+      const consoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {})
+      const bug = new TypeError('Cannot read properties of undefined')
+
+      const rejections = await recordUnhandledRejections(async () => {
+        const { socket } = await mountApp({
+          actions: { loadTask: () => Promise.reject(bug) },
+          getters: { taskMap: () => new Map([['task-1', { id: 'task-1' }]]) }
+        })
+        emitSocketEvent(socket, 'task:update', { task_id: 'task-1' })
+      })
+
+      expect(rejections).toEqual([bug])
+      expect(consoleError).not.toHaveBeenCalledWith(bug)
     })
 
     // A production page replaces the task map, which then lacks the todos.
@@ -173,6 +204,47 @@ describe('App', () => {
         emitSocketEvent(socket, 'connect')
 
         expect(refresh).toHaveBeenCalled()
+      })
+
+      it('logs a failed read of the statuses after a reconnection', async () => {
+        const consoleError = vi
+          .spyOn(console, 'error')
+          .mockImplementation(() => {})
+        const failure = Object.assign(new Error('HTTP 502'), { status: 502 })
+        errors.markRequestFailure(failure)
+
+        const rejections = await recordUnhandledRejections(async () => {
+          const { socket } = await mountApp({
+            actions: {
+              refreshProcessingPreviewFiles: () => Promise.reject(failure)
+            },
+            getters
+          })
+          emitSocketEvent(socket, 'connect')
+        })
+
+        expect(rejections).toEqual([])
+        expect(consoleError).toHaveBeenCalledWith(failure)
+      })
+
+      it('leaves a bug in the read of the statuses to Sentry', async () => {
+        const consoleError = vi
+          .spyOn(console, 'error')
+          .mockImplementation(() => {})
+        const bug = new TypeError('Cannot read properties of undefined')
+
+        const rejections = await recordUnhandledRejections(async () => {
+          const { socket } = await mountApp({
+            actions: {
+              refreshProcessingPreviewFiles: () => Promise.reject(bug)
+            },
+            getters
+          })
+          emitSocketEvent(socket, 'connect')
+        })
+
+        expect(rejections).toEqual([bug])
+        expect(consoleError).not.toHaveBeenCalledWith(bug)
       })
     })
 
@@ -1070,6 +1142,212 @@ describe('App', () => {
       })
 
       expect(i18n.global.locale.value).toBe('fr')
+    })
+  })
+
+  // The config answers after the first render: the theme the page starts
+  // with comes from the storage.
+  describe('dark theme', () => {
+    let answerConfig = null
+
+    const mountWithTheme = async () => {
+      const isDarkTheme = ref(false)
+      const config = new Promise(resolve => {
+        answerConfig = async answer => {
+          resolve(answer)
+          await flushPromises()
+        }
+      })
+      await mountApp({
+        actions: { setMainConfig: () => config },
+        getters: { isDarkTheme: () => isDarkTheme.value },
+        mutations: {
+          TOGGLE_DARK_THEME: (state, isDark) => {
+            isDarkTheme.value = isDark
+          }
+        }
+      })
+    }
+
+    afterEach(() => {
+      localStorage.removeItem('dark-theme')
+      localStorage.removeItem('dark-theme-default')
+      window.history.replaceState(null, '', '/')
+    })
+
+    it('starts in the theme the user chose, before the config answers', async () => {
+      localStorage.setItem('dark-theme', 'true')
+      await mountWithTheme()
+
+      expect(wrapper.classes('dark')).toBe(true)
+    })
+
+    it('starts in the studio default the last config left', async () => {
+      localStorage.setItem('dark-theme-default', 'true')
+      await mountWithTheme()
+
+      expect(wrapper.classes('dark')).toBe(true)
+    })
+
+    it('remembers the studio default of the config for the next start', async () => {
+      await mountWithTheme()
+      await answerConfig({ dark_theme_by_default: true })
+
+      expect(wrapper.classes('dark')).toBe(true)
+      expect(localStorage.getItem('dark-theme-default')).toBe('true')
+    })
+
+    it('keeps the theme the user chose over the studio default', async () => {
+      localStorage.setItem('dark-theme', 'false')
+      await mountWithTheme()
+      await answerConfig({ dark_theme_by_default: true })
+
+      expect(wrapper.classes('dark')).toBe(false)
+    })
+
+    it('keeps the theme it started with when the config fails', async () => {
+      localStorage.setItem('dark-theme-default', 'true')
+      await mountWithTheme()
+      // setMainConfig answers an empty config when its request fails.
+      await answerConfig({})
+
+      expect(wrapper.classes('dark')).toBe(true)
+      expect(localStorage.getItem('dark-theme-default')).toBe('true')
+    })
+
+    it('keeps a shared playlist dark when the config answers after it', async () => {
+      window.history.replaceState(null, '', '/playlists/shared/token-1')
+      await mountWithTheme()
+      expect(wrapper.classes('dark')).toBe(true)
+
+      await answerConfig({ dark_theme_by_default: false })
+
+      expect(wrapper.classes('dark')).toBe(true)
+    })
+
+    it('starts light when the browser blocks the storage', async () => {
+      vi.spyOn(localStorage, 'getItem').mockImplementation(() => {
+        throw new Error('The operation is insecure.')
+      })
+      await mountWithTheme()
+      await answerConfig({})
+
+      expect(wrapper.classes('dark')).toBe(false)
+    })
+  })
+
+  describe('logout in another tab', () => {
+    const mountTab = async path => {
+      const channel = {}
+      vi.spyOn(auth, 'getBroadcastChannel').mockReturnValue(channel)
+      const logoutLocal = vi.fn()
+      const { router } = await mountApp({ actions: { logoutLocal }, path })
+      const receiveLogout = async () => {
+        await channel.onmessage({ data: 'logout' })
+        await flushPromises()
+      }
+      return { logoutLocal, receiveLogout, router }
+    }
+
+    afterEach(() => {
+      window.history.replaceState(null, '', '/')
+    })
+
+    it('purges the tab from the login page', async () => {
+      const { logoutLocal, receiveLogout, router } = await mountTab('/')
+
+      await receiveLogout()
+
+      expect(router.currentRoute.value.name).toBe('login')
+      expect(router.currentRoute.value.query).toEqual({ redirect: '/' })
+      expect(logoutLocal).toHaveBeenCalled()
+    })
+
+    it('leaves a shared playlist tab alone', async () => {
+      window.history.replaceState(null, '', '/playlists/shared/token-1')
+      const { logoutLocal, receiveLogout, router } = await mountTab(
+        '/playlists/shared/token-1'
+      )
+
+      await receiveLogout()
+
+      expect(router.currentRoute.value.name).toBe('shared-playlist')
+      expect(logoutLocal).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('top-level page swap', () => {
+    // Vue looks past a single teleport for the node after a page: once the
+    // preview modal had moved past the teleports of the shot cells, the
+    // next page went before a node the leaving page removed.
+    it('shows the next page after a preview over teleported cells', async () => {
+      const LoginPage = { template: '<div class="login-page" />' }
+      const ShotsPage = {
+        components: { MetadataTextarea },
+        template: `
+          <div class="shots-page">
+            <metadata-textarea model-value="Long text" />
+            <metadata-textarea model-value="Long text" />
+          </div>
+        `
+      }
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: '/login', component: LoginPage },
+          { path: '/shots', component: ShotsPage }
+        ]
+      })
+      router.push('/login')
+      await router.isReady()
+      const store = createStore({
+        state: { previewFileId: null },
+        actions: { setMainConfig: () => ({}) },
+        getters: { previewFileIdToShow: state => state.previewFileId },
+        mutations: {
+          HIDE_PREVIEW_FILE: state => {
+            state.previewFileId = null
+          },
+          SHOW_PREVIEW_FILE: (state, previewFileId) => {
+            state.previewFileId = previewFileId
+          },
+          TOGGLE_DARK_THEME: () => {}
+        }
+      })
+      const renderErrors = []
+      const warnings = []
+      wrapper = mount(App, {
+        attachTo: document.body,
+        global: {
+          config: {
+            errorHandler: error => renderErrors.push(error),
+            warnHandler: message => warnings.push(message)
+          },
+          plugins: [
+            router,
+            store,
+            {
+              install: app => {
+                app.config.globalProperties.$socket = { on: vi.fn() }
+              }
+            }
+          ],
+          stubs: { PreviewModal: true }
+        }
+      })
+      await router.push('/shots')
+      await flushPromises()
+      store.commit('SHOW_PREVIEW_FILE', 'preview-1')
+      await flushPromises()
+      store.commit('HIDE_PREVIEW_FILE')
+      await flushPromises()
+
+      await router.push('/login')
+      await flushPromises()
+
+      expect(renderErrors.map(String)).toEqual([])
+      expect(warnings).toEqual([])
+      expect(document.querySelector('.login-page')).not.toBeNull()
     })
   })
 })

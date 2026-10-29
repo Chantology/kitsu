@@ -10,7 +10,10 @@ import taskStatusStore from '@/store/modules/taskstatus'
 import taskTypeStore from '@/store/modules/tasktypes'
 
 import client from '@/store/api/client'
+import assetsApi from '@/store/api/assets'
+import playlistsApi from '@/store/api/playlists'
 import productionApi from '@/store/api/productions.js'
+import shotsApi from '@/store/api/shots'
 
 import {
   ADD_METADATA_DESCRIPTOR_END,
@@ -30,6 +33,7 @@ import {
   PRODUCTION_ADD_ASSET_TYPE,
   PRODUCTION_ADD_TASK_STATUS,
   PRODUCTION_ADD_TASK_TYPE,
+  PRODUCTION_SET_TASK_STATUS_LINK,
   PRODUCTION_SET_TASK_TYPE_LINK,
   PRODUCTION_AVATAR_UPLOADED,
   PRODUCTION_REMOVE_ASSET_TYPE,
@@ -244,6 +248,64 @@ describe('Productions store', () => {
       ])
     })
 
+    describe('client access', () => {
+      const flags = {
+        is_client_stats_visible: false,
+        is_client_task_list_visible: false,
+        is_client_task_panel_visible: false,
+        task_type_links: { tt: { is_client_visible: false } }
+      }
+      const access = (production, isClient, id = 'p') =>
+        store.getters.getClientAccess(
+          { productionMap: new Map([['p', { id: 'p', ...production }]]) },
+          {},
+          {},
+          { isCurrentUserClient: isClient }
+        )(id)
+
+      test('non-client sees everything', () => {
+        const result = access(flags, false)
+        expect(result.isStatsVisible).toBe(true)
+        expect(result.isTaskListVisible).toBe(true)
+        expect(result.isTaskPanelVisible).toBe(true)
+        expect(result.isTaskTypeVisible('tt')).toBe(true)
+      })
+
+      test('client sees false per flag', () => {
+        const result = access(flags, true)
+        expect(result.isStatsVisible).toBe(false)
+        expect(result.isTaskListVisible).toBe(false)
+        expect(result.isTaskPanelVisible).toBe(false)
+        expect(result.isTaskTypeVisible('tt')).toBe(false)
+        expect(result.isTaskTypeVisible('other')).toBe(true)
+      })
+
+      test('flags are independent', () => {
+        const result = access({ is_client_task_list_visible: false }, true)
+        expect(result.isStatsVisible).toBe(true)
+        expect(result.isTaskListVisible).toBe(false)
+      })
+
+      test('null, missing flags and unknown production are visible', () => {
+        const nulls = access({ is_client_stats_visible: null }, true)
+        expect(nulls.isStatsVisible).toBe(true)
+        expect(nulls.isTaskListVisible).toBe(true)
+        expect(nulls.isTaskTypeVisible('tt')).toBe(true)
+        expect(access({}, true, 'unknown').isTaskPanelVisible).toBe(true)
+      })
+
+      test('clientAccess reads the current production', () => {
+        const getClientAccess = vi.fn(() => 'x')
+        expect(
+          store.getters.clientAccess(
+            {},
+            { getClientAccess, currentProduction: { id: 'p' } }
+          )
+        ).toBe('x')
+        expect(getClientAccess).toHaveBeenCalledWith('p')
+      })
+    })
+
     describe('team roles', () => {
       const state = {
         currentProduction: { id: 'production-1' },
@@ -277,6 +339,69 @@ describe('Productions store', () => {
   })
 
   describe('Actions', () => {
+    describe('loadProductionOverview', () => {
+      beforeEach(() => {
+        shotsApi.getShots = vi.fn(() => Promise.resolve([{ id: 'shot-1' }]))
+        assetsApi.getAssets = vi.fn(() => Promise.resolve([{ id: 'asset-1' }]))
+        playlistsApi.getPlaylists = vi.fn(() =>
+          Promise.resolve([{ id: 'playlist-1' }])
+        )
+        shotsApi.getEpisodes = vi.fn(() =>
+          Promise.resolve([{ id: 'episode-1' }])
+        )
+      })
+
+      test('loads the episodes of a tv show only', async () => {
+        const tvshow = { id: 'production-1', production_type: 'tvshow' }
+        const overview = await store.actions.loadProductionOverview({}, tvshow)
+        expect(shotsApi.getEpisodes).toHaveBeenCalledWith(tvshow)
+        expect(overview.episodes).toEqual([{ id: 'episode-1' }])
+        shotsApi.getEpisodes.mockClear()
+        const film = await store.actions.loadProductionOverview(
+          {},
+          { id: 'production-1', production_type: 'featurefilm' }
+        )
+        expect(shotsApi.getEpisodes).not.toHaveBeenCalled()
+        expect(film.episodes).toEqual([])
+      })
+
+      test('loads the entities with their tasks, typed, and the latest playlists', async () => {
+        const production = { id: 'production-1', production_type: 'featurefilm' }
+        const overview = await store.actions.loadProductionOverview(
+          {},
+          production
+        )
+        expect(assetsApi.getAssets).toHaveBeenCalledWith(production, null, true)
+        expect(shotsApi.getShots).toHaveBeenCalledWith(production)
+        expect(playlistsApi.getPlaylists).toHaveBeenCalledWith(
+          production,
+          null,
+          null,
+          'updated_at',
+          1
+        )
+        expect(overview).toEqual({
+          entities: [{ id: 'shot-1' }, { id: 'asset-1', type: 'Asset' }],
+          episodes: [],
+          playlists: [{ id: 'playlist-1' }]
+        })
+      })
+
+      test.each([
+        ['assets', shotsApi, 'getShots'],
+        ['shots', assetsApi, 'getAssets']
+      ])(
+        'skips the entities an %s production has none of',
+        async (productionType, api, method) => {
+          await store.actions.loadProductionOverview(
+            {},
+            { id: 'production-1', production_type: productionType }
+          )
+          expect(api[method]).not.toHaveBeenCalled()
+        }
+      )
+    })
+
     test('loadProductionStatus', async () => {
       let mockCommit = vi.fn()
       productionApi.getProductionStatus = vi.fn(() => Promise.reject())
@@ -823,6 +948,56 @@ describe('Productions store', () => {
         456: { hd_bitrate_compression: 20 }
       })
       expect(nextProduction.task_type_links).toEqual({})
+    })
+
+    test('setTaskTypeClientVisibility sends the flag and updates the link', async () => {
+      const production = {
+        id: '123',
+        task_type_links: { 456: { priority: 3 } }
+      }
+      const state = { currentProduction: production }
+      const commit = (type, payload) => store.mutations[type](state, payload)
+      productionApi.setTaskTypeClientVisibility = vi.fn(() => Promise.resolve())
+      await store.actions.setTaskTypeClientVisibility(
+        { commit, state },
+        { taskTypeId: '456', isClientVisible: false }
+      )
+      expect(productionApi.setTaskTypeClientVisibility).toHaveBeenCalledWith(
+        '123', '456', false
+      )
+      expect(production.task_type_links[456]).toEqual({
+        priority: 3,
+        is_client_visible: false
+      })
+    })
+
+    test('setTaskStatusClientAllowed sends the value and updates the link', async () => {
+      const production = {
+        id: '123',
+        task_statuses_link: { 456: { priority: 3, is_client_allowed: true } }
+      }
+      const state = { currentProduction: production }
+      const commit = (type, payload) => store.mutations[type](state, payload)
+      productionApi.setTaskStatusClientAllowed = vi.fn(() => Promise.resolve())
+      await store.actions.setTaskStatusClientAllowed(
+        { commit, state },
+        { taskStatusId: '456', isClientAllowed: null }
+      )
+      expect(productionApi.setTaskStatusClientAllowed).toHaveBeenCalledWith(
+        '123', '456', null
+      )
+      expect(production.task_statuses_link[456]).toEqual({
+        priority: 3,
+        is_client_allowed: null
+      })
+
+      const bare = { id: '789' }
+      store.mutations[PRODUCTION_SET_TASK_STATUS_LINK](state, {
+        production: bare,
+        taskStatusId: '1',
+        is_client_allowed: false
+      })
+      expect(bare.task_statuses_link).toEqual({ 1: { is_client_allowed: false } })
     })
 
     test('PRODUCTION_SET_TASK_TYPE_LINK keeps the other link fields', () => {

@@ -186,6 +186,7 @@
               <div v-if="isPreviews">
                 <preview-player
                   ref="preview-player"
+                  :can-comment="isCommentingAllowed"
                   :entity-preview-files="taskEntityPreviews"
                   :extra-wide="true"
                   :fps="currentFps"
@@ -415,22 +416,36 @@
         @confirm="confirmAddPreviewModal"
       />
 
-      <add-preview-modal
-        ref="add-extra-preview-modal"
-        :active="modals.addExtraPreview"
-        :is-loading="loading.addExtraPreview"
-        :is-error="errors.addExtraPreview"
-        :form-data="addExtraPreviewFormData"
-        message=""
-        :upload-progress="uploadProgress"
-        :title="
-          task
-            ? `${task.entity_name} / ${taskTypeMap.get(task.task_type_id)?.name || ''}`
-            : ''
-        "
-        @cancel="hideExtraPreviewModal"
-        @confirm="createExtraPreview"
-      />
+      <!-- The browser shows a player in full screen alone: the modals of its
+           "+" and trash buttons go into it. -->
+      <teleport :to="fullScreenPlayer" :disabled="!fullScreenPlayer">
+        <add-preview-modal
+          ref="add-extra-preview-modal"
+          :active="modals.addExtraPreview"
+          :is-loading="loading.addExtraPreview"
+          :is-error="errors.addExtraPreview"
+          :form-data="addExtraPreviewFormData"
+          message=""
+          :upload-progress="uploadProgress"
+          :title="
+            task
+              ? `${task.entity_name} / ${taskTypeMap.get(task.task_type_id)?.name || ''}`
+              : ''
+          "
+          @cancel="hideExtraPreviewModal"
+          @confirm="createExtraPreview"
+        />
+
+        <delete-modal
+          :active="modals.deleteExtraPreview"
+          :is-loading="loading.deleteExtraPreview"
+          :is-error="errors.deleteExtraPreview"
+          :text="$t('tasks.delete_preview')"
+          :error-text="$t('tasks.delete_preview_error')"
+          @cancel="hideRemoveExtraPreviewModal"
+          @confirm="confirmDeleteTaskPreview"
+        />
+      </teleport>
 
       <edit-comment-modal
         :active="modals.editComment"
@@ -455,16 +470,6 @@
         @confirm="confirmDeleteTaskComment"
         @cancel="onCancelDeleteComment"
       />
-
-      <delete-modal
-        :active="modals.deleteExtraPreview"
-        :is-loading="loading.deleteExtraPreview"
-        :is-error="errors.deleteExtraPreview"
-        :text="$t('tasks.delete_preview')"
-        :error-text="$t('tasks.delete_preview_error')"
-        @cancel="hideRemoveExtraPreviewModal"
-        @confirm="confirmDeleteTaskPreview"
-      />
     </div>
   </div>
 </template>
@@ -472,6 +477,7 @@
 <script setup>
 import {
   computed,
+  defineAsyncComponent,
   getCurrentInstance,
   nextTick,
   onBeforeUnmount,
@@ -495,7 +501,9 @@ import {
   ImageIcon
 } from 'lucide-vue-next'
 
-import { isClientThread } from '@/lib/comments'
+import { isListOfPageLoaded } from '@/composables/entity'
+import { useFullScreenTarget } from '@/composables/fullScreen'
+import { isCommentReplyable } from '@/lib/comments'
 import drafts from '@/lib/drafts'
 import { logRequestFailure } from '@/lib/errors'
 import func from '@/lib/func'
@@ -534,8 +542,11 @@ import Spinner from '@/components/widgets/Spinner.vue'
 import SubscribeButton from '@/components/widgets/SubscribeButton.vue'
 import TaskTypeName from '@/components/widgets/TaskTypeName.vue'
 import ValidationTag from '@/components/widgets/ValidationTag.vue'
-import ViewPlaylistModal from '@/components/modals/ViewPlaylistModal.vue'
 /* eslint-enable no-unused-vars */
+
+const ViewPlaylistModal = defineAsyncComponent(
+  () => import('@/components/modals/ViewPlaylistModal.vue')
+)
 
 defineOptions({
   name: 'task'
@@ -557,7 +568,8 @@ const taskComments = ref([])
 const taskPreviews = ref([])
 const commentToEdit = ref(null)
 const failedActionCommentId = ref(null)
-const selectedPreviewId = ref(null)
+// The revision of the URL shows from the first render, not after the latest.
+const selectedPreviewId = ref(route.params.preview_id || null)
 const previewForms = ref([])
 const currentFrame = ref(0)
 const isUseCurrentFrame = ref(false)
@@ -603,6 +615,7 @@ provide('draftComment', draftComment)
 
 const taskColumns = useTemplateRef('task-columns')
 const previewPlayerRef = useTemplateRef('preview-player')
+const fullScreenPlayer = useFullScreenTarget(() => previewPlayerRef.value?.$el)
 const addCommentRef = useTemplateRef('add-comment')
 const addPreviewModalRef = useTemplateRef('add-preview-modal')
 const addExtraPreviewModalRef = useTemplateRef('add-extra-preview-modal')
@@ -658,7 +671,20 @@ const entityListsByType = {
   Shot: () => shotsStore.cache.shots
 }
 
-const entityList = computed(() => entityListsByType[currentType.value]())
+// The page loads the list of its episode once the task shows, and a list load
+// replaces the cached array out of sight of Vue: the chevrons walk the list
+// once that load is over. The sequences and the episodes reload without the
+// tasks the chevrons read: their lists stay as they were.
+const entityList = computed(() => {
+  const type = currentType.value
+  if (
+    ['Asset', 'Edit', 'Shot'].includes(type) &&
+    !isListOfPageLoaded(store.getters, type)
+  ) {
+    return []
+  }
+  return entityListsByType[type]()
+})
 
 // Computed (task)
 // --------------------------------------------------------------------------
@@ -696,7 +722,8 @@ const currentFps = computed(() => {
   const entityFps = parseFloat(getTaskEntity(task.value)?.data?.fps)
   if (entityFps) return entityFps
   return (
-    parseInt(productionMap.value.get(task.value.project_id)?.fps) || DEFAULT_FPS
+    parseFloat(productionMap.value.get(task.value.project_id)?.fps) ||
+    DEFAULT_FPS
   )
 })
 
@@ -1073,8 +1100,12 @@ function taskPath(targetTask, section = 'task') {
 
     if (isTVShow.value && currentEpisode.value) {
       target.name = `episode-${section}`
+      // The episode of the URL, the one of the list the chevrons walk: a task
+      // the store reloads carries its own, for an asset its source episode.
       target.params.episode_id =
-        targetTask.episode_id || currentEpisode.value.id
+        route.params.episode_id ||
+        targetTask.episode_id ||
+        currentEpisode.value.id
     }
   }
   return target
@@ -1341,27 +1372,16 @@ const confirmDeleteTaskComment = () => {
     })
 }
 
-// The client is shown who answers the threads it sees: there, the production
-// managers answer for the studio, and the client once mentioned. The other
-// threads reach the client emptied of their text, so only the studio answers.
-const canReplyTo = comment => {
-  if (isCurrentUserManager.value) return true
-  const isAuthor = Boolean(user.value) && user.value.id === comment.person?.id
-  if (isCurrentUserClient.value) {
-    return (
-      isAuthor ||
-      (isClientThread(comment, teamRoles.value) &&
-        (isAssigned.value || isMentioned.value))
-    )
-  }
-  return (
-    !isClientThread(comment, teamRoles.value) &&
-    (isAuthor ||
-      isAssigned.value ||
-      isMentioned.value ||
-      isDepartmentSupervisor.value)
-  )
-}
+const canReplyTo = comment =>
+  isCommentReplyable(comment, {
+    user: user.value,
+    teamRoles: teamRoles.value,
+    isManager: isCurrentUserManager.value,
+    isClient: isCurrentUserClient.value,
+    isAssigned: isAssigned.value,
+    isMentioned: isMentioned.value,
+    isDepartmentSupervisor: isDepartmentSupervisor.value
+  })
 
 const isStatusChange = index => {
   const comments = taskComments.value
@@ -1682,14 +1702,9 @@ const onRemoteAcknowledge = (eventData, type) => {
   const comment = taskComments.value.find(c => c.id === eventData.comment_id)
   const person = personMap.value.get(eventData.person_id)
   if (!comment || !person) return
-  if (user.value?.id === person.id) {
-    if (
-      (type === 'ack' && !comment.acknowledgements.includes(person.id)) ||
-      (type === 'unack' && comment.acknowledgements.includes(person.id))
-    ) {
-      store.commit('ACK_COMMENT', { comment, user: person })
-    }
-  } else {
+  // The event may be applied already: by the user's own click, or by the
+  // panel the player holds for its full screen comments, which gets it too.
+  if ((type === 'ack') !== comment.acknowledgements.includes(person.id)) {
     store.commit('ACK_COMMENT', { comment, user: person })
   }
 }
@@ -1971,10 +1986,6 @@ video {
   margin-bottom: 0.3em;
   border-width: 2px;
   font-weight: bold;
-}
-
-.preview-row {
-  margin-bottom: 0.5em;
 }
 
 .add-comment {

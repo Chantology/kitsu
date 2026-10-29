@@ -1,4 +1,5 @@
 import { flushPromises, shallowMount } from '@vue/test-utils'
+import { ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { createStore } from 'vuex'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -16,14 +17,19 @@ vi.mock('vue-i18n', async importOriginal => ({
 import '@/lib/auth'
 
 import Task from '@/components/pages/Task.vue'
+import AddPreviewModal from '@/components/modals/AddPreviewModal.vue'
+import DeleteModal from '@/components/modals/DeleteModal.vue'
 import AddComment from '@/components/widgets/AddComment.vue'
+import ComboboxStyled from '@/components/widgets/ComboboxStyled.vue'
 import Comment from '@/components/widgets/Comment.vue'
 import PreviewPlayer from '@/components/players/players/PreviewPlayer.vue'
 import SubscribeButton from '@/components/widgets/SubscribeButton.vue'
 import drafts from '@/lib/drafts'
 import { DEFAULT_FPS } from '@/lib/video'
+import sequencesStore from '@/store/modules/sequences'
 import shotsStore from '@/store/modules/shots'
 
+import { resetFullScreen, setFullScreenElement } from '../fixtures/full-screen'
 import { recordUnhandledRejections } from '../fixtures/unhandled-rejections'
 
 // The ten events the page used to declare through the `socket` component
@@ -74,6 +80,8 @@ const mountPage = async ({
   previews = [],
   // Leave the task load hanging: the page then mounts with no task at all.
   pendingTaskLoad = false,
+  // The revision the URL names when the page opens.
+  previewId = null,
   stubs = {}
 } = {}) => {
   const dispatched = []
@@ -94,10 +102,27 @@ const mountPage = async ({
         path: '/productions/:production_id/:type/tasks/:task_id/previews/:preview_id',
         name: 'task-preview',
         component: { template: '<div />' }
+      },
+      {
+        path: '/productions/:production_id/episodes/:episode_id/:type/tasks/:task_id',
+        name: 'episode-task',
+        component: { template: '<div />' }
+      },
+      {
+        path: '/productions/:production_id/episodes/:episode_id/:type/tasks/:task_id/previews/:preview_id',
+        name: 'episode-task-preview',
+        component: { template: '<div />' }
       }
     ]
   })
-  await router.push({ name: 'task', params: TASK_ROUTE_PARAMS })
+  await router.push(
+    previewId
+      ? {
+          name: 'task-preview',
+          params: { ...TASK_ROUTE_PARAMS, preview_id: previewId }
+        }
+      : { name: 'task', params: TASK_ROUTE_PARAMS }
+  )
   await router.isReady()
 
   const store = createStore({
@@ -156,8 +181,12 @@ const mountPage = async ({
         // The default stub swallows its slot, which holds the page title.
         RouterLink: {
           props: ['to'],
-          template: '<a :data-task="to?.params?.task_id"><slot /></a>'
+          template:
+            '<a :data-task="to?.params?.task_id" :data-episode="to?.params?.episode_id"><slot /></a>'
         },
+        // The shallow stub drops the modals the player opens: they stay in
+        // the page, or go into the player in full screen.
+        teleport: false,
         // Provided by the animxyz plugin, which the specs do not install.
         XyzTransitionGroup: { template: '<div><slot /></div>' },
         ...stubs
@@ -384,6 +413,22 @@ describe('Task.vue', () => {
           own: true
         })
       })
+
+      it('answers the clients of its studio', async () => {
+        const { wrapper } = await mountPage({
+          comments: [
+            {
+              id: 'same-studio',
+              person: { id: 'client-2', role: 'client', studio_id: 'studio-1' }
+            }
+          ],
+          getterOverrides: {
+            isCurrentUserClient: () => true,
+            user: () => ({ id: 'user-1', departments: [], studio_id: 'studio-1' })
+          }
+        })
+        expect(replyable(wrapper)).toEqual({ 'same-studio': true })
+      })
     })
 
     it('lets a manager answer every thread', async () => {
@@ -450,6 +495,36 @@ describe('Task.vue preview selection', () => {
     await flushPromises()
   }
 
+  // Same as the chevrons: the episode of the task may not be the one of the
+  // page, the list the page walks.
+  it('keeps the episode of the URL when it switches revision', async () => {
+    const { wrapper, router } = await mountPage({
+      previews,
+      task: buildTask({ episode_id: 'episode-2' }),
+      getterOverrides: {
+        currentEpisode: () => ({ id: 'episode-1' }),
+        isTVShow: () => true
+      }
+    })
+    await router.push({
+      name: 'episode-task',
+      params: { ...TASK_ROUTE_PARAMS, episode_id: 'episode-1' }
+    })
+    await flushPromises()
+
+    wrapper
+      .findAllComponents(ComboboxStyled)
+      .find(combo => combo.classes().includes('preview-combo'))
+      .vm.$emit('update:modelValue', 'preview-2')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('episode-task-preview')
+    expect(router.currentRoute.value.params).toMatchObject({
+      episode_id: 'episode-1',
+      preview_id: 'preview-2'
+    })
+  })
+
   it('shows the latest preview when none is selected', async () => {
     const { wrapper } = await mountPage({ previews })
     expect(playerPreviews(wrapper)).toEqual(['from-3'])
@@ -458,6 +533,13 @@ describe('Task.vue preview selection', () => {
   it('shows the preview named by the route', async () => {
     const { wrapper, router } = await mountPage({ previews })
     await selectPreview(router, 'preview-2')
+    expect(playerPreviews(wrapper)).toEqual(['from-2'])
+  })
+
+  // The task panel opens the page on the revision it shows: no detour
+  // through the latest one.
+  it('shows the preview its URL names from the first render', async () => {
+    const { wrapper } = await mountPage({ previews, previewId: 'preview-2' })
     expect(playerPreviews(wrapper)).toEqual(['from-2'])
   })
 
@@ -600,6 +682,46 @@ describe('Task.vue comment events', () => {
 
       expect(rejections).toEqual([bug])
     })
+  })
+
+  // The panel the player holds for its full screen comments gets the same
+  // events as the page.
+  describe('comment:acknowledge', () => {
+    const TEAMMATE_ID = 'person-2'
+
+    it.each([
+      ['comment:acknowledge', [], [TEAMMATE_ID]],
+      ['comment:unacknowledge', [TEAMMATE_ID], []]
+    ])(
+      'applies a %s of a teammate once, however many panels get it',
+      async (event, acknowledgements, expected) => {
+        const acknowledged = { ...comment, acknowledgements }
+        const { socket, store } = await mountPage({
+          comments: [acknowledged],
+          getterOverrides: {
+            personMap: () => new Map([[TEAMMATE_ID, { id: TEAMMATE_ID }]])
+          }
+        })
+        // The toggle of the ACK_COMMENT mutation.
+        store.commit.mockImplementation((type, payload) => {
+          if (type === 'ACK_COMMENT') {
+            const { user } = payload
+            acknowledged.acknowledgements =
+              acknowledged.acknowledgements.includes(user.id)
+                ? acknowledged.acknowledgements.filter(id => id !== user.id)
+                : [...acknowledged.acknowledgements, user.id]
+          }
+        })
+        const [, handler] = socket.on.mock.calls.find(
+          ([name]) => name === event
+        )
+
+        handler({ comment_id: acknowledged.id, person_id: TEAMMATE_ID })
+        handler({ comment_id: acknowledged.id, person_id: TEAMMATE_ID })
+
+        expect(acknowledged.acknowledgements).toEqual(expected)
+      }
+    )
   })
 })
 
@@ -1065,11 +1187,16 @@ describe('Task.vue navigation', () => {
       .findAll('.header-title > div:not(.task-type) a')
       .map(link => link.attributes('data-task'))
 
-  const mountWith = ({ entities, production = {} } = {}) => {
+  const mountWith = ({
+    entities,
+    production = {},
+    currentTask = task,
+    getterOverrides = {}
+  } = {}) => {
     // entityList reads the module cache, not the store.
     shotsStore.cache.shots.push(...entities)
     return mountPage({
-      task,
+      task: currentTask,
       getterOverrides: {
         currentProduction: () => ({
           id: 'production-1',
@@ -1078,15 +1205,21 @@ describe('Task.vue navigation', () => {
           fps: 25,
           ...production
         }),
-        taskMap: () => new Map(tasks.map(item => [item.id, item])),
+        // The list of the page, loaded.
+        isShotsLoading: () => false,
+        shotsLoadingKey: () => 'production-1/',
+        taskMap: () =>
+          new Map([...tasks, currentTask].map(item => [item.id, item])),
         taskTypeMap: () =>
-          new Map(taskTypes.map(taskType => [taskType.id, taskType]))
+          new Map(taskTypes.map(taskType => [taskType.id, taskType])),
+        ...getterOverrides
       }
     })
   }
 
   afterEach(() => {
     shotsStore.cache.shots.length = 0
+    sequencesStore.cache.sequences.length = 0
   })
 
   describe('between the task types of an entity', () => {
@@ -1176,6 +1309,79 @@ describe('Task.vue navigation', () => {
       expect(entityLinks(wrapper)).toEqual([])
     })
   })
+
+  // The page loads the list of its episode once the task shows.
+  describe('list of the page', () => {
+    const entities = [
+      { id: 'entity-0', tasks: ['task-0-anim'] },
+      { id: 'entity-1', tasks: [TASK_ID] },
+      { id: 'entity-3', tasks: ['task-3-anim'] }
+    ]
+
+    it('offers no link while that list loads, then walks it', async () => {
+      const isLoading = ref(true)
+      const { wrapper } = await mountWith({
+        entities,
+        getterOverrides: { isShotsLoading: () => isLoading.value }
+      })
+      expect(entityLinks(wrapper)).toEqual([])
+
+      isLoading.value = false
+      await flushPromises()
+      expect(entityLinks(wrapper)).toEqual(['task-0-anim', 'task-3-anim'])
+    })
+
+    it('offers no link over the list of another episode', async () => {
+      const { wrapper } = await mountWith({
+        entities,
+        getterOverrides: {
+          currentEpisode: () => ({ id: 'episode-1' }),
+          isTVShow: () => true,
+          shotsLoadingKey: () => 'production-1/episode-3#partial'
+        }
+      })
+      expect(entityLinks(wrapper)).toEqual([])
+    })
+
+    // A task the store reloads (task:update) carries its own episode, for an
+    // asset its source, which may not be the episode of the page for an asset
+    // cast in from another one. Opened under it, a neighbor leaves the list.
+    it('opens a neighbor under the episode of the URL', async () => {
+      const { wrapper, router } = await mountWith({
+        entities,
+        currentTask: buildTask({ task_type_id: 'tt-anim', episode_id: 'episode-2' }),
+        getterOverrides: {
+          currentEpisode: () => ({ id: 'episode-1' }),
+          isTVShow: () => true,
+          shotsLoadingKey: () => 'production-1/episode-1'
+        }
+      })
+      await router.push({
+        name: 'episode-task',
+        params: { ...TASK_ROUTE_PARAMS, episode_id: 'episode-1' }
+      })
+      await flushPromises()
+      expect(
+        wrapper
+          .findAll('.header-title > div:not(.task-type) a')
+          .map(link => link.attributes('data-episode'))
+      ).toEqual(['episode-1', 'episode-1'])
+    })
+
+    // The page reloads them without the tasks the chevrons read.
+    it('keeps walking the sequences the store holds', async () => {
+      sequencesStore.cache.sequences.push(...entities)
+      const { wrapper } = await mountWith({
+        entities: [],
+        currentTask: buildTask({
+          task_type_id: 'tt-anim',
+          entity_type_name: 'Sequence'
+        }),
+        getterOverrides: { sequencesLoadingKey: () => 'production-1/#partial' }
+      })
+      expect(entityLinks(wrapper)).toEqual(['task-0-anim', 'task-3-anim'])
+    })
+  })
 })
 
 describe('Task.vue fps', () => {
@@ -1186,6 +1392,16 @@ describe('Task.vue fps', () => {
   it('uses the production fps by default', async () => {
     const { wrapper } = await mountPage({ previews })
     expect(playerFps(wrapper)).toBe(30)
+  })
+
+  it('keeps a fractional production fps', async () => {
+    const { wrapper } = await mountPage({
+      previews,
+      getterOverrides: {
+        productionMap: () => new Map([['production-1', { fps: '23.976' }]])
+      }
+    })
+    expect(playerFps(wrapper)).toBe(23.976)
   })
 
   it('lets the entity override the production fps', async () => {
@@ -1206,6 +1422,16 @@ describe('Task.vue fps', () => {
       getterOverrides: { productionMap: () => new Map([['production-1', {}]]) }
     })
     expect(playerFps(wrapper)).toBe(DEFAULT_FPS)
+  })
+
+  it('keeps the decimals of a production fps', async () => {
+    const { wrapper } = await mountPage({
+      previews,
+      getterOverrides: {
+        productionMap: () => new Map([['production-1', { fps: '29.97' }]])
+      }
+    })
+    expect(playerFps(wrapper)).toBe(29.97)
   })
 })
 
@@ -1237,6 +1463,18 @@ describe('Task.vue preview player permissions', () => {
       }
     })
     expect(isReadOnly(wrapper)).toBe(false)
+  })
+
+  // Annotating and commenting are two rights: the player shows its comments
+  // in full screen to whoever can comment here.
+  it.each([
+    ['a plain artist', false, {}],
+    ['an assigned artist', true, { task: buildTask({ assignees: ['user-1'] }) }]
+  ])('lets %s comment in the player: %s', async (_, canComment, options) => {
+    const { wrapper } = await mountPage({ previews, ...options })
+    expect(wrapper.findComponent(PreviewPlayer).props('canComment')).toBe(
+      canComment
+    )
   })
 
   it('is read only for a supervisor of another department', async () => {
@@ -1608,4 +1846,74 @@ describe('Task.vue annotation snapshots', () => {
 
     expect(errorHandler).not.toHaveBeenCalled()
   })
+})
+
+describe('Task.vue full screen', () => {
+  const previews = [
+    { id: 'preview-1', revision: 1, extension: 'png', previews: ['p-1'] }
+  ]
+
+  const mountWithModals = () =>
+    mountPage({
+      previews,
+      stubs: {
+        AddPreviewModal: {
+          props: ['active'],
+          template: '<div />',
+          methods: { reset: () => {} }
+        }
+      }
+    })
+
+  const openModal = async (wrapper, event, Modal) => {
+    wrapper.findComponent(PreviewPlayer).vm.$emit(event, { id: 'preview-1' })
+    await flushPromises()
+    return wrapper
+      .findAllComponents(Modal)
+      .find(modal => modal.props('active'))
+  }
+
+  afterEach(() => {
+    resetFullScreen()
+  })
+
+  // The browser shows the player alone: the modals of its "+" and trash
+  // buttons go into it, and come back to the page once it ends.
+  it.each([
+    ['add-extra-preview', AddPreviewModal],
+    ['remove-extra-preview', DeleteModal]
+  ])('opens the %s modal in the player', async (event, Modal) => {
+    const { wrapper } = await mountWithModals()
+    const player = wrapper.findComponent(PreviewPlayer).element
+    setFullScreenElement(player)
+
+    const modal = await openModal(wrapper, event, Modal)
+    expect(player.contains(modal.element)).toBe(true)
+
+    setFullScreenElement(null)
+    await flushPromises()
+    expect(player.contains(modal.element)).toBe(false)
+    expect(wrapper.element.contains(modal.element)).toBe(true)
+  })
+
+  // The modal plays the video picked for upload, which can go full screen
+  // on its own.
+  it.each([
+    ['in the page', false],
+    ['in the player in full screen', true]
+  ])(
+    'keeps the modal %s when its video goes full screen',
+    async (_, isPlayerFullScreen) => {
+      const { wrapper } = await mountWithModals()
+      const player = wrapper.findComponent(PreviewPlayer).element
+      if (isPlayerFullScreen) setFullScreenElement(player)
+      const modal = await openModal(wrapper, 'add-extra-preview', AddPreviewModal)
+      const parent = modal.element.parentNode
+
+      const video = document.createElement('video')
+      setFullScreenElement(modal.element.appendChild(video))
+      await flushPromises()
+      expect(modal.element.parentNode).toBe(parent)
+    }
+  )
 })

@@ -120,6 +120,15 @@ export default {
     return client.ppost(path, data)
   },
 
+  setTaskTypeClientVisibility(productionId, taskTypeId, isClientVisible) {
+    const data = {
+      task_type_id: taskTypeId,
+      is_client_visible: isClientVisible
+    }
+    const path = `/api/data/projects/${productionId}/settings/task-types`
+    return client.ppost(path, data)
+  },
+
   addSettingsToProduction(
     productionId,
     {
@@ -151,6 +160,12 @@ export default {
     const data = { task_status_id: taskStatusId }
     const path = `/api/data/projects/${productionId}/settings/task-status`
     return client.ppost(path, data)
+  },
+
+  setTaskStatusClientAllowed(productionId, taskStatusId, isClientAllowed) {
+    const data = { is_client_allowed: isClientAllowed }
+    const path = `/api/data/projects/${productionId}/settings/task-status/${taskStatusId}`
+    return client.pput(path, data)
   },
 
   removeTaskStatusFromProduction(productionId, taskStatusId) {
@@ -267,5 +282,23 @@ export default {
         field_order: fieldOrder
       }
     )
+  },
+
+  getPreviewAccount(productionId) {
+    return client.pget(`/api/data/projects/${productionId}/preview-account`)
+  },
+
+  createPreviewAccount(productionId) {
+    return client.ppost(`/api/data/projects/${productionId}/preview-account`)
+  },
+
+  setPreviewAccountOpen(productionId, isOpen) {
+    return client.pput(`/api/data/projects/${productionId}/preview-account`, {
+      is_open: isOpen
+    })
+  },
+
+  deletePreviewAccount(productionId) {
+    return client.pdel(`/api/data/projects/${productionId}/preview-account`)
   }
 }

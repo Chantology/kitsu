@@ -2,6 +2,7 @@
 
 import { vi } from 'vitest'
 import { computed, reactive } from 'vue'
+import { createStore } from 'vuex'
 
 // Importing the episodes module transitively pulls in the root store
 // (lib/models → timezone → @/store); stub it so no Vuex store is built.
@@ -606,5 +607,97 @@ describe('Episodes store, DELETE_TASK_END', () => {
     const episode = episodesStore.cache.episodeMap.get('ep-full')
     expect(episode.tasks).toEqual(['t2'])
     expect([...episode.validations]).toEqual([['tt2', 't2']])
+  })
+})
+
+describe('Episodes store, production switch', () => {
+  // The back link of an episode page carries this search: the lists of
+  // another production must not inherit it.
+  test('forgets the search typed in the previous production', () => {
+    const store = createStore({
+      modules: {
+        episodes: {
+          state: { episodeSearchText: 'E01' },
+          getters: episodesStore.getters,
+          mutations: episodesStore.mutations
+        }
+      }
+    })
+
+    store.commit('SET_CURRENT_PRODUCTION', 'production-2')
+
+    expect(store.getters.episodeSearchText).toBe('')
+  })
+})
+
+describe('Episodes store, retake stats', () => {
+  const production = { id: 'production-1' }
+  // The user holds `role` on the production of the stats. The route may
+  // show another production by the time the load runs.
+  const loadRetakeStats = (
+    commit,
+    { role, isAdmin = false, isRouteClient = role === 'client' }
+  ) =>
+    episodesStore.actions.loadEpisodeRetakeStats(
+      {
+        commit,
+        rootGetters: {
+          currentUserRoleForProduction: id =>
+            id === production.id ? role : null,
+          isCurrentUserAdmin: isAdmin,
+          isCurrentUserClient: isRouteClient
+        }
+      },
+      production.id
+    )
+
+  // Zou refuses the retake stats to clients since 1.0.97.
+  test('asks no retake stats for a client', async () => {
+    shotsApi.getEpisodeRetakeStats = vi.fn(() => Promise.resolve({}))
+    await loadRetakeStats(vi.fn(), { role: 'client' })
+    expect(shotsApi.getEpisodeRetakeStats).not.toHaveBeenCalled()
+  })
+
+  // The page loads the episodes and the status stats first.
+  test('asks no retake stats for a client once the route moved on', async () => {
+    shotsApi.getEpisodeRetakeStats = vi.fn(() => Promise.resolve({}))
+    await loadRetakeStats(vi.fn(), { role: 'client', isRouteClient: false })
+    expect(shotsApi.getEpisodeRetakeStats).not.toHaveBeenCalled()
+  })
+
+  test('loads the retake stats for the studio', async () => {
+    const episodeRetakeStats = { all: { all: {} } }
+    shotsApi.getEpisodeRetakeStats = vi.fn(() =>
+      Promise.resolve(episodeRetakeStats)
+    )
+    const commit = vi.fn()
+    await loadRetakeStats(commit, { role: 'manager' })
+    expect(shotsApi.getEpisodeRetakeStats).toHaveBeenCalledWith(production.id)
+    expect(commit).toHaveBeenLastCalledWith(
+      'SET_EPISODE_RETAKE_STATS',
+      expect.objectContaining({ episodeRetakeStats })
+    )
+  })
+
+  // Admin is a global-only role, as in Zou.
+  test('loads the retake stats for an admin, whatever its project role', async () => {
+    shotsApi.getEpisodeRetakeStats = vi.fn(() => Promise.resolve({}))
+    await loadRetakeStats(vi.fn(), {
+      role: 'client',
+      isAdmin: true,
+      isRouteClient: false
+    })
+    expect(shotsApi.getEpisodeRetakeStats).toHaveBeenCalledWith(production.id)
+  })
+
+  // Both stats count the same tasks: a retake load that is skipped or fails
+  // must not empty the table.
+  test('keeps the columns of the status stats', () => {
+    const state = { episodeValidationColumns: ['layout', 'anim'] }
+    episodesStore.mutations.SET_EPISODE_RETAKE_STATS(state, {
+      episodeRetakeStats: {}
+    })
+    expect(state.episodeValidationColumns).toEqual(['layout', 'anim'])
+    expect(state.episodeRetakeStats).toEqual({})
   })
 })

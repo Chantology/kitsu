@@ -90,6 +90,7 @@ const NAME_RGX =
 const SESSION_CHECK_TIMEOUT = 20000
 
 let userId = null
+let isPreviewAccount = false
 let isPageHidden = false
 const reportedRoutes = new Set()
 
@@ -155,6 +156,18 @@ const navigationFailureIntegration = {
   preprocessEvent(event, hint) {
     const kind = getNavigationFailureKind(hint.originalException)
     if (kind) nameNavigationFailure(event, hint.originalException, kind)
+  },
+  // Kitsu follows the redirects, and aborts and cancels are plain outcomes of
+  // the router: none crashes the session. The SDK only applies the handled
+  // false of the router capture after preprocessEvent.
+  processEvent(event, hint) {
+    if (getNavigationFailureKind(hint.originalException)) {
+      event.level = 'warning'
+      event.exception?.values?.forEach(({ mechanism }) => {
+        if (mechanism) mechanism.handled = true
+      })
+    }
+    return event
   }
 }
 
@@ -179,10 +192,11 @@ const getSessionOwner = async () => {
 }
 
 // One warning per kind of failure, route and session, whatever the ids,
-// dates and numbers in the path. The 2FA setup gate refuses everything on
-// purpose.
+// dates and numbers in the path. The 2FA setup gate and the read-only preview
+// accounts refuse requests on purpose.
 export const reportApiError = async (err, { method, path, duration }) => {
   if (err?.body?.two_factor_authentication_required) return
+  if (isPreviewAccount) return
   const kind = getFailureKind(err)
   const cleanPath = scrubSharedToken(path.split('?')[0])
   const route = getPathPattern(cleanPath)
@@ -192,8 +206,12 @@ export const reportApiError = async (err, { method, path, duration }) => {
   // Sentry records the breadcrumb of the request once the microtasks of its
   // response have run: capture in a later task to keep it.
   await new Promise(resolve => setTimeout(resolve))
-  // Leaving the page cuts the requests still running.
-  if (kind === 'no response' && isPageHidden) return
+  // Leaving the page cuts the requests still running. The route stays free
+  // for a failure once the page is back from the back-forward cache.
+  if (kind === 'no response' && isPageHidden) {
+    reportedRoutes.delete(key)
+    return
+  }
   const identity =
     err.status === 403 && isOwnData(path) ? await getSessionOwner() : null
   Sentry.captureMessage(`API ${kind} on ${method} ${route}`, {
@@ -265,6 +283,7 @@ export default {
 
   setContext(organisation, user) {
     userId = user.id
+    isPreviewAccount = Boolean(user.preview_project_id)
     Sentry.setTag('kitsu.org', organisation.name)
     Sentry.setTag('kitsu.role', user.role)
     Sentry.setUser({
