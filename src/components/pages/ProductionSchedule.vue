@@ -1969,9 +1969,9 @@ const syncOwnerToSegments = async owner => {
 
 // Rows are replaced rather than edited in place: the intermediate states of
 // a partial rewrite would trip the backend's overlap check.
-const rewriteSegments = async (owner, desired) => {
+const rewriteSegments = async (owner, desired, existing = owner.segments) => {
   await Promise.all(
-    (owner.segments || []).map(segment =>
+    (existing || []).map(segment =>
       store.dispatch('deleteScheduleSegment', segment)
     )
   )
@@ -2128,27 +2128,42 @@ const saveMovedElement = async element => {
   await (element.type === 'Task'
     ? saveChangedItem(element)
     : updateScheduleItem(element))
-  await saveCarriedPieces(element)
+  await saveDraggedPieces(element)
 }
 
-// A carried bar brings its pieces along, all shifted by the same days: they
-// only need saving, not the merge and the parent fit a piece dragged on its
-// own gets.
-const saveCarriedPieces = element => {
-  const stamped = (element.segments ?? []).filter(
-    piece => piece._dragOrigStartDate
-  )
-  const moved = stamped.filter(
-    piece => !piece.startDate.isSame(piece._dragOrigStartDate)
-  )
-  stamped.forEach(clearDragOrigin)
-  return Promise.all(
-    moved.map(piece => {
-      piece.start_date = piece.startDate.format('YYYY-MM-DD')
-      piece.end_date = piece.endDate.format('YYYY-MM-DD')
-      return store.dispatch('updateScheduleSegment', piece)
-    })
-  )
+// A dragged bar brings its pieces with it. Carried, they all moved by the
+// same days and only need saving. Trimmed, the set itself changed - pieces
+// pushed together merge, pieces the window no longer has room for go - so
+// it is rewritten against the set the drag started from.
+const saveDraggedPieces = async element => {
+  const pieces = element.segments ?? []
+  const originals =
+    element._dragOrigSegments ??
+    pieces.filter(piece => piece._dragOrigStartDate)
+  delete element._dragOrigSegments
+  if (!originals.length) return
+
+  if (pieces.length === originals.length) {
+    const moved = pieces.filter(
+      piece => !piece.startDate.isSame(piece._dragOrigStartDate)
+    )
+    originals.forEach(clearDragOrigin)
+    await Promise.all(
+      moved.map(piece => {
+        piece.start_date = piece.startDate.format('YYYY-MM-DD')
+        piece.end_date = piece.endDate.format('YYYY-MM-DD')
+        return store.dispatch('updateScheduleSegment', piece)
+      })
+    )
+    return
+  }
+
+  const desired = pieces.map(piece => ({
+    start_date: piece.startDate.format('YYYY-MM-DD'),
+    end_date: piece.endDate.format('YYYY-MM-DD')
+  }))
+  originals.forEach(clearDragOrigin)
+  await rewriteSegments(element, desired, originals)
 }
 
 // a thousand tasks at once would flood the browser's connection pool

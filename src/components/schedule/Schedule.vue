@@ -1752,11 +1752,79 @@ const stampSubItems = item => {
 // A cut bar is drawn as its pieces, so carrying the bar has to carry them:
 // a bar whose own dates moved while its pieces stayed behind renders where
 // it was and contradicts its own dates after a reload.
-const stampPieces = item =>
-  item.segments?.forEach(piece => {
+const stampPieces = item => {
+  if (!item.segments?.length) return
+  item._dragOrigSegments = [...item.segments]
+  item.segments.forEach(piece => {
     piece._dragOrigStartDate = piece.startDate.clone()
     piece._dragOrigEndDate = piece.endDate.clone()
   })
+}
+
+// A trim leaves a row fewer days than it had. Its slack goes first: each
+// piece is pushed into the new window keeping its length, eating the gap in
+// front of it, and only once the gaps are spent is work cut. A move can
+// always absorb itself this way, so it never destroys work; only resizing a
+// bar below what is under it does.
+const fitPiecesIntoWindow = (item, newStart, newEnd) => {
+  if (!item._dragOrigSegments?.length) return
+
+  const pieces = item._dragOrigSegments.map(piece => ({
+    piece,
+    start: piece._dragOrigStartDate.clone(),
+    end: piece._dragOrigEndDate.clone()
+  }))
+
+  let limit = newStart.clone()
+  pieces.forEach(entry => {
+    if (entry.start.isBefore(limit)) {
+      const shift = limit.diff(entry.start, 'days')
+      entry.start.add(shift, 'days')
+      entry.end.add(shift, 'days')
+    }
+    limit = entry.end.clone().add(1, 'days')
+  })
+
+  limit = newEnd.clone()
+  ;[...pieces].reverse().forEach(entry => {
+    if (entry.end.isAfter(limit)) {
+      const shift = entry.end.diff(limit, 'days')
+      entry.start.subtract(shift, 'days')
+      entry.end.subtract(shift, 'days')
+    }
+    limit = entry.start.clone().subtract(1, 'days')
+  })
+
+  const kept = pieces.filter(entry => {
+    entry.start = moment.max(entry.start, newStart).clone()
+    entry.end = moment.min(entry.end, newEnd).clone()
+    return !entry.end.isBefore(entry.start)
+  })
+
+  // a gap squeezed to nothing leaves two pieces touching: that is one piece
+  const merged = kept.reduce((acc, entry) => {
+    const previous = acc[acc.length - 1]
+    if (
+      previous &&
+      entry.start.isSameOrBefore(previous.end.clone().add(1, 'days'))
+    ) {
+      previous.end = moment.max(previous.end, entry.end).clone()
+      return acc
+    }
+    acc.push(entry)
+    return acc
+  }, [])
+
+  merged.forEach(entry => {
+    entry.piece.startDate = entry.start.clone()
+    entry.piece.endDate = entry.end.clone()
+  })
+  if (merged.length) {
+    item.startDate = merged[0].start.clone()
+    item.endDate = merged[merged.length - 1].end.clone()
+  }
+  item.segments = merged.length > 1 ? merged.map(entry => entry.piece) : []
+}
 
 const shiftPieces = (item, shift) =>
   item.segments?.forEach(piece => {
@@ -1813,6 +1881,8 @@ const propagateClipToChildren = item => {
       child.endDate = newEnd.clone()
     }
     // else: child fully inside new bounds — already restored, leave untouched
+
+    fitPiecesIntoWindow(child, newStart, newEnd)
   })
   if (props.multiline) refreshItemPositionsDuringDrag([item])
 }

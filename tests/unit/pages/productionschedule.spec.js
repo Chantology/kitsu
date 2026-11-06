@@ -2989,6 +2989,62 @@ describe('ProductionSchedule page', () => {
       return task
     }
 
+    // A trim pushes the pieces into the bar's new window, spending the gaps
+    // first, so the row can come back with fewer pieces than it had: the
+    // ones it lost have to go from the database too.
+    it('rewrites the pieces a trimmed row came back with', async () => {
+      const { storeActions, wrapper } = await mountPage({
+        actions: segmentActions()
+      })
+      const taskTypeBar = rowsOf(wrapper)[0]
+      const row = {
+        id: 'row-1',
+        start_date: '2026-02-09',
+        end_date: '2026-02-20',
+        startDate: day('2026-02-16'),
+        endDate: day('2026-02-20'),
+        _dragOrigStartDate: day('2026-02-09'),
+        _dragOrigEndDate: day('2026-02-20'),
+        parentElement: taskTypeBar
+      }
+      const dropped = {
+        id: 'segment-1',
+        start_date: '2026-02-09',
+        end_date: '2026-02-11',
+        startDate: day('2026-02-09'),
+        endDate: day('2026-02-11'),
+        _dragOrigStartDate: day('2026-02-09'),
+        _dragOrigEndDate: day('2026-02-11'),
+        owner: row
+      }
+      const kept = {
+        id: 'segment-2',
+        start_date: '2026-02-16',
+        end_date: '2026-02-20',
+        startDate: day('2026-02-16'),
+        endDate: day('2026-02-20'),
+        _dragOrigStartDate: day('2026-02-16'),
+        _dragOrigEndDate: day('2026-02-20'),
+        owner: row
+      }
+      // what the widget left behind: both pieces stamped, one survived
+      row._dragOrigSegments = [dropped, kept]
+      row.segments = [kept]
+      taskTypeBar.children = [row]
+
+      await changeItem(wrapper, taskTypeBar)
+      wrapper.findComponent(ConfirmModal).vm.$emit('confirm')
+      await flushPromises()
+
+      expect(storeActions.deleteScheduleSegment).toHaveBeenCalledTimes(2)
+      expect(payloadsOf(storeActions.createScheduleSegment)).toEqual([
+        expect.objectContaining({
+          start_date: '2026-02-16',
+          end_date: '2026-02-20'
+        })
+      ])
+    })
+
     it('saves the pieces a carried cut task brought along', async () => {
       const { storeActions, wrapper } = await mountPage({
         actions: segmentActions()
