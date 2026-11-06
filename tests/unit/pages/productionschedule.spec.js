@@ -2959,6 +2959,63 @@ describe('ProductionSchedule page', () => {
       await flushPromises()
     }
 
+    // A bar moved without shift carries its rows and tasks along, pieces
+    // included. The pieces are what the row draws, so leaving them at their
+    // old dates in the database puts the row back where it was on reload.
+    const buildCarriedCutTask = parentElement => {
+      const task = {
+        type: 'Task',
+        id: 'task-1',
+        assignees: ['person-1'],
+        estimation: 2 * 8 * 60,
+        startDate: day('2026-02-19'),
+        endDate: day('2026-02-21'),
+        _dragOrigStartDate: day('2026-02-09'),
+        _dragOrigEndDate: day('2026-02-11'),
+        parentElement
+      }
+      task.segments = [
+        {
+          id: 'segment-1',
+          start_date: '2026-02-09',
+          end_date: '2026-02-10',
+          startDate: day('2026-02-19'),
+          endDate: day('2026-02-20'),
+          _dragOrigStartDate: day('2026-02-09'),
+          _dragOrigEndDate: day('2026-02-10'),
+          owner: task
+        }
+      ]
+      return task
+    }
+
+    it('saves the pieces a carried cut task brought along', async () => {
+      const { storeActions, wrapper } = await mountPage({
+        actions: segmentActions()
+      })
+      const taskTypeBar = rowsOf(wrapper)[0]
+      const movedBar = {
+        start_date: '2026-03-01',
+        end_date: '2026-03-02',
+        startDate: day('2026-02-11'),
+        endDate: day('2026-02-20'),
+        parentElement: taskTypeBar
+      }
+      taskTypeBar.children = [movedBar]
+      const task = buildCarriedCutTask(movedBar)
+      movedBar.children = new Map([['person-1', [task]]])
+
+      await changeItem(wrapper, movedBar)
+      wrapper.findComponent(ConfirmModal).vm.$emit('confirm')
+      await flushPromises()
+
+      expect(payloadsOf(storeActions.updateScheduleSegment)).toHaveLength(1)
+      expect(payloadsOf(storeActions.updateScheduleSegment)[0]).toMatchObject({
+        start_date: '2026-02-19',
+        end_date: '2026-02-20'
+      })
+    })
+
     it('saves the task dates a cut trimmed off its end', async () => {
       const { storeActions, wrapper } = await mountPage({
         actions: segmentActions()

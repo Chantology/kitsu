@@ -1744,9 +1744,27 @@ const stampSubItems = item => {
     if (!child.startDate || !child.endDate) return
     child._dragOrigStartDate = child.startDate.clone()
     child._dragOrigEndDate = child.endDate.clone()
+    stampPieces(child)
     stampSubItems(child)
   })
 }
+
+// A cut bar is drawn as its pieces, so carrying the bar has to carry them:
+// a bar whose own dates moved while its pieces stayed behind renders where
+// it was and contradicts its own dates after a reload.
+const stampPieces = item =>
+  item.segments?.forEach(piece => {
+    piece._dragOrigStartDate = piece.startDate.clone()
+    piece._dragOrigEndDate = piece.endDate.clone()
+  })
+
+const shiftPieces = (item, shift) =>
+  item.segments?.forEach(piece => {
+    if (piece._dragOrigStartDate) {
+      piece.startDate = piece._dragOrigStartDate.clone().add(shift, 'days')
+      piece.endDate = piece._dragOrigEndDate.clone().add(shift, 'days')
+    }
+  })
 
 // Moved without shift: everything under the bar moves by the same whole days,
 // recomputed from the stamped origin so a back-drag never drifts (a
@@ -1756,6 +1774,7 @@ const shiftSubItems = (item, shift) => {
     if (!child._dragOrigStartDate) return
     child.startDate = child._dragOrigStartDate.clone().add(shift, 'days')
     child.endDate = child._dragOrigEndDate.clone().add(shift, 'days')
+    shiftPieces(child, shift)
     shiftSubItems(child, shift)
   })
 }

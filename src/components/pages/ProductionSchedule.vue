@@ -2124,10 +2124,32 @@ const saveSegmentChanged = async segment => {
   await saveOwnerSpan(owner)
 }
 
-const saveMovedElement = element =>
-  element.type === 'Task'
+const saveMovedElement = async element => {
+  await (element.type === 'Task'
     ? saveChangedItem(element)
-    : updateScheduleItem(element)
+    : updateScheduleItem(element))
+  await saveCarriedPieces(element)
+}
+
+// A carried bar brings its pieces along, all shifted by the same days: they
+// only need saving, not the merge and the parent fit a piece dragged on its
+// own gets.
+const saveCarriedPieces = element => {
+  const stamped = (element.segments ?? []).filter(
+    piece => piece._dragOrigStartDate
+  )
+  const moved = stamped.filter(
+    piece => !piece.startDate.isSame(piece._dragOrigStartDate)
+  )
+  stamped.forEach(clearDragOrigin)
+  return Promise.all(
+    moved.map(piece => {
+      piece.start_date = piece.startDate.format('YYYY-MM-DD')
+      piece.end_date = piece.endDate.format('YYYY-MM-DD')
+      return store.dispatch('updateScheduleSegment', piece)
+    })
+  )
+}
 
 // a thousand tasks at once would flood the browser's connection pool
 const SAVE_BATCH_SIZE = 10
