@@ -148,6 +148,11 @@ None of these are regressions; they are things not built yet.
   cuts are not part of that.
 - **No load or capacity indicators.** Out of scope by design.
 
+Things found along the way that turned out to belong to the schedule in
+general rather than to cut bars are listed in
+`notes/schedule-followups-outside-the-cut-tool.md` and deliberately left out of
+this branch.
+
 ## Reporting back
 
 The most useful thing in a report is *what you did*, not just what you saw —
