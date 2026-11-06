@@ -9,6 +9,7 @@ import assetTypeStore from '@/store/modules/assettypes'
 import ValidationCell from '@/components/cells/ValidationCell.vue'
 import ValidationHeader from '@/components/cells/ValidationHeader.vue'
 import AssetList from '@/components/lists/AssetList.vue'
+import AssetListNumbers from '@/components/widgets/AssetListNumbers.vue'
 import TableHeaderMenu from '@/components/widgets/TableHeaderMenu.vue'
 
 import {
@@ -22,6 +23,9 @@ import {
   stubResizeObserver,
   taskTypeId
 } from '../../fixtures/entity-list'
+
+const getAssetTypeWorkflow = assetTypeId =>
+  assetTypeStore.cache.assetTypeMap.get(assetTypeId)?.task_types || []
 
 const modelingId = 'task-type-modeling'
 const riggingId = 'task-type-rigging'
@@ -52,6 +56,7 @@ const selectableCells = async asset => {
     getters: {
       currentProduction: production,
       displayedAssetsCount: 2,
+      getAssetTypeWorkflow,
       productionAssetTaskTypes: [{ id: modelingId }, { id: riggingId }],
       taskMap: new Map([['task-1', { id: 'task-1' }]]),
       taskTypeMap: new Map([
@@ -65,12 +70,13 @@ const selectableCells = async asset => {
       displayedAssets: [[asset], [character]]
     }
   })
-  const [modeling, rigging] = wrapper
-    .findAll('tbody validation-cell-stub')
-    .slice(0, 2)
-    .map(cell => cell.attributes('selectable') === 'true')
+  const cells = wrapper.findAll('tbody validation-cell-stub').slice(0, 2)
+  const [modeling, rigging] = cells.map(
+    cell => cell.attributes('selectable') === 'true'
+  )
+  const hidden = cells[0].attributes('hidetask') === 'true'
   wrapper.unmount()
-  return { modeling, rigging }
+  return { modeling, rigging, hidden }
 }
 
 describe('lists/AssetList', () => {
@@ -91,9 +97,11 @@ describe('lists/AssetList', () => {
       assetTypeStore.cache.assetTypeMap.delete(charactersTypeId)
     })
 
-    test('cell with an existing task stays selectable when its task type left the workflow', async () => {
+    test('cell with an existing task is masked when its task type left the workflow', async () => {
       const asset = buildAsset(new Map([[modelingId, 'task-1']]))
-      expect((await selectableCells(asset)).modeling).toBe(true)
+      const { modeling, hidden } = await selectableCells(asset)
+      expect(modeling).toBe(false)
+      expect(hidden).toBe(true)
     })
 
     test('empty cell outside the workflow is not selectable', async () => {
@@ -129,6 +137,7 @@ describe('lists/AssetList', () => {
         getters: {
           currentProduction: production,
           displayedAssetsCount: 1,
+          getAssetTypeWorkflow,
           productionAssetTaskTypes: [{ id: riggingId }],
           taskMap: new Map(),
           taskTypeMap: new Map([
@@ -206,6 +215,7 @@ describe('lists/AssetList task selection', () => {
         currentProduction: production,
         displayedAssetsCount: listedAssets.length,
         isTVShow: true,
+        getAssetTypeWorkflow,
         productionAssetTaskTypes: [layout, color],
         taskMap: new Map(
           listedAssets.flatMap(asset =>
@@ -409,6 +419,7 @@ describe('lists/AssetList sticky columns', () => {
         assetMetadataDescriptors: [descriptor],
         currentProduction: production,
         displayedAssetsCount: 1,
+        getAssetTypeWorkflow,
         productionAssetTaskTypes: [{ id: taskTypeId }]
       },
       props: {
@@ -471,6 +482,68 @@ describe('lists/AssetList sticky columns', () => {
 
     expect(stickyLeft(wrapper, 'validation-header-stub')).toBe('290px')
 
+    wrapper.unmount()
+  })
+})
+
+// The store changes the result in place, in the cache, out of the reactive
+// state: the rows and the count are what tell the footer.
+describe('lists/AssetList footer', () => {
+  const mountFooter = async assets => {
+    assetStore.cache.result = assets
+    const getters = reactive({
+      currentProduction: production,
+      displayedAssetsCount: assets.length,
+      getAssetTypeWorkflow,
+      organisation: { hours_by_day: 8 }
+    })
+    const wrapper = await mountEntityList(AssetList, {
+      getters,
+      props: { displayedAssets: [assets] },
+      stubs: { AssetListNumbers: false }
+    })
+    return { footer: wrapper.findComponent(AssetListNumbers), getters, wrapper }
+  }
+
+  afterEach(() => {
+    assetStore.cache.result = []
+  })
+
+  test('counts an asset added to the list', async () => {
+    const asset = buildAsset(new Map())
+    const { footer, wrapper } = await mountFooter([asset])
+    expect(footer.text()).toMatch(/^1 /)
+
+    assetStore.cache.result.push(character)
+    await wrapper.setProps({ displayedAssets: [[asset], [character]] })
+
+    expect(footer.text()).toMatch(/^2 /)
+    wrapper.unmount()
+  })
+
+  test('counts an asset left out of the displayed rows', async () => {
+    const asset = buildAsset(new Map())
+    const { footer, getters, wrapper } = await mountFooter([asset])
+    expect(footer.text()).toMatch(/^1 /)
+
+    assetStore.cache.result.push(character)
+    getters.displayedAssetsCount = 2
+    await flushPromises()
+
+    expect(wrapper.findComponent(AssetListNumbers).text()).toMatch(/^2 /)
+    wrapper.unmount()
+  })
+
+  test('stops counting an asset once canceled', async () => {
+    const asset = buildAsset(new Map())
+    const assets = [asset, { ...character }]
+    const { footer, wrapper } = await mountFooter(assets)
+    expect(footer.text()).toMatch(/^2 /)
+
+    assets[1].canceled = true
+    await wrapper.setProps({ displayedAssets: [[...assets]] })
+
+    expect(footer.text()).toMatch(/^1 /)
     wrapper.unmount()
   })
 })

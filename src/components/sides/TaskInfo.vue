@@ -1417,14 +1417,21 @@ const onFrameUpdated = frame => {
 
 const extractAnnotationSnapshots = async (withLabel = false) => {
   const previewPlayer = previewPlayerRef.value || props.player
-  addCommentRef.value.showAnnotationLoading(withLabel ? 'label' : 'standard')
-  const files = await previewPlayer.extractAnnotationSnapshots({
-    withLabel
-  })
-  // The panel may have closed during the extraction.
-  addCommentRef.value?.hideAnnotationLoading()
-  addCommentRef.value?.setAnnotationSnapshots(files)
-  return files
+  // The attachment dialog stops the snapshots when it closes.
+  const signal = addCommentRef.value.showAnnotationLoading(
+    withLabel ? 'label' : 'standard'
+  )
+  try {
+    const files = await previewPlayer.extractAnnotationSnapshots({
+      withLabel,
+      signal
+    })
+    // The panel may have closed during the extraction.
+    addCommentRef.value?.setAnnotationSnapshots(files)
+    return files
+  } finally {
+    addCommentRef.value?.hideAnnotationLoading()
+  }
 }
 
 const onExportClick = () => {
@@ -1700,7 +1707,12 @@ const onRemoteAnnotationUpdate = eventData => {
         taskId: previewPlayer.currentPreview.task_id
       })
       .then(() => {
-        if (!previewPlayer.notSaved) {
+        // Asked again: a text may be typed, or a batch sent, by now.
+        const isStillValid = previewPlayer.isValidPreviewModification(
+          eventData.preview_file_id,
+          eventData.updated_at
+        )
+        if (isStillValid) {
           taskPreviews.value = store.getters.getTaskPreviews(props.task.id)
           // Wait for the refreshed previews prop to propagate to the
           // player before reloading — otherwise reloadAnnotations

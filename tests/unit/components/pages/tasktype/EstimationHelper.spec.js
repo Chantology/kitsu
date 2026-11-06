@@ -40,7 +40,7 @@ const mountHelper = isDurationInHours => {
   })
   return shallowMount(EstimationHelper, {
     props: { entityType: 'Asset', tasks: [task] },
-    global: { plugins: [store], mocks: { $t: key => key } }
+    global: { plugins: [store] }
   })
 }
 
@@ -77,6 +77,34 @@ describe('EstimationHelper', () => {
     expect(wrapper.emitted('estimation-changed')).toBeUndefined()
     // the day stored comes back
     expect(input.element.value).toBe('1')
+    wrapper.unmount()
+  })
+
+  // The cell canceled the key, so the browser did not commit the typed
+  // estimation, and selected its line again, drawn with the stored one.
+  it('keeps the estimation typed when Enter is pressed in the field', async () => {
+    const wrapper = mountHelper(false)
+    await wrapper.find('td.estimation').trigger('click')
+    const input = wrapper.find('td.estimation input')
+    input.element.value = '2'
+    let keydown
+    wrapper.element.addEventListener('keydown', event => (keydown = event), {
+      capture: true
+    })
+
+    await input.trigger('keydown', { key: 'Enter' })
+
+    expect(keydown.defaultPrevented).toBe(false)
+    expect(input.element.value).toBe('2')
+    wrapper.unmount()
+  })
+
+  it('selects its line on Enter in the cell', async () => {
+    const wrapper = mountHelper(false)
+
+    await wrapper.find('td.estimation').trigger('keydown', { key: 'Enter' })
+
+    expect(wrapper.find('tr.task-line').classes()).toContain('selected')
     wrapper.unmount()
   })
 })

@@ -23,6 +23,7 @@ vi.mock('wavesurfer.js', () => ({ default: waveSurfer }))
 import '@/lib/auth'
 import { useModal } from '@/composables/modal'
 import clipboard from '@/lib/clipboard'
+import playlistStore from '@/store/modules/playlists'
 
 import PlaylistPlayer from '@/components/players/players/PlaylistPlayer.vue'
 
@@ -66,6 +67,13 @@ const withMethods = (names, values = {}) => ({
   }
 })
 
+// The task type button lives in the extra-controls slot of the bar, which
+// the default stub does not render.
+const PlaybackBarWithSlot = {
+  name: 'PlayerPlaybackBar',
+  template: '<div><slot name="extra-controls" /></div>'
+}
+
 // Without previewFileStatusMap, the store keeps no preview status.
 const mountPlayer = ({
   playlistProp = playlist,
@@ -75,6 +83,7 @@ const mountPlayer = ({
   isClient = false,
   organisation = {},
   props = {},
+  previewFileMap = new Map(),
   previewFileStatusMap,
   shotMap = new Map(),
   taskMap = new Map(),
@@ -96,7 +105,7 @@ const mountPlayer = ({
       isCurrentUserSupervisor: () => false,
       organisation: () => organisation,
       personMap: () => new Map(),
-      previewFileMap: () => new Map(),
+      previewFileMap: () => previewFileMap,
       previewFileStatusMap: () => previewFileStatusMap,
       productionAssetTaskTypes: () => [],
       productionBackgrounds: () => [],
@@ -144,6 +153,7 @@ const mountPlayer = ({
               'setVolume'
             ],
             {
+              getCurrentFrame: () => 0,
               getCurrentTime: () => 0,
               getCurrentTimeRaw: () => 0,
               getNaturalDimensions: () => ({ width: 1920, height: 1080 }),
@@ -243,6 +253,17 @@ describe('PlaylistPlayer.vue', () => {
       vi.useRealTimers()
     })
 
+    // The next file of the shot, then the next shot
+    const nextShot = async () => {
+      wrapper
+        .findAllComponents({ name: 'ButtonSimple' })
+        .find(
+          button => button.attributes('title') === 'playlists.actions.next_shot'
+        )
+        .vm.$emit('click')
+      await flushPromises()
+    }
+
     it.each([
       [
         'video',
@@ -304,6 +325,327 @@ describe('PlaylistPlayer.vue', () => {
         await expect(snapshots).resolves.toEqual([])
       }
     )
+
+    // Its snapshots would land in the closed dialog.
+    it('stops the video snapshots once the attachment dialog closes', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      // jsdom draws and encodes nothing
+      const snapshotCanvas = document.createElement('canvas')
+      snapshotCanvas.toBlob = callback => callback(new Blob())
+      vi.spyOn(document, 'getElementById').mockReturnValue(snapshotCanvas)
+      vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+        clearRect: () => {},
+        drawImage: () => {}
+      })
+      wrapper = mountPlayer({
+        entities: [
+          {
+            ...entity,
+            preview_file_extension: 'mp4',
+            preview_file_annotations: [1, 2].map(time => ({
+              time,
+              drawing: { objects: [] }
+            }))
+          }
+        ]
+      })
+      await flushPromises()
+      const controller = new AbortController()
+
+      const snapshots = wrapper.vm.extractAnnotationSnapshots({
+        signal: controller.signal
+      })
+      await vi.advanceTimersByTimeAsync(550)
+      controller.abort()
+      await vi.advanceTimersByTimeAsync(1500)
+
+      await expect(snapshots).resolves.toEqual([])
+    })
+
+    // The keyboard still moves the player under the attachment dialog.
+    it('stops the video snapshots once the player moves to another shot', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      // jsdom draws and encodes nothing
+      const snapshotCanvas = document.createElement('canvas')
+      snapshotCanvas.toBlob = callback => callback(new Blob())
+      vi.spyOn(document, 'getElementById').mockReturnValue(snapshotCanvas)
+      vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+        clearRect: () => {},
+        drawImage: () => {}
+      })
+      const annotations = [1, 2].map(time => ({
+        time,
+        drawing: { objects: [] }
+      }))
+      const movie = id => ({
+        ...entity,
+        id,
+        preview_file_id: `${id}-movie`,
+        preview_file_extension: 'mp4',
+        preview_file_annotations: annotations
+      })
+      wrapper = mountPlayer({ entities: [movie('shot-1'), movie('shot-2')] })
+      await flushPromises()
+
+      const snapshots = wrapper.vm.extractAnnotationSnapshots()
+      await vi.advanceTimersByTimeAsync(550)
+      await nextShot()
+      await vi.advanceTimersByTimeAsync(1500)
+
+      expect(wrapper.vm.playingEntityIndex).toBe(1)
+      await expect(snapshots).resolves.toEqual([])
+    })
+
+    // A picture loads once shown, and the next one of a revision can take
+    // longer than the snapshot of the previous one: a picture still loading
+    // makes a snapshot without the picture, or a 0x0 one that drawImage
+    // refuses, even once its size is known.
+    describe('of a revision with several pictures', () => {
+      let loaded = null
+      let snapshotCanvas = null
+      let unavailable = null
+
+      const mountRevision = async (otherShots = []) => {
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+        // jsdom encodes nothing
+        snapshotCanvas = document.createElement('canvas')
+        snapshotCanvas.toBlob = callback => callback(new Blob())
+        vi.spyOn(document, 'getElementById').mockReturnValue(snapshotCanvas)
+        loaded = new Set(['preview-1'])
+        unavailable = new Set()
+        wrapper = mountPlayer({
+          entities: [
+            {
+              ...entity,
+              preview_file_extension: 'png',
+              preview_file_revision: 1,
+              preview_file_previews: [
+                { id: 'preview-1b', extension: 'png', revision: 1 }
+              ]
+            },
+            ...otherShots
+          ],
+          stubs: {
+            // Its picture has a size before the whole file is in.
+            MultiPictureViewer: {
+              ...withMethods(['resetPanZoom', 'resumePanZoom', 'setPanZoom'], {
+                getNaturalDimensions: () => ({ width: 1920, height: 1080 }),
+                getPictureElement: () => null
+              }),
+              props: {
+                currentPreview: { type: Object, default: null },
+                previews: { type: Array, default: () => [] }
+              },
+              setup: props => ({
+                isPictureReady: () => loaded.has(props.currentPreview?.id),
+                isPictureUnavailable: () =>
+                  unavailable.has(props.currentPreview?.id)
+              })
+            }
+          }
+        })
+        await flushPromises()
+      }
+
+      it('waits for the next picture to load', async () => {
+        await mountRevision()
+        let isDone = false
+
+        const snapshots = wrapper.vm.extractAnnotationSnapshots()
+        const done = (async () => {
+          await snapshots
+          isDone = true
+        })()
+        await vi.advanceTimersByTimeAsync(2000)
+        expect(isDone).toBe(false)
+
+        loaded.add('preview-1b')
+        await vi.advanceTimersByTimeAsync(1500)
+        await done
+
+        await expect(snapshots).resolves.toHaveLength(2)
+      })
+
+      it('leaves out a picture that does not load', async () => {
+        await mountRevision()
+
+        const snapshots = wrapper.vm.extractAnnotationSnapshots()
+        // A picture gets 10 s to load.
+        await vi.advanceTimersByTimeAsync(12000)
+
+        await expect(snapshots).resolves.toHaveLength(1)
+      })
+
+      // The live canvas gets 500 ms to settle once the picture is in: a picture
+      // that comes in after its 10 s would get less.
+      it('leaves out a picture that comes in after its 10 s', async () => {
+        await mountRevision()
+
+        const snapshots = wrapper.vm.extractAnnotationSnapshots()
+        await vi.advanceTimersByTimeAsync(10700)
+        loaded.add('preview-1b')
+        await vi.advanceTimersByTimeAsync(2000)
+
+        await expect(snapshots).resolves.toHaveLength(1)
+      })
+
+      it('does not wait for a picture that cannot load', async () => {
+        await mountRevision()
+        unavailable.add('preview-1b')
+        let isDone = false
+
+        const snapshots = wrapper.vm.extractAnnotationSnapshots()
+        const done = (async () => {
+          await snapshots
+          isDone = true
+        })()
+        await vi.advanceTimersByTimeAsync(2000)
+
+        expect(isDone).toBe(true)
+        await done
+        await expect(snapshots).resolves.toHaveLength(1)
+      })
+
+      it('goes back to the file of the user when a snapshot fails', async () => {
+        await mountRevision()
+        loaded.add('preview-1b')
+        const error = new Error('encoding failed')
+        let encoded = 0
+        snapshotCanvas.toBlob = callback => {
+          encoded += 1
+          if (encoded > 1) throw error
+          callback(new Blob())
+        }
+
+        const failure = wrapper.vm.extractAnnotationSnapshots().catch(e => e)
+        await vi.advanceTimersByTimeAsync(3000)
+
+        expect(await failure).toBe(error)
+        expect(
+          wrapper.findComponent({ ref: 'picture-player' }).props('currentPreview')
+            .id
+        ).toBe('preview-1')
+      })
+
+      // Its snapshots would land in the closed dialog.
+      it('stops once the attachment dialog closes, back on the first file', async () => {
+        await mountRevision()
+        const controller = new AbortController()
+        let isDone = false
+
+        const snapshots = wrapper.vm.extractAnnotationSnapshots({
+          signal: controller.signal
+        })
+        const done = (async () => {
+          await snapshots
+          isDone = true
+        })()
+        await vi.advanceTimersByTimeAsync(2000)
+        controller.abort()
+        await vi.advanceTimersByTimeAsync(1500)
+
+        expect(isDone).toBe(true)
+        await done
+        await expect(snapshots).resolves.toEqual([])
+        expect(wrapper.vm.currentPreviewIndex).toBe(0)
+      })
+
+      // The keyboard still moves the player under the attachment dialog.
+      it('stops once the player moves to another shot, and leaves it there', async () => {
+        await mountRevision([
+          {
+            ...entity,
+            id: 'shot-2',
+            preview_file_id: 'preview-2',
+            preview_file_extension: 'png',
+            preview_file_revision: 1,
+            preview_file_previews: [
+              { id: 'preview-2b', extension: 'png', revision: 1 }
+            ]
+          }
+        ])
+        // The user is on the second file of the first shot.
+        await nextShot()
+        expect(wrapper.vm.currentPreviewIndex).toBe(1)
+        let isDone = false
+
+        const snapshots = wrapper.vm.extractAnnotationSnapshots()
+        const done = (async () => {
+          await snapshots
+          isDone = true
+        })()
+        await vi.advanceTimersByTimeAsync(2000)
+        await nextShot()
+        await vi.advanceTimersByTimeAsync(1500)
+
+        expect(isDone).toBe(true)
+        await done
+        await expect(snapshots).resolves.toEqual([])
+        // The other shot opens on its first file, as without the snapshots.
+        expect(wrapper.vm.playingEntityIndex).toBe(1)
+        expect(wrapper.vm.currentPreviewIndex).toBe(0)
+      })
+
+      // Encoding a big picture takes a while.
+      it('drops the snapshots when the dialog closes during the last encoding', async () => {
+        await mountRevision()
+        loaded.add('preview-1b')
+        const controller = new AbortController()
+        let encoded = 0
+        let encodeLast = null
+        snapshotCanvas.toBlob = callback => {
+          encoded += 1
+          if (encoded === 2) {
+            encodeLast = () => callback(new Blob())
+          } else {
+            callback(new Blob())
+          }
+        }
+
+        const snapshots = wrapper.vm.extractAnnotationSnapshots({
+          signal: controller.signal
+        })
+        await vi.advanceTimersByTimeAsync(1500)
+        expect(encodeLast).not.toBeNull()
+        controller.abort()
+        encodeLast()
+        await vi.advanceTimersByTimeAsync(1000)
+
+        await expect(snapshots).resolves.toEqual([])
+      })
+
+      it('drops the snapshots when the player moves during the last encoding', async () => {
+        await mountRevision([
+          {
+            ...entity,
+            id: 'shot-2',
+            preview_file_id: 'preview-2',
+            preview_file_extension: 'png',
+            preview_file_revision: 1
+          }
+        ])
+        loaded.add('preview-1b')
+        let encoded = 0
+        let encodeLast = null
+        snapshotCanvas.toBlob = callback => {
+          encoded += 1
+          if (encoded === 2) {
+            encodeLast = () => callback(new Blob())
+          } else {
+            callback(new Blob())
+          }
+        }
+
+        const snapshots = wrapper.vm.extractAnnotationSnapshots()
+        await vi.advanceTimersByTimeAsync(1500)
+        expect(encodeLast).not.toBeNull()
+        await nextShot()
+        encodeLast()
+        await vi.advanceTimersByTimeAsync(1000)
+
+        await expect(snapshots).resolves.toEqual([])
+      })
+    })
   })
 
   // The waveform loads 100 ms after it is set up for the movie on screen:
@@ -1198,6 +1540,39 @@ describe('PlaylistPlayer.vue', () => {
     expect(comparisonViewer.props('entities')).toEqual([])
   })
 
+  // Firefox paints no frame for a second seek right after a first one: the
+  // comparison movie, paused on its own frame then sent to the frame of the
+  // main one, stayed a frame or two ahead.
+  it('pauses the comparison movie on the frame of the main one', async () => {
+    wrapper = mountPlayer({
+      entities: [comparedEntity('shot-1')],
+      taskTypeMap: comparedTaskTypeMap
+    })
+    await flushPromises()
+    wrapper
+      .findComponent({ name: 'PlayerComparisonBar' })
+      .vm.$emit('compare-clicked')
+    await flushPromises()
+    const playPause = () =>
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { code: 'Space', key: ' ' })
+      )
+    const main = wrapper.findComponent({ ref: 'raw-player' }).vm
+    main.isPlaying = true
+    playPause()
+    await flushPromises()
+    const comparison = wrapper.findComponent({ ref: 'raw-player-comparison' }).vm
+    main.getCurrentFrame = () => 627
+    comparison.pause = vi.fn()
+    comparison.setCurrentTimeRaw = vi.fn()
+
+    playPause()
+    await flushPromises()
+
+    expect(comparison.pause).toHaveBeenCalledWith(627)
+    expect(comparison.setCurrentTimeRaw).not.toHaveBeenCalled()
+  })
+
   describe('comparison movie of a picture', () => {
     const openComparison = async entities => {
       wrapper = mountPlayer({ entities, taskTypeMap: comparedTaskTypeMap })
@@ -1562,6 +1937,289 @@ describe('PlaylistPlayer.vue', () => {
       expect(zip.attributes('rel')).toBe('noopener noreferrer')
       expect(zip.attributes('download')).toBeUndefined()
     })
+  })
+
+  describe('header buttons', () => {
+    const clientPlaylist = { ...playlist, for_client: true }
+
+    // undefined when absent, else whether it is disabled.
+    const isDisabled = isTarget =>
+      wrapper
+        .findAllComponents({ name: 'ButtonSimple' })
+        .find(
+          button =>
+            button.element.closest('.playlist-header') && isTarget(button)
+        )
+        ?.props('disabled')
+
+    const readHeaderButtons = () => ({
+      notify: isDisabled(button => button.props('icon') === 'bell'),
+      share: isDisabled(button => button.props('icon') === 'link'),
+      add: isDisabled(button => button.props('icon') === 'plus'),
+      edit: isDisabled(button => button.classes('edit-button')),
+      delete: isDisabled(button => button.classes('delete-button'))
+    })
+
+    const isAddPressed = () =>
+      wrapper
+        .findAllComponents({ name: 'ButtonSimple' })
+        .find(
+          button =>
+            button.element.closest('.playlist-header') &&
+            button.props('icon') === 'plus'
+        )
+        .props('active')
+
+    it('enables them once the playlist is loaded', async () => {
+      wrapper = mountPlayer({ playlistProp: clientPlaylist })
+      await flushPromises()
+      expect(readHeaderButtons()).toEqual({
+        notify: false,
+        share: false,
+        add: false,
+        edit: false,
+        delete: false
+      })
+    })
+
+    // During the load, the page still passes the playlist shown before, or
+    // an empty one: the trash sent DELETE /api/data/playlists/undefined.
+    it('disables them while a playlist loads', async () => {
+      wrapper = mountPlayer({
+        playlistProp: clientPlaylist,
+        props: { isLoading: true }
+      })
+      await flushPromises()
+      expect(readHeaderButtons()).toEqual({
+        notify: true,
+        share: true,
+        add: true,
+        edit: true,
+        delete: true
+      })
+    })
+
+    // The empty playlist of the Sentry event. The page opens the addition
+    // panel for a playlist without entries: the add button must not look
+    // pressed.
+    it('disables them over the empty playlist of a load', async () => {
+      wrapper = mountPlayer({
+        playlistProp: { name: '' },
+        entities: [],
+        props: { isAddingEntity: true, isLoading: true }
+      })
+      await flushPromises()
+      expect(readHeaderButtons()).toEqual({
+        notify: undefined,
+        share: true,
+        add: true,
+        edit: true,
+        delete: true
+      })
+      expect(isAddPressed()).toBe(false)
+    })
+
+    it('shows the add button pressed while its panel is open', async () => {
+      wrapper = mountPlayer({ props: { isAddingEntity: true } })
+      await flushPromises()
+      expect(isAddPressed()).toBe(true)
+    })
+  })
+
+  describe('footer actions', () => {
+    const mountFooter = (props = {}) =>
+      mountPlayer({ props, stubs: { PlayerPlaybackBar: PlaybackBarWithSlot } })
+
+    const footerButton = title =>
+      wrapper
+        .findAllComponents({ name: 'ButtonSimple' })
+        .find(button => button.attributes('title') === title)
+    const readFooterActions = () => ({
+      taskType: footerButton('playlists.actions.change_task_type')?.props(
+        'disabled'
+      ),
+      downloadMenu: footerButton('playlists.actions.download')?.props(
+        'disabled'
+      ),
+      builds: wrapper
+        .findAll('.mp4-button, .mp4-2-button')
+        .map(build => build.classes('disabled'))
+    })
+    const builds = () =>
+      wrapper.vm.$store.dispatch.mock.calls.filter(
+        ([action]) => action === 'runPlaylistBuild'
+      )
+
+    it('enables the task type change, the download menu and the builds once loaded', async () => {
+      wrapper = mountFooter()
+      await flushPromises()
+      expect(readFooterActions()).toEqual({
+        taskType: false,
+        downloadMenu: false,
+        builds: [false, false]
+      })
+      await wrapper.get('.mp4-button').trigger('click')
+      expect(builds()).toEqual([
+        ['runPlaylistBuild', { playlist, full: false }]
+      ])
+    })
+
+    // During the load, the footer still belongs to the playlist shown before.
+    it('disables them while a playlist loads', async () => {
+      wrapper = mountFooter({ isLoading: true })
+      await flushPromises()
+      expect(readFooterActions()).toEqual({
+        taskType: true,
+        downloadMenu: true,
+        builds: [true, true]
+      })
+      await wrapper.get('.mp4-button').trigger('click')
+      await wrapper.get('.mp4-2-button').trigger('click')
+      expect(builds()).toEqual([])
+    })
+
+    // The menu only closes through its button, disabled during the load.
+    it('closes the download menu when a load starts', async () => {
+      wrapper = mountFooter()
+      await flushPromises()
+      const isMenuOpen = () => !wrapper.get('.build-options').classes('hidden')
+      footerButton('playlists.actions.download').vm.$emit('click')
+      await flushPromises()
+      expect(isMenuOpen()).toBe(true)
+
+      await wrapper.setProps({ isLoading: true })
+
+      expect(isMenuOpen()).toBe(false)
+    })
+  })
+
+  // The browser history opens another playlist under an open modal.
+  describe('modals', () => {
+    const isOpen = name => {
+      const modal = wrapper.findComponent({ name })
+      return modal.exists() && modal.props('active')
+    }
+
+    it.each([
+      ['DeleteModal', button => button.classes('delete-button')],
+      ['SharePlaylistModal', button => button.props('icon') === 'link'],
+      ['NotifyClientModal', button => button.props('icon') === 'bell'],
+      [
+        'SelectTaskTypeModal',
+        button =>
+          button.attributes('title') === 'playlists.actions.change_task_type'
+      ]
+    ])('closes the %s when a load starts', async (name, isOpener) => {
+      wrapper = mountPlayer({
+        playlistProp: { ...playlist, for_client: true },
+        stubs: { PlayerPlaybackBar: PlaybackBarWithSlot }
+      })
+      await flushPromises()
+      wrapper
+        .findAllComponents({ name: 'ButtonSimple' })
+        .find(isOpener)
+        .vm.$emit('click')
+      await flushPromises()
+      expect(isOpen(name)).toBe(true)
+
+      await wrapper.setProps({ isLoading: true })
+
+      expect(isOpen(name)).toBe(false)
+    })
+  })
+
+  // Ctrl or Cmd+Shift+Left/Right moves the entry played.
+  describe('reorder shortcut', () => {
+    const entities = ['shot-1', 'shot-2', 'shot-3'].map((id, index) => ({
+      ...entity,
+      id,
+      preview_file_id: `preview-${index + 1}`
+    }))
+
+    const press = async code => {
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          code,
+          key: code,
+          ctrlKey: true,
+          shiftKey: true
+        })
+      )
+      await flushPromises()
+    }
+
+    const strip = () => wrapper.findAllComponents({ name: 'PlaylistedEntity' })
+    const stripIds = () => strip().map(entry => entry.props('entity').id)
+
+    // The page saves each move on the order it saved before, by putting
+    // the `after` entry right after the `before` one.
+    const savedIds = () => {
+      const saved = {
+        shots: entities.map(({ id, preview_file_id }) => ({
+          entity_id: id,
+          preview_file_id
+        }))
+      }
+      wrapper.emitted('order-change').forEach(([info]) =>
+        playlistStore.mutations.CHANGE_PLAYLIST_ORDER(
+          {},
+          { playlist: saved, info }
+        )
+      )
+      return saved.shots.map(shot => shot.entity_id)
+    }
+
+    it('saves the moves the strip shows', async () => {
+      wrapper = mountPlayer({ entities })
+      await flushPromises()
+
+      await press('ArrowRight')
+      expect(stripIds()).toEqual(['shot-2', 'shot-1', 'shot-3'])
+      expect(savedIds()).toEqual(stripIds())
+
+      await press('ArrowRight')
+      expect(stripIds()).toEqual(['shot-2', 'shot-3', 'shot-1'])
+      expect(savedIds()).toEqual(stripIds())
+
+      await press('ArrowLeft')
+      expect(stripIds()).toEqual(['shot-2', 'shot-1', 'shot-3'])
+      expect(savedIds()).toEqual(stripIds())
+    })
+
+    // The shortcut wraps at neither end: one put-after pair cannot take the
+    // last entry to the start, and the first entry stops too, so that both
+    // directions behave alike.
+    it('stops at the ends of the playlist', async () => {
+      wrapper = mountPlayer({ entities })
+      await flushPromises()
+
+      await press('ArrowLeft')
+      expect(wrapper.emitted('order-change')).toBeUndefined()
+
+      await press('ArrowRight')
+      await press('ArrowRight')
+      await press('ArrowRight')
+      expect(wrapper.emitted('order-change')).toHaveLength(2)
+      expect(stripIds()).toEqual(['shot-2', 'shot-3', 'shot-1'])
+    })
+
+    // During the load, the entries are still those of the playlist shown
+    // before: the page saved its order.
+    it.each(['ArrowLeft', 'ArrowRight'])(
+      'ignores %s while a playlist loads',
+      async code => {
+        wrapper = mountPlayer({ entities })
+        await flushPromises()
+        // The middle entry, which can move either way.
+        strip()[1].vm.$emit('play-click', 1)
+        await flushPromises()
+        expect(strip()[1].props('isPlaying')).toBe(true)
+        await wrapper.setProps({ isLoading: true })
+
+        await press(code)
+        expect(wrapper.emitted('order-change')).toBeUndefined()
+      }
+    )
   })
 
   // The trim belongs to the shot, not to a revision: an end handle left at
@@ -1986,32 +2644,74 @@ describe('PlaylistPlayer.vue', () => {
       expect(rawPlayer.setCurrentTimeRaw).not.toHaveBeenCalledWith(frame / 25)
     })
 
-    // A pause moves the movie to the next frame boundary: past the last
-    // frame, that is the very end of the movie, where no drawing is found.
-    it('shows the drawing of the last frame once paused on it', async () => {
+    // A drawing is saved on frame * frameDuration, 0.0333 at 30 fps, which
+    // runs 0.001 s a frame behind the movie time: 50 s in, a step showed
+    // the drawing of 2 frames before.
+    it.each(['ArrowRight', 'ArrowLeft'])(
+      'shows the drawing of the frame reached on %s far into a movie',
+      async key => {
+        const canvas = await mountShowing({
+          ...movie,
+          fps: '30',
+          preview_file_duration: 60,
+          preview_file_annotations: [
+            drawingAt(1498 * 0.0333, 'before'),
+            drawingAt(1500 * 0.0333, 'reached')
+          ]
+        })
+        const rawPlayer = wrapper.findComponent({ ref: 'raw-player' }).vm
+        const step = () => rawPlayer.$emit('frame-update', 1500)
+        rawPlayer.goNextFrame = step
+        rawPlayer.goPreviousFrame = step
+        rawPlayer.getCurrentTime = () => 1500 / 30 + 0.001
+        canvas.add.mockClear()
+
+        await press(key)
+
+        expect(drawnIds(canvas)).toEqual(['reached'])
+      }
+    )
+
+    const togglePlayback = () =>
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { code: 'Space', key: ' ' })
+      )
+
+    // The viewer pauses on the frame on screen and sends it: the movie
+    // time can still read the frame before.
+    it('shows the drawing of the frame the movie pauses on', async () => {
       const canvas = await mountShowing(movie)
       const rawPlayer = wrapper.findComponent({ ref: 'raw-player' }).vm
-      let time = 0
-      rawPlayer.getCurrentTime = () => time
-      rawPlayer.getCurrentTimeRaw = () => time
-      rawPlayer.setCurrentTimeRaw = value => {
-        time = value
-      }
+      rawPlayer.getCurrentTime = () => 2.69
+      rawPlayer.getCurrentTimeRaw = () => 2.69
+      rawPlayer.pause = () => rawPlayer.$emit('frame-update', 68)
       rawPlayer.isPlaying = true
-      const togglePlayback = () =>
-        window.dispatchEvent(
-          new KeyboardEvent('keydown', { code: 'Space', key: ' ' })
-        )
       togglePlayback()
       await flushPromises()
-      // Inside the last frame, from 2.72 to 2.76 s.
-      time = 2.74
       canvas.add.mockClear()
 
       togglePlayback()
       await flushPromises()
 
       expect(drawnIds(canvas)).toEqual(['last'])
+    })
+
+    // A second seek, to the next frame boundary, landed after the one of
+    // the viewer: the picture moved off the frame on the counter.
+    it('leaves the pause of the movie to its viewer', async () => {
+      await mountShowing(movie)
+      const rawPlayer = wrapper.findComponent({ ref: 'raw-player' }).vm
+      rawPlayer.pause = vi.fn()
+      rawPlayer.setCurrentTimeRaw = vi.fn()
+      rawPlayer.isPlaying = true
+      togglePlayback()
+      await flushPromises()
+
+      togglePlayback()
+      await flushPromises()
+
+      expect(rawPlayer.pause).toHaveBeenCalled()
+      expect(rawPlayer.setCurrentTimeRaw).not.toHaveBeenCalled()
     })
 
     // As in the preview player: loading the drawing would pause the movie.
@@ -2070,7 +2770,10 @@ describe('PlaylistPlayer.vue', () => {
       )
 
     it('keeps the task type change and the download menu from a client', async () => {
-      wrapper = mountPlayer({ isClient: true })
+      wrapper = mountPlayer({
+        isClient: true,
+        stubs: { PlayerPlaybackBar: PlaybackBarWithSlot }
+      })
       await flushPromises()
       expect(
         wrapper.find('[title="playlists.actions.change_task_type"]').exists()
@@ -2206,6 +2909,81 @@ describe('PlaylistPlayer.vue', () => {
       await resize()
 
       expect([before, anchor.style.width]).toEqual(['800px', '400px'])
+    })
+  })
+
+  // Reloading the canvas under a note being typed ended the typing.
+  describe('annotation updates', () => {
+    const textareas = []
+
+    afterEach(() => {
+      textareas.splice(0).forEach(textarea => textarea.remove())
+    })
+
+    const emitAnnotationUpdate = async ({
+      isEditing = false,
+      isFocused = false
+    } = {}) => {
+      const canvas = createFakeCanvas()
+      wrapper = mountPlayer({
+        entities: [{ ...entity, preview_file_extension: 'png' }],
+        previewFileMap: new Map([['preview-1', { id: 'preview-1' }]]),
+        stubs: { AnnotationCanvas: annotationCanvasStub(canvas) }
+      })
+      await flushPromises()
+      const store = wrapper.vm.$store
+      store.dispatch.mockImplementation(type =>
+        Promise.resolve(
+          type === 'refreshPreview'
+            ? {
+                id: 'preview-1',
+                annotations: [{ time: 0, drawing: { objects: [] } }]
+              }
+            : undefined
+        )
+      )
+      const [, onAnnotationUpdate] = store.$socket.on.mock.calls.find(
+        ([event]) => event === 'preview-file:annotation-update'
+      )
+      // fabric types into a hidden textarea, focused while the note is typed.
+      const hiddenTextarea = document.createElement('textarea')
+      textareas.push(hiddenTextarea)
+      document.body.appendChild(hiddenTextarea)
+      if (isFocused) hiddenTextarea.focus()
+      canvas.getActiveObject.mockReturnValue(
+        isEditing ? { isEditing, hiddenTextarea } : null
+      )
+      canvas.clear.mockClear()
+
+      onAnnotationUpdate({
+        preview_file_id: 'preview-1',
+        updated_at: '2026-11-03T10:00:00'
+      })
+      await flushPromises()
+      return canvas
+    }
+
+    it('reloads the drawings another user saved', async () => {
+      const canvas = await emitAnnotationUpdate()
+
+      expect(canvas.clear).toHaveBeenCalled()
+    })
+
+    it('leaves a note being typed', async () => {
+      const canvas = await emitAnnotationUpdate({
+        isEditing: true,
+        isFocused: true
+      })
+
+      expect(canvas.clear).not.toHaveBeenCalled()
+    })
+
+    // fabric keeps a note in editing when the user clicks outside the
+    // canvas, into the comment box for instance.
+    it('reloads under a note left in editing', async () => {
+      const canvas = await emitAnnotationUpdate({ isEditing: true })
+
+      expect(canvas.clear).toHaveBeenCalled()
     })
   })
 

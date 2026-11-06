@@ -27,9 +27,12 @@
         <asset-type-settings
           :asset-types="restrictedAssetTypes"
           :all-asset-types="assetTypes"
+          :task-types="sortedAssetTaskTypes"
+          :workflows="currentProduction?.asset_type_workflows"
           @add="addAssetType"
           @import-items="importAssetTypes"
           @remove="removeAssetType"
+          @update-workflow="updateAssetTypeWorkflow"
         />
       </div>
     </div>
@@ -63,83 +66,85 @@
         <div class="box" v-if="isEmpty(currentProduction?.task_statuses)">
           {{ $t('settings.production.empty_list') }}
         </div>
-        <table class="datatable" v-else>
-          <thead>
-            <tr>
-              <th class="th-grab"></th>
-              <th class="th-name">{{ $t('task_status.fields.name') }}</th>
-              <th class="th-short-name">
-                {{ $t('task_status.fields.short_name') }}
-              </th>
-              <th class="th-bool">
-                {{ $t('task_status.fields.is_done') }}
-              </th>
-              <th class="th-bool">
-                {{ $t('task_status.fields.is_retake') }}
-              </th>
-              <th class="th-bool">
-                {{ $t('task_status.fields.is_artist_allowed') }}
-              </th>
-              <th class="th-bool">
-                {{ $t('task_status.fields.is_client_allowed') }}
-              </th>
-            </tr>
-          </thead>
-          <!-- A held button must not arm a drag: a reload that shifted
-               the rows before the release made vuedraggable throw. -->
-          <draggable
-            class="datatable-body"
-            filter="button"
-            item-key="id"
-            :prevent-on-filter="false"
-            tag="tbody"
-            v-model="taskStatusItems"
-            @choose="onRowHeld"
-            @end="updateTaskStatusPriority"
-            @start="onRowDragged"
-            @unchoose="onRowReleased"
-          >
-            <template #item="{ element: taskStatus }">
-              <tr class="datatable-row task-status">
-                <td class="grab">
-                  <grip-vertical-icon />
-                </td>
-                <td>
-                  {{ taskStatus.name }}
-                </td>
-                <td class="name">
-                  <validation-tag
-                    :is-static="true"
-                    :task="{ task_status_id: taskStatus.id }"
-                  />
-                </td>
-                <boolean-cell :value="taskStatus.is_done" />
-                <boolean-cell :value="taskStatus.is_retake" />
-                <boolean-cell :value="taskStatus.is_artist_allowed" />
-                <boolean-cell :value="taskStatus.is_client_allowed" />
-                <td>
-                  <button
-                    class="button"
-                    @click="removeTaskStatus(taskStatus.id)"
-                  >
-                    {{ $t('main.remove') }}
-                  </button>
-                </td>
+        <div class="datatable-wrapper" v-else>
+          <table class="datatable">
+            <thead>
+              <tr>
+                <th class="th-grab"></th>
+                <th class="th-name">{{ $t('task_status.fields.name') }}</th>
+                <th class="th-short-name">
+                  {{ $t('task_status.fields.short_name') }}
+                </th>
+                <th class="th-bool">
+                  {{ $t('task_status.fields.is_done') }}
+                </th>
+                <th class="th-bool">
+                  {{ $t('task_status.fields.is_retake') }}
+                </th>
+                <th class="th-bool">
+                  {{ $t('task_status.fields.is_artist_allowed') }}
+                </th>
+                <th class="th-bool">
+                  {{ $t('task_status.fields.is_client_allowed') }}
+                </th>
               </tr>
-            </template>
-          </draggable>
-        </table>
+            </thead>
+            <!-- A held button must not arm a drag: a reload that shifted
+                 the rows before the release made vuedraggable throw. -->
+            <draggable
+              class="datatable-body"
+              filter="button"
+              item-key="id"
+              :prevent-on-filter="false"
+              tag="tbody"
+              v-model="taskStatusItems"
+              @choose="onRowHeld"
+              @end="updateTaskStatusPriority"
+              @start="onRowDragged"
+              @unchoose="onRowReleased"
+            >
+              <template #item="{ element: taskStatus }">
+                <tr class="datatable-row task-status">
+                  <td class="grab">
+                    <grip-vertical-icon />
+                  </td>
+                  <td>
+                    {{ taskStatus.name }}
+                  </td>
+                  <td class="name">
+                    <validation-tag
+                      :is-static="true"
+                      :task="{ task_status_id: taskStatus.id }"
+                    />
+                  </td>
+                  <boolean-cell :value="taskStatus.is_done" />
+                  <boolean-cell :value="taskStatus.is_retake" />
+                  <boolean-cell :value="taskStatus.is_artist_allowed" />
+                  <boolean-cell :value="taskStatus.is_client_allowed" />
+                  <td>
+                    <button
+                      class="button"
+                      @click="removeTaskStatus(taskStatus.id)"
+                    >
+                      {{ $t('main.remove') }}
+                    </button>
+                  </td>
+                </tr>
+              </template>
+            </draggable>
+          </table>
+        </div>
       </div>
     </div>
 
-    <div class="tab is-wide" v-show="isActiveTab('board')">
+    <div class="tab is-full" v-show="isActiveTab('board')">
       <div class="box section">
         <h2 class="subtitle">{{ $t('board.settings.title') }}</h2>
         <production-board />
       </div>
     </div>
 
-    <div class="tab is-wide" v-show="isActiveTab('statusAutomations')">
+    <div class="tab is-full" v-show="isActiveTab('statusAutomations')">
       <div class="box section">
         <h2 class="subtitle">{{ $t('status_automations.title') }}</h2>
         <production-status-automations />
@@ -166,7 +171,7 @@ import { useStore } from 'vuex'
 
 import { useDraggableRebuild } from '@/composables/draggableRebuild'
 import { useFieldCommitOnLeave } from '@/composables/fieldCommit'
-import { sortTaskStatuses } from '@/lib/sorting'
+import { sortTaskStatuses, sortTaskTypes } from '@/lib/sorting'
 
 import BooleanCell from '@/components/cells/BooleanCell.vue'
 import AssetTypeSettings from '@/components/pages/production/AssetTypeSettings.vue'
@@ -221,6 +226,9 @@ const layout = useTemplateRef('page')
 // --------------------------------------------------------------------------
 const assetTypes = computed(() => store.getters.assetTypes)
 const currentProduction = computed(() => store.getters.currentProduction)
+const sortedAssetTaskTypes = computed(() =>
+  sortTaskTypes(store.getters.productionAssetTaskTypes, currentProduction.value)
+)
 const isCurrentUserProductionManager = computed(
   () => store.getters.isCurrentUserProductionManager
 )
@@ -265,6 +273,10 @@ const importAssetTypes = async ({ ids, done }) => {
 
 const removeAssetType = assetTypeId => {
   store.dispatch('removeAssetTypeFromProduction', assetTypeId)
+}
+
+const updateAssetTypeWorkflow = payload => {
+  store.dispatch('setAssetTypeWorkflow', payload).catch(console.error)
 }
 
 const changeTaskStatuses = async (action, payload) => {
@@ -362,6 +374,11 @@ useHead({
   color: var(--text);
   padding-left: 10px;
   padding-bottom: 5px;
+}
+
+// The block padding is the only space below the table.
+.datatable-wrapper {
+  margin-bottom: 0;
 }
 
 .th-name {

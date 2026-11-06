@@ -271,10 +271,13 @@
             :queries="searchQueries"
             type="taskType"
             :production-id="currentProduction?.id"
-            @remove-search="removeSearchQuery"
           />
         </div>
 
+        <error-text
+          :text="taskListSaveErrorText"
+          v-if="taskListSaveErrorText"
+        />
         <task-list
           ref="task-list"
           :disabled-dates="disabledDates"
@@ -349,6 +352,10 @@
           />
         </div>
 
+        <error-text
+          :text="cellSaveErrorText"
+          v-if="isActiveTab('estimation') && cellSaveErrorText"
+        />
         <div
           class="task-type-estimation flexrow-item"
           v-if="isActiveTab('estimation')"
@@ -356,7 +363,7 @@
           <estimation-helper
             :entity-type="entityType"
             :tasks="tasks"
-            @estimation-changed="updateEstimation"
+            @estimation-changed="onEstimationCellChanged"
           />
         </div>
 
@@ -441,6 +448,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useStore } from 'vuex'
 
+import { useCellSave } from '@/composables/cellSave'
 import { getEntityMap } from '@/composables/entity'
 import csv, { getEstimationsCsvLabelKeys } from '@/lib/csv'
 import { isSupervisorInDepartments } from '@/lib/descriptors'
@@ -453,7 +461,12 @@ import {
   getTaskFilters
 } from '@/lib/filtering'
 import { buildSupervisorTaskIndex, indexSearch } from '@/lib/indexing'
-import { getPersonPath, pluralizeEntityType } from '@/lib/path'
+import {
+  episodifyRoute,
+  getPersonPath,
+  getProductionSchedulePath,
+  pluralizeEntityType
+} from '@/lib/path'
 import preferences from '@/lib/preferences'
 import { sortByMetadata, sortByName, sortPeople } from '@/lib/sorting'
 import stringHelpers from '@/lib/string'
@@ -483,6 +496,7 @@ import ComboboxStatusMultiple from '@/components/widgets/ComboboxStatusMultiple.
 import ComboboxStyled from '@/components/widgets/ComboboxStyled.vue'
 import ComboboxTaskType from '@/components/widgets/ComboboxTaskType.vue'
 import DateField from '@/components/widgets/DateField.vue'
+import ErrorText from '@/components/widgets/ErrorText.vue'
 // eslint-disable-next-line no-unused-vars
 import Schedule from '@/components/schedule/Schedule.vue'
 import SearchField from '@/components/widgets/SearchField.vue'
@@ -543,6 +557,10 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const store = useStore()
+// The cells of the estimation tab save at once.
+const { cellSaveErrorText, saveCell } = useCellSave(task => task.entity_name, {
+  rowsAreTasks: true
+})
 
 const instance = getCurrentInstance()
 const socket = instance.appContext.config.globalProperties.$socket
@@ -693,6 +711,10 @@ const taskListRef = useTemplateRef('task-list')
 
 // Computed
 const currentEpisode = computed(() => store.getters.currentEpisode)
+// Shown above the list, whose row holds the schedule beside the rows.
+const taskListSaveErrorText = computed(
+  () => taskListRef.value?.cellSaveErrorText
+)
 const currentTaskTypeEpisode = computed(
   () => store.getters.currentTaskTypeEpisode
 )
@@ -891,13 +913,12 @@ const title = computed(() => {
 const backPath = computed(() => {
   let pathRoute
   if (isActiveTab('schedule')) {
-    pathRoute = {
-      name: 'schedule',
-      params: {
-        production_id: currentProduction.value.id
-      },
-      query: { search: '' }
-    }
+    // Without its episode, the production schedule of a TV show has no
+    // episode selector.
+    pathRoute = episodifyRoute(
+      getProductionSchedulePath(currentProduction.value.id),
+      isTVShow.value ? (currentEpisode.value?.id ?? 'all') : null
+    )
   } else {
     const pathsByEntity = {
       Shot: store.getters.shotsPath,
@@ -1205,10 +1226,6 @@ const saveSearchQuery = searchQuery => {
     })
 }
 
-const removeSearchQuery = searchQuery => {
-  store.dispatch('removeTaskSearch', searchQuery).catch(console.error)
-}
-
 const updateUrlParams = () => {
   const retakeCount = retakeCountFilter.value
   router.push({
@@ -1297,6 +1314,11 @@ const getTasks = entities => {
       // entity-level canceled boolean.
       entity.status === 'canceled' ||
       !entity.tasks?.length ||
+      (entityType.value === 'Asset' &&
+        !store.getters.isInAssetTypeWorkflow(
+          entity.asset_type_id,
+          currentTaskType.value.id
+        )) ||
       (isTVShow.value &&
         !displaySettings.value.showLinkedAssets &&
         !isEpisodesSection.value &&
@@ -1373,9 +1395,7 @@ const onExportClick = () => {
   csv.buildCsvFile(name, taskLines)
 }
 
-const updateEstimation = ({ taskId, estimation, item, daysOff }) => {
-  const task = taskMap.value.get(taskId)
-  if (!task) return
+const saveEstimation = (task, { estimation, item, daysOff }) => {
   let data = { estimation }
   if (task.start_date) {
     const startDate = parseDate(task.start_date)
@@ -1400,7 +1420,17 @@ const updateEstimation = ({ taskId, estimation, item, daysOff }) => {
       }
     }
   }
-  store.dispatch('updateTask', { taskId, data }).catch(console.error)
+  return store.dispatch('updateTask', { taskId: task.id, data })
+}
+
+const updateEstimation = ({ taskId, ...change }) => {
+  const task = taskMap.value.get(taskId)
+  if (task) saveEstimation(task, change).catch(console.error)
+}
+
+const onEstimationCellChanged = ({ taskId, ...change }) => {
+  const task = taskMap.value.get(taskId)
+  if (task) saveCell(task, () => saveEstimation(task, change))
 }
 
 // Schedule

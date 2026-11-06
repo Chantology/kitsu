@@ -608,7 +608,8 @@ import {
   parseHiddenTaskTypeIds,
   refreshRawDates,
   removeHiddenTaskTypes,
-  setTaskTypeVisibility
+  setTaskTypeVisibility,
+  subItemsOf
 } from '@/lib/productionSchedule'
 import {
   sortByName,
@@ -1417,6 +1418,11 @@ const loadEpisodeRows = async taskTypeElement => {
   }
 }
 
+const loadRootRows = taskTypeElement =>
+  isAllEpisodes.value
+    ? loadEpisodeRows(taskTypeElement)
+    : loadTaskTypeRows(taskTypeElement)
+
 const expandTaskTypeDrillDown = async (
   taskTypeElement,
   refreshScheduleCallBack = null,
@@ -1688,10 +1694,11 @@ const loadTaskTypeRows = async taskTypeElement => {
       // filtering following custom asset types workflow
       children = children.filter(item => {
         const assetType = assetTypeMap.value.get(item.object_id)
+        const workflow = store.getters.getAssetTypeWorkflow(item.object_id)
         return (
           assetType &&
-          (!assetType.task_types.length ||
-            assetType.task_types.includes(taskTypeElement.task_type_id)) &&
+          (!workflow.length ||
+            workflow.includes(taskTypeElement.task_type_id)) &&
           (!scopedAssetTypeIds || scopedAssetTypeIds.has(item.object_id))
         )
       })
@@ -1786,6 +1793,12 @@ const onScheduleItemChanged = async item => {
     return
   }
 
+  if (!item.parentElement && !item.expanded && !subItemsOf(item).length) {
+    const generation = scheduleGeneration
+    await loadRootRows(item)
+    if (isStaleSchedule(generation)) return
+    scheduleRef.value?.applyMoveToLoadedRows(item)
+  }
   const affected = item.type === 'Task' ? [] : movedSubItems(item)
   if (affected.length) {
     pendingParentChange.value = { item, affected }
@@ -2151,6 +2164,7 @@ const cancelChildMove = () => {
     child.startDate = child._dragOrigStartDate.clone()
     child.endDate = child._dragOrigEndDate.clone()
   })
+  scheduleRef.value?.refreshItemPositions(item.parentElement ?? item)
   pendingParentChange.value = null
   modals.value.confirmChildMove = false
 }
@@ -2282,10 +2296,8 @@ const selectTaskTypeElement = async (
     assignments.value.entityTypes = productionAssetTypes.value
       .filter(assetType => {
         // filtering following custom asset types workflow
-        return (
-          !assetType.task_types.length ||
-          assetType.task_types.includes(taskType.task_type_id)
-        )
+        const workflow = store.getters.getAssetTypeWorkflow(assetType.id)
+        return !workflow.length || workflow.includes(taskType.task_type_id)
       })
       .map(assetType => {
         return {
@@ -3069,7 +3081,6 @@ const exportSchedule = async () => {
   if (exportProgress.value !== null) return
   const generation = scheduleGeneration
   const rows = filteredScheduleItems.value.filter(row => !row.expanded)
-  const loadRows = isAllEpisodes.value ? loadEpisodeRows : loadTaskTypeRows
   exportCancelled = false
   exportProgress.value = 0
   errors.value.exportSchedule = false
@@ -3077,7 +3088,7 @@ const exportSchedule = async () => {
   try {
     for (const [index, row] of rows.entries()) {
       if (exportCancelled || isStaleSchedule(generation)) return
-      await loadRows(row)
+      await loadRootRows(row)
       exportProgress.value = Math.round(((index + 1) / rows.length) * 100)
     }
     if (exportCancelled || isStaleSchedule(generation)) return

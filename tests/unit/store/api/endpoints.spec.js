@@ -1,5 +1,6 @@
 // @vitest-environment node
 
+import moment from 'moment'
 import { vi } from 'vitest'
 
 vi.mock('@/store/api/client', () => ({
@@ -24,6 +25,7 @@ import previewsApi from '@/store/api/previews'
 import projectTemplatesApi from '@/store/api/projecttemplates'
 import scheduleApi from '@/store/api/schedule'
 import shotsApi from '@/store/api/shots'
+import statusAutomationsApi from '@/store/api/statusautomation'
 import tasksApi from '@/store/api/tasks'
 import taskTypesApi from '@/store/api/tasktypes'
 
@@ -353,6 +355,61 @@ describe('store/api endpoints', () => {
     })
   })
 
+  describe('milestones', () => {
+    const milestone = {
+      id: 'm1',
+      date: moment('2026-11-02'),
+      name: 'Animation lock',
+      milestone_type: 'approval',
+      color: null,
+      department_id: 'dep-1'
+    }
+
+    test('creates a milestone with its department', () => {
+      scheduleApi.createMilestone({ id: 'p1' }, milestone)
+      expect(client.ppost).toHaveBeenCalledWith('/api/data/milestones', {
+        date: '2026-11-02',
+        name: 'Animation lock',
+        task_type_id: undefined,
+        milestone_type: 'approval',
+        color: null,
+        department_id: 'dep-1',
+        project_id: 'p1'
+      })
+    })
+
+    test('updates the department of a milestone', () => {
+      scheduleApi.updateMilestone({ ...milestone, department_id: null })
+      expect(client.pput).toHaveBeenCalledWith('/api/data/milestones/m1', {
+        date: '2026-11-02',
+        name: 'Animation lock',
+        task_type_id: undefined,
+        milestone_type: 'approval',
+        color: null,
+        department_id: null
+      })
+    })
+  })
+
+  // The production schedule unfolds a task type into the schedule items of
+  // its asset types, sequences, edits, or episodes.
+  describe('schedule items of a task type', () => {
+    test.each([
+      ['getAssetTypeScheduleItems', 'asset-types'],
+      ['getSequenceScheduleItems', 'sequences'],
+      ['getEditScheduleItems', 'edits'],
+      ['getEpisodeScheduleItems', 'episodes']
+    ])('%s loads the %s items, of an episode if given', (method, path) => {
+      scheduleApi[method]({ id: 'p1' }, { id: 'tt-1' })
+      scheduleApi[method]({ id: 'p1' }, { id: 'tt-1' }, 'ep-1')
+
+      expect(client.pget.mock.calls).toEqual([
+        [`/api/data/projects/p1/schedule-items/tt-1/${path}`],
+        [`/api/data/projects/p1/schedule-items/tt-1/${path}?episode_id=ep-1`]
+      ])
+    })
+  })
+
   describe('tasktypes deleteTaskType', () => {
     // Without force Zou refuses a task type still attached to schedule
     // items or productions, and says so: that answer drives the second,
@@ -432,5 +489,75 @@ describe('store/api endpoints', () => {
       '/api/data/tasks?project_id=p1&task_type_id=tt1&page=1&limit=1'
     )
     expect(nbTasks).toBe(12)
+  })
+
+  describe('status automations', () => {
+    const form = {
+      id: 'automation-1',
+      entityType: 'shot',
+      operator: 'and',
+      conditions: [
+        { taskTypeId: 'task-type-lighting', taskStatusIds: ['done'] },
+        { taskTypeId: 'task-type-fx', taskStatusIds: ['done', 'na'] }
+      ],
+      outFieldType: 'status',
+      outTaskTypeId: 'task-type-compositing',
+      outTaskStatusId: 'ready',
+      outOnlyIfTaskStatusIds: [],
+      importLastRevision: 'true',
+      archived: 'true'
+    }
+    const trigger = {
+      operator: 'and',
+      conditions: [
+        { task_type_id: 'task-type-lighting', task_status_ids: ['done'] },
+        { task_type_id: 'task-type-fx', task_status_ids: ['done', 'na'] }
+      ]
+    }
+
+    it('creates an automation with its trigger conditions', () => {
+      statusAutomationsApi.newStatusAutomation(form)
+      expect(client.ppost).toHaveBeenCalledWith(
+        '/api/data/status-automations/',
+        {
+          entity_type: 'shot',
+          in_conditions: trigger,
+          out_field_type: 'status',
+          out_task_type_id: 'task-type-compositing',
+          out_task_status_id: 'ready',
+          out_only_if_task_status_ids: [],
+          import_last_revision: true
+        }
+      )
+    })
+
+    it('updates an automation, archived flag included', () => {
+      statusAutomationsApi.updateStatusAutomation(form)
+      const [path, data] = client.pput.mock.calls[0]
+      expect(path).toBe('/api/data/status-automations/automation-1')
+      expect(data.in_conditions).toEqual(trigger)
+      expect(data.archived).toBe(true)
+      expect(data).not.toHaveProperty('in_task_type_id')
+    })
+
+    it('leaves out the trigger of an edit that keeps it', () => {
+      statusAutomationsApi.updateStatusAutomation({
+        ...form,
+        isTriggerChanged: false
+      })
+      const [, data] = client.pput.mock.calls[0]
+      expect(data).not.toHaveProperty('in_conditions')
+      expect(data.out_task_type_id).toBe('task-type-compositing')
+    })
+
+    it('leaves out the guard of an edit that keeps it', () => {
+      statusAutomationsApi.updateStatusAutomation({
+        ...form,
+        isGuardChanged: false
+      })
+      const [, data] = client.pput.mock.calls[0]
+      expect(data).not.toHaveProperty('out_only_if_task_status_ids')
+      expect(data.in_conditions.operator).toBe('and')
+    })
   })
 })

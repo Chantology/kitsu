@@ -68,7 +68,10 @@
       },
       "include_all": "모든 어셋 작업 유형 포함",
       "add_asset_type_to_library": "라이브러리에 어셋 종류 추가",
-      "add_asset_type_placeholder": "+ 어셋 종류 추가"
+      "add_asset_type_placeholder": "+ 어셋 종류 추가",
+      "restore_studio_workflow": "스튜디오 워크플로 사용",
+      "workflow_production": "프로덕션 워크플로",
+      "workflow_studio": "스튜디오 워크플로"
     },
     "breakdown": {
       "all_assets": "사용 가능한 모든 어셋",
@@ -427,6 +430,8 @@
       "all_assets": "모든 어셋",
       "admin": "관리자",
       "cancel": "취소",
+      "cell_save_error": "\"{name}\"을(를) 저장할 수 없습니다. 이전 값으로 되돌렸습니다. 페이지를 새로 고치고 다시 시도해 주세요.",
+      "cells_save_error": "일부 변경 사항을 저장할 수 없습니다. 이전 값으로 되돌렸습니다. 페이지를 새로 고치고 다시 시도해 주세요.",
       "clear_selection": "현재 선택 해제",
       "close": "닫기",
       "confirmation": "확인",
@@ -441,6 +446,7 @@
       "delete_text": "데이터베이스에서 {name}을(를) 정말로 제거하시겠습니까?",
       "documentation": "문서",
       "edit": "수정",
+      "edit_deleted_error": "\"{name}\"을(를) 저장할 수 없습니다. 그 사이에 삭제되었습니다.",
       "empty_comment": "빈 댓글",
       "end_date": "종료일",
       "files_selected": "파일 {count}개 선택됨 | 파일 {count}개 선택됨",
@@ -640,7 +646,9 @@
       "expand_all": "모두 확장",
       "hours": "시간 | 시간",
       "remove_search_query": "검색어 '{name}'을 제거하시겠습니까?",
+      "remove_search_query_error": "이 검색어를 제거하는 동안 오류가 발생했습니다.",
       "remove_search_filter_group": "검색 필터 그룹 \"{name}\"을 제거하시겠습니까?",
+      "remove_search_filter_group_error": "이 검색 필터 그룹을 제거하는 동안 오류가 발생했습니다.",
       "shared_by": "{name}님이 공유",
       "continue": "계속하기",
       "developer_documentation": "개발자 문서",
@@ -994,8 +1002,10 @@
         "active_links": "활성 링크",
         "add_link": "새 링크 추가",
         "can_comment": "댓글 허용",
+        "can_download": ".zip 다운로드 허용",
         "comments_disabled": "댓글 비활성화됨",
         "comments_enabled": "댓글 활성화됨",
+        "download_enabled": ".zip 다운로드 사용",
         "copy": "링크 복사",
         "create_new": "새 링크 만들기",
         "description": "외부 리뷰어와 이 재생 목록을 공유할 링크를 생성합니다. 링크가 있는 사람은 누구나 Kitsu 계정 없이도 재생 목록을 보고 댓글을 남길 수 있습니다. 만료일을 설정하고 언제든지 접근을 취소할 수 있습니다.",
@@ -1401,6 +1411,7 @@
       "create_error": "이 작업 상태를 저장하는 동안 오류가 발생했습니다. 비슷한 이름의 작업 상태가 정말로 없습니까?",
       "delete_text": "데이터베이스에서 {name}을(를) 정말로 제거하시겠습니까?",
       "delete_error": "이 작업 상태를 삭제하는 동안 오류가 발생했습니다. 아마도 연결된 데이터가 있는 것 같습니다. 이 작업 상태에 연결된 작업이 정말로 없습니까?",
+      "delete_blocked_by_automations": "아카이브된 항목을 포함해 이 작업 상태를 사용하는 상태 자동화가 아직 있습니다. 먼저 수정하거나 삭제하세요.",
       "edit_title": "작업 상태 편집",
       "number": "작업 상태 | 작업 상태",
       "new_task_status": "작업 상태 추가",
@@ -1425,11 +1436,13 @@
         "entities": "어셋, 샷, 시퀀스, ..."
       },
       "add_task_status_to_library": "라이브러리에 작업 상태 추가",
-      "add_task_status_placeholder": "+ 작업 상태 추가"
+      "add_task_status_placeholder": "+ 작업 상태 추가",
+      "remove_status": "상태 {name} 제거"
     },
     "task_types": {
       "delete_text": "데이터베이스에서 {name}을(를) 정말로 제거하시겠습니까?",
       "delete_error": "이 작업 유형을 삭제하는 동안 오류가 발생했습니다. 아마도 연결된 데이터가 있는 것 같습니다. 이 작업 유형에 연결된 작업이 정말로 없습니까?",
+      "delete_blocked_by_automations": "아카이브된 항목을 포함해 이 작업 유형을 사용하는 상태 자동화가 아직 있습니다. 먼저 수정하거나 삭제하세요.",
       "delete_blocked_by_links": "이 작업 유형은 아직 일부 프로덕션의 일정 또는 워크플로에서 사용 중입니다. 분리하면 모든 프로덕션에서 해당 일정 날짜가 삭제됩니다.",
       "delete_blocked_by_tasks": "이 작업 유형을 사용하는 작업이 아직 있습니다. 제거하기 전에 해당 작업을 삭제하거나 다시 할당하세요.",
       "delete_force": "분리 후 삭제",
@@ -1454,6 +1467,7 @@
       "remaining_tasks": "{name}에 이 프로덕션의 작업이 아직 {count}개 남아 있습니다. 작업 유형을 제거해도 작업은 삭제되지 않습니다. | {name}에 이 프로덕션의 작업이 아직 {count}개 남아 있습니다. 작업 유형을 제거해도 작업은 삭제되지 않습니다.",
       "remaining_tasks_delete": "이 작업도 댓글 및 미리보기와 함께 삭제 | 이 작업 {count}개도 댓글 및 미리보기와 함께 삭제",
       "remaining_tasks_lock": "삭제를 확인하려면 {name}을(를) 입력하세요",
+      "remaining_tasks_lock_error": "이름이 일치하지 않습니다.",
       "remove_error": "작업 유형을 제거할 수 없습니다. 다시 시도해 주세요.",
       "remove_title": "작업 유형 제거",
       "select_task_type": "작업 유형 선택...",
@@ -1534,7 +1548,16 @@
         "edit_milestone": "마일스톤 편집",
         "name": "이름",
         "error": "마일스톤을 추가하거나 편집하는 동안 오류가 발생했습니다. 다시 시도해 주세요.",
-        "delete_milestone": "마일스톤 삭제"
+        "delete_milestone": "마일스톤 삭제",
+        "type": "유형",
+        "color": "색상",
+        "types": {
+          "kickoff": "킥오프",
+          "review": "리뷰",
+          "approval": "승인",
+          "delivery": "납품",
+          "other": "기타"
+        }
       },
       "mode": "보기 모드",
       "mode_prev": "예측",
@@ -1994,29 +2017,32 @@
     },
     "status_automations": {
       "change_ready_for": "\"준비 대상\"을 다음으로 변경합니다",
-      "change_status": "작업 상태를 다음으로 변경합니다",
-      "create_error": "이 상태 자동화를 저장하던 중 오류가 발생했습니다. 정말 같은 이름을 가진 다른 자동화가 없습니까?",
-      "delete_text": "정말 데이터베이스에서 {name} 상태 자동화를 제거하시겠습니까?",
-      "delete_error": "이 상태 자동화를 삭제하던 중 오류가 발생했습니다. 프로덕션에 연결되어 있을 수 있습니다. 이 경우 먼저 모든 프로덕션에서 이 상태 자동화를 제거해야 합니다.",
+      "change_status": "작업의 상태를 변경합니다:",
+      "create_error": "저장할 수 없습니다. 다시 시도해 주세요.",
+      "delete_text": "정말 데이터베이스에서 이 상태 자동화를 제거하시겠습니까?",
+      "delete_error": "이 상태 자동화를 삭제하던 중 오류가 발생했습니다. 프로덕션 또는 프로덕션 템플릿에 연결되어 있을 수 있습니다. 이 경우 먼저 모든 프로덕션과 템플릿에서 이 상태 자동화를 제거해야 합니다.",
       "edit_title": "상태 자동화 편집",
-      "entity_title": "트리거의 영향을 받는 엔티티 유형",
       "number": "상태 자동화 | 상태 자동화",
-      "in_title": "변경을 발동하는 상태",
+      "in_title": "트리거 조건",
       "out_title": "트리거 발동 시 적용되는 변경입니다",
       "new_status_automation": "상태 자동화 추가",
       "production_description": "자동화는 상태가 설정될 때 작업 상태 또는 다음 작업을 변경합니다.",
       "run_for_selection": "선택된 작업에 상태 자동화 실행:",
+      "save_refused": "이 자동화는 현재 상태로는 저장할 수 없습니다.",
       "title": "자동화",
-      "wrong_automation": "이 자동화는 선행 작업 유형에 적용됩니다. 이러한 자동화는 (무한 순환을 피하기 위해) Kitsu에서 허용되지 않으며, 아무 영향을 미치지 않습니다.",
+      "to_status": "→",
+      "wrong_automation": "이 프로덕션에서는 모든 조건이 적용된 작업 유형보다 뒤에 오는 작업 유형을 사용합니다. 무한 순환을 피하기 위해 이들의 상태 변경은 이 자동화를 실행하지 않으므로 아무 효과가 없습니다.",
       "fields": {
         "entity_type": "엔티티 유형",
-        "in_field_type": "입력 필드 유형",
         "in_task_type": "작업 유형",
         "in_task_status": "작업 상태",
-        "out_field_type": "트리거",
+        "out_field_type": "적용된 변경",
         "out_task_type": "적용된 작업 유형",
         "out_task_status": "적용된 작업 상태",
-        "import_last_revision": "마지막 수정본 가져오기"
+        "import_last_revision": "마지막 수정본 가져오기",
+        "conditions": "조건",
+        "operator": "연산자",
+        "out_only_if_task_status_ids": "적용된 작업이 다음 상태일 때만"
       },
       "entity_types": {
         "asset": "어셋",
@@ -2029,7 +2055,36 @@
         "status": "상태",
         "ready_for": "준비 대상"
       },
-      "add_status_automation_placeholder": "+ 상태 자동화 추가"
+      "add_status_automation_placeholder": "+ 상태 자동화 추가",
+      "connectors": {
+        "and": "그리고",
+        "or": "또는"
+      },
+      "guard_only_condition_and": "이 프로덕션에서 {taskType}은(는) 적용된 작업 유형보다 뒤에 옵니다. 이 작업 유형의 상태 변경은 이 자동화를 실행하지 않지만, 조건은 여전히 충족되어야 합니다.",
+      "guard_only_condition_or": "이 프로덕션에서 {taskType}은(는) 적용된 작업 유형보다 뒤에 옵니다. 이 조건은 무시됩니다.",
+      "trigger_when": "실행 시점",
+      "operators": {
+        "and": "다음 조건을 모두 충족할 때",
+        "or": "다음 조건 중 하나를 충족할 때"
+      },
+      "add_condition": "+ 조건 추가",
+      "remove_condition": "조건 제거",
+      "remove_condition_on": "{taskType} 조건 제거",
+      "help": {
+        "and": "상태 변경으로 모든 조건이 충족되면 실행됩니다. 엔티티에 없는 작업 유형은 무시됩니다.",
+        "or": "충족된 조건이 없던 상태에서 상태 변경으로 조건 중 하나가 충족되면 실행됩니다.",
+        "new_comments_only": "자동화는 새 댓글이 상태를 변경할 때 실행되며, 댓글을 수정하거나 삭제할 때는 실행되지 않습니다.",
+        "import_and": "수정본은 엔티티에 있는 첫 번째 조건의 작업에서 가져옵니다.",
+        "import_or": "수정본은 상태 변경으로 조건을 충족한 작업에서 가져옵니다.",
+        "out_only_if": "비워 두면 적용된 작업의 상태와 관계없이 변경이 적용됩니다."
+      },
+      "errors": {
+        "max_conditions": "자동화에는 최대 10개의 조건을 설정할 수 있습니다.",
+        "missing_value": "작업 유형과 하나 이상의 상태를 선택하세요.",
+        "same_task_type": "이 작업 유형은 이미 다른 조건에서 사용 중입니다. 해당 조건에 상태를 추가하세요.",
+        "output_in_conditions": "적용된 작업 유형은 조건에 사용할 수 없습니다."
+      },
+      "only_from": "다음 상태에서만:"
     },
     "preview_room": {
       "join_room": "검수실 참여",

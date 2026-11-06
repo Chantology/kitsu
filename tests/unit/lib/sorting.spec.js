@@ -1,6 +1,9 @@
 // @vitest-environment node
 
+import { PAGE_SIZE } from '@/lib/pagination'
 import {
+  insertAssetInPage,
+  insertShotInPage,
   sortAssets,
   sortByMetadata,
   sortByName,
@@ -14,7 +17,9 @@ import {
   sortTaskNames,
   sortTaskTypes,
   sortTasks,
-  sortValidationColumns, sortComments, sortRevisionPreviewFiles, sortAssetResult, sortShotResult
+  sortValidationColumns, sortComments, sortRevisionPreviewFiles, sortAssetResult, sortEpisodeResult, sortShotResult,
+  sortEditResult,
+  sortEdits
 } from '@/lib/sorting'
 
 const taskTypeMap = new Map(Object.entries({
@@ -24,6 +29,72 @@ const taskTypeMap = new Map(Object.entries({
 }))
 
 describe('lib/sorting', () => {
+  describe('insertShotInPage', () => {
+    const shot = name => ({ name, sequence_name: 'SQ01' })
+    const names = rows => rows.map(({ name }) => name)
+    const fullPage = () =>
+      Array.from({ length: PAGE_SIZE }, (_, index) =>
+        shot(`SH${String(index + 1).padStart(3, '0')}`)
+      )
+
+    it('fills an empty list', () => {
+      const rows = []
+      expect(insertShotInPage(rows, shot('SH010'), 1)).toBe(0)
+      expect(names(rows)).toEqual(['SH010'])
+    })
+
+    it('inserts among the rows of a page not full', () => {
+      const rows = [shot('SH010'), shot('SH030')]
+      expect(insertShotInPage(rows, shot('SH020'), 3)).toBe(1)
+      expect(names(rows)).toEqual(['SH010', 'SH020', 'SH030'])
+    })
+
+    it('adds after the rows of a page not full', () => {
+      const rows = [shot('SH010')]
+      expect(insertShotInPage(rows, shot('SH020'), 2)).toBe(1)
+      expect(names(rows)).toEqual(['SH010', 'SH020'])
+    })
+
+    it('leaves out a shot sorted past the rows of a list holding more', () => {
+      const rows = [shot('SH010'), shot('SH020')]
+      expect(insertShotInPage(rows, shot('SH999'), 4)).toBe(-1)
+      expect(names(rows)).toEqual(['SH010', 'SH020'])
+    })
+
+    it('leaves out a shot sorted past a full page', () => {
+      const rows = fullPage()
+      expect(insertShotInPage(rows, shot('SH999'), PAGE_SIZE + 1)).toBe(-1)
+      expect(names(rows)).toEqual(names(fullPage()))
+    })
+
+    it('keeps a full page full', () => {
+      const rows = fullPage()
+      expect(insertShotInPage(rows, shot('SH000'), PAGE_SIZE + 1)).toBe(0)
+      expect(names(rows)).toEqual(['SH000', ...names(fullPage()).slice(0, -1)])
+    })
+
+    it('keeps the next pages full too', () => {
+      const rows = [...fullPage(), ...fullPage()]
+      const nbListed = 2 * PAGE_SIZE + 1
+      expect(insertShotInPage(rows, shot('SH999'), nbListed)).toBe(-1)
+      expect(rows).toHaveLength(2 * PAGE_SIZE)
+      expect(insertShotInPage(rows, shot('SH000'), nbListed)).toBe(0)
+      expect(rows).toHaveLength(2 * PAGE_SIZE)
+    })
+  })
+
+  it('insertAssetInPage keeps a full page full', () => {
+    const asset = name => ({ name, asset_type_name: 'Character' })
+    const rows = Array.from({ length: PAGE_SIZE }, (_, index) =>
+      asset(`A${String(index + 1).padStart(3, '0')}`)
+    )
+    expect(insertAssetInPage(rows, asset('A999'), PAGE_SIZE + 1)).toBe(-1)
+    expect(rows).toHaveLength(PAGE_SIZE)
+    expect(insertAssetInPage(rows, asset('A000'), PAGE_SIZE + 1)).toBe(0)
+    expect(rows).toHaveLength(PAGE_SIZE)
+    expect(rows[0].name).toBe('A000')
+  })
+
   it('sortByMetadata', () => {
     const entries = [
       { id: 1, data: { render_layer: 'fg' } },
@@ -59,6 +130,91 @@ describe('lib/sorting', () => {
       sortByMetadata({ column: 'steps', data_type: 'checklist' })
     )
     expect(results.slice(0, 2).map(entry => entry.id)).toEqual([4, 2])
+  })
+
+  it('sortByMetadata puts the ticked booleans last', () => {
+    const entries = [
+      { id: 1, data: { approved: 'true' } },
+      { id: 2, data: {} },
+      { id: 3, data: { approved: 'false' } },
+      { id: 4, data: { approved: 'true' } }
+    ]
+    const results = [...entries].sort(
+      sortByMetadata({ column: 'approved', data_type: 'boolean' })
+    )
+    expect(results.map(entry => entry.id)).toEqual([2, 3, 1, 4])
+  })
+
+  it('sortByMetadata sorts tag lists by their text, the empty ones last', () => {
+    const entries = [
+      { id: 1, data: { tags: 'hero,night' } },
+      { id: 2, data: {} },
+      { id: 3, data: { tags: 'crowd' } },
+      { id: 4, data: { tags: 'hero' } }
+    ]
+    const results = [...entries].sort(
+      sortByMetadata({ column: 'tags', data_type: 'taglist' })
+    )
+    expect(results.map(entry => entry.id)).toEqual([3, 4, 1, 2])
+  })
+
+  it('sortEdits', () => {
+    const edits = [
+      { id: 1, name: 'edit 10', episode_name: 'E01', canceled: false },
+      { id: 2, name: 'edit 2', episode_name: 'E02', canceled: false },
+      { id: 3, name: 'edit 2', episode_name: 'E01', canceled: false },
+      { id: 4, name: 'edit 1', episode_name: 'E01', canceled: true }
+    ]
+    expect(sortEdits(edits).map(edit => edit.id)).toEqual([3, 1, 2, 4])
+  })
+
+  it('sortEditResult', () => {
+    const entries = [
+      {
+        id: 1,
+        name: 'edit 2',
+        episode_name: 'E01',
+        canceled: false,
+        data: { cut: 'b' }
+      },
+      {
+        id: 2,
+        name: 'edit 1',
+        episode_name: 'E01',
+        canceled: false,
+        data: { cut: 'a' }
+      },
+      {
+        id: 3,
+        name: 'edit 3',
+        episode_name: 'E01',
+        canceled: true,
+        data: { cut: 'b' }
+      },
+      {
+        id: 4,
+        name: 'edit 0',
+        episode_name: 'E01',
+        canceled: false,
+        data: { cut: 'b' }
+      }
+    ]
+    const sortIds = sorting =>
+      sortEditResult([...entries], sorting, taskTypeMap, new Map()).map(
+        edit => edit.id
+      )
+
+    expect(sortIds([])).toEqual([4, 2, 1, 3])
+    expect(
+      sortIds([
+        {
+          type: 'metadata',
+          column: 'cut',
+          data_type: 'string',
+          ascending: false
+        }
+      ])
+    ).toEqual([4, 1, 2, 3])
   })
 
   it('sortByName', () => {
@@ -780,6 +936,23 @@ describe('lib/sorting', () => {
     expect(resultsTaskTypes[3].id).toEqual(3)
     expect(resultsTaskTypes[4].id).toEqual(1)
     expect(resultsTaskTypes[5].id).toEqual(2)
+  })
+
+  // The plain list of the episodes comes without their tasks.
+  it('sortEpisodeResult by task type on entries without tasks', () => {
+    const episodes = [
+      { id: 'ep-1', name: 'E01', canceled: false },
+      { id: 'ep-2', name: 'E02', canceled: false }
+    ]
+
+    const results = sortEpisodeResult(
+      episodes,
+      [{ type: 'task_type', column: 'valid' }],
+      taskTypeMap,
+      new Map()
+    )
+
+    expect(results).toHaveLength(2)
   })
 
   it('sortByPersonName', () => {

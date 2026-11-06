@@ -127,8 +127,13 @@ defineProps({
   max-width: 1200px;
 }
 
-// The look of the setting blocks of every tab lives here. Wide tables
-// scroll inside their block instead of stretching it.
+// Their rows are too long for that cap: the board roles wrapped and the last
+// automation columns scrolled out of sight on a screen with room to spare.
+:deep(.tab.is-full) {
+  max-width: none;
+}
+
+// The look of the setting blocks of every tab lives here.
 // Same look as the .block panels of the entity pages (Shot.vue)
 :deep(.tab .section) {
   background: var(--background-block);
@@ -136,8 +141,23 @@ defineProps({
   border-radius: 1em;
   box-shadow: 0 0 6px var(--box-shadow);
   margin-bottom: 1em;
-  overflow-x: auto;
   padding: 1.5em;
+}
+
+// Wide content scrolls inside its block instead of stretching it: tables
+// in their wrapper, a list and its importer in their row. The block itself
+// must not scroll: it would cut the combobox lists that open past its
+// bottom.
+:deep(.tab .section .asset-type-settings .columns),
+:deep(.tab .section .production-task-types .columns),
+:deep(.tab .section .task-type-settings .columns) {
+  overflow-x: auto;
+}
+
+// Lets the automation list scroll in its wrapper rather than widen its
+// column.
+:deep(.tab .section .status-automation-settings .column) {
+  min-width: 0;
 }
 
 // Empty list messages: modals also render a .box here, hence the parents.

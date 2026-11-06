@@ -111,7 +111,10 @@ const buildStore = getters => ({
 
 // The store is both mocked for the Options API lists and provided for the
 // script setup ones: useStore() injects it under the 'store' key.
-export const mountEntityList = async (component, { getters, props, query }) => {
+export const mountEntityList = async (
+  component,
+  { getters, props, query, stubs }
+) => {
   const store = buildStore(getters)
   const router = createRouter({
     history: createMemoryHistory(),
@@ -130,10 +133,10 @@ export const mountEntityList = async (component, { getters, props, query }) => {
   const wrapper = shallowMount(component, {
     global: {
       // No task in the rows: task links never resolve a route.
-      mocks: { $router: {}, $store: store, $t: key => key },
+      mocks: { $router: {}, $store: store },
       plugins: [resizableColumn, router, i18n],
       provide: { store },
-      stubs: { RouterLink: true }
+      stubs: { RouterLink: true, ...stubs }
     },
     props: {
       displaySettings: { showInfos: true },

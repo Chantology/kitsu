@@ -13,6 +13,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useStore } from 'vuex'
 
+import { getEntityName, useCellSave } from '@/composables/cellSave'
 import csv from '@/lib/csv'
 import func from '@/lib/func'
 import preferences from '@/lib/preferences'
@@ -97,6 +98,7 @@ const ERRORS = {
   deleteAllTasks: false,
   deleteMetadata: false,
   edit: false,
+  editDeleted: false,
   importing: false,
   importingError: null,
   restore: false
@@ -138,6 +140,11 @@ export const useEntityPage = ({
   const route = useRoute()
   const router = useRouter()
   const store = useStore()
+  // A partial entry, as the ready for of an asset, takes its name from the
+  // cache.
+  const { cellSaveErrorText, saveCell } = useCellSave(entry =>
+    getEntityName(store.getters[`${type}Map`]?.get(entry.id) || entry)
+  )
 
   const entityTypeName = stringHelpers.capitalize(type)
   const TYPE = type.toUpperCase()
@@ -302,12 +309,6 @@ export const useEntityPage = ({
     } finally {
       loading.savingSearch = false
     }
-  }
-
-  const removeSearchQuery = searchQuery => {
-    store
-      .dispatch(`remove${entityTypeName}Search`, searchQuery)
-      .catch(console.error)
   }
 
   // Scroll and scope
@@ -479,11 +480,13 @@ export const useEntityPage = ({
     )
 
   const onMetadataChanged = async ({ entry, descriptor, value }) => {
-    await store.dispatch(`edit${entityTypeName}`, {
-      id: entry.id,
-      data: { [descriptor.field_name]: value }
-    })
-    applySearchFromUrl(false)
+    const isSaved = await saveCell(entry, () =>
+      store.dispatch(`edit${entityTypeName}`, {
+        id: entry.id,
+        data: { [descriptor.field_name]: value }
+      })
+    )
+    if (isSaved) applySearchFromUrl(false)
   }
 
   // CSV export
@@ -819,17 +822,14 @@ export const useEntityPage = ({
     displaySettings,
     entityToDelete,
     entityToEdit,
-    entityToRestore,
-    entityTypeName,
     errors,
-    keepTaskPanelOpen,
     loading,
     modals,
     parsedCSV,
     selectedDepartment,
     success,
-    taskTypeForTaskDeletion,
 
+    cellSaveErrorText,
     deleteAllTasksText,
     deleteText,
     isTaskSidePanelOpen,
@@ -873,10 +873,9 @@ export const useEntityPage = ({
     onRestoreClicked,
     openEditModal,
     onSearchChange,
-    onSelectedDepartmentChanged,
-    removeSearchQuery,
     renderImport,
     resetImport,
+    saveCell,
     saveScrollPosition,
     saveSearchQuery,
     selectableDepartments,

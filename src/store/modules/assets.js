@@ -6,7 +6,6 @@ import peopleApi from '@/store/api/people'
 
 import assetTypeStore from '@/store/modules/assettypes'
 import episodeStore from '@/store/modules/episodes'
-import peopleStore from '@/store/modules/people'
 import productionsStore from '@/store/modules/productions'
 import tasksStore from '@/store/modules/tasks'
 import taskStatusStore from '@/store/modules/taskstatus'
@@ -18,6 +17,7 @@ import { getTaskTypePriorityOfProd } from '@/lib/productions'
 import { minutesToDays } from '@/lib/time'
 import { PAGE_SIZE } from '@/lib/pagination'
 import {
+  insertAssetInPage,
   insertSortedAsset,
   sortAssetResult,
   sortAssets,
@@ -26,11 +26,17 @@ import {
   sortTasks,
   sortValidationColumns
 } from '@/lib/sorting'
-import { buildSelectionGrid, clearSelectionGrid } from '@/lib/selection'
+import {
+  addRowToSelectionGrid,
+  buildSelectionGrid,
+  clearSelectionGrid
+} from '@/lib/selection'
 import {
   getFilledColumns,
   groupEntitiesByParents,
-  removeModelFromList
+  removeModelFromList,
+  setCanceled,
+  trackEdit
 } from '@/lib/models'
 import { computeStats, countEntities } from '@/lib/stats'
 import {
@@ -60,7 +66,6 @@ import {
   IMPORT_ASSETS_START,
   IMPORT_ASSETS_END,
   DELETE_TASK_END,
-  NEW_TASK_COMMENT_END,
   NEW_TASK_END,
   SET_ASSET_SEARCH,
   SET_SHARED_ASSET_SEARCH,
@@ -100,12 +105,6 @@ const helpers = {
   },
   getTaskType(taskTypeId) {
     return taskTypesStore.cache.taskTypeMap.get(taskTypeId)
-  },
-  getTask(taskId) {
-    return tasksStore.state.taskMap.get(taskId)
-  },
-  getPerson(personId) {
-    return peopleStore.cache.personMap.get(personId)
   },
 
   setListStats(state, assets) {
@@ -301,7 +300,6 @@ const cache = {
 
 const initialState = {
   assetValidationColumns: [],
-  nbValidationColumns: 0,
 
   filteredAssets: [],
   displayedAssets: [],
@@ -348,8 +346,6 @@ const state = {
 const getters = {
   assetMap: state => cache.assetMap,
   assetSearchText: state => state.assetSearchText,
-  assetSearchQueries: state => state.assetSearchQueries,
-  assetSearchFilterGroups: state => state.assetSearchFilterGroups,
   assetSelectionGrid: state => state.assetSelectionGrid,
   assetValidationColumns: state => state.assetValidationColumns,
 
@@ -359,10 +355,6 @@ const getters = {
 
   displayedAssets: state => state.displayedAssets,
   displayedAssetsCount: state => state.displayedAssetsCount,
-  displayedAssetsLength: state => state.displayedAssetsLength,
-  displayedAssetsTimeSpent: state => state.displayedAssetsTimeSpent,
-  displayedAssetsEstimation: state => state.displayedAssetsEstimation,
-  assetFilledColumns: state => state.assetFilledColumns,
 
   usedAssetTypes: state => state.assetTypes,
   assetTypeStats: state => state.assetTypeStats,
@@ -391,7 +383,6 @@ const getters = {
 
   selectedAssets: state => state.selectedAssets,
 
-  sharedAssets: state => state.sharedAssets,
   unsharedAssets: state => state.unsharedAssets,
 
   displayedSharedAssets: state => state.displayedSharedAssets,
@@ -400,10 +391,6 @@ const getters = {
       state.displayedSharedAssets,
       'asset_type_name'
     )
-  },
-
-  sharedAssetsByType: state => {
-    return groupEntitiesByParents(state.sharedAssets, 'asset_type_name')
   }
 }
 
@@ -540,10 +527,6 @@ const actions = {
     return loadingPromise
   },
 
-  getAsset({ commit, state, rootGetters }, assetId) {
-    return assetsApi.getAsset(assetId)
-  },
-
   // Reloads an asset after a remote change. A socket event passes
   // { assetId, onlyInScope: true }: a freshly created asset is cast nowhere
   // yet, so its episode alone says whether the loaded dataset should hold
@@ -598,7 +581,8 @@ const actions = {
             taskMap,
             persons,
             personMap,
-            production
+            production,
+            isInLoadedScope
           })
           // A detail page loads its asset whatever the list holds: holding more
           // than its recorded scope, the list must be refetched by its pages.
@@ -615,8 +599,7 @@ const actions = {
     }
     return assetsApi.newAsset(data).then(asset => {
       const assetTypeMap = rootGetters.assetTypeMap
-      const assetType = assetTypeMap.get(asset.entity_type_id)
-      const workflow = assetType ? assetType.task_types || [] : []
+      const workflow = rootGetters.getAssetTypeWorkflow(asset.entity_type_id)
       let taskTypeIds = rootGetters.productionAssetTaskTypeIds
       const sortInfo =
         state.assetSorting && state.assetSorting.length > 0
@@ -651,12 +634,38 @@ const actions = {
     }
     const assetTypeMap = assetTypeStore.cache.assetTypeMap
     commit(LOCK_ASSET, data)
-    commit(EDIT_ASSET_END, { newAsset: data, assetTypeMap })
-    return assetsApi.updateAsset(data).finally(() => {
-      setTimeout(() => {
-        commit(UNLOCK_ASSET, data)
-      }, 2000)
-    })
+    // EDIT_ASSET_END lists the assets it does not find, the new ones: the
+    // partial form of an asset deleted in another session must not enter.
+    // Out of the cache, an asset gets no undo edit either.
+    const trackedEdit = trackEdit(
+      () => cache.assetMap.get(data.id),
+      () => {
+        if (cache.assetMap.has(data.id)) {
+          commit(EDIT_ASSET_END, { newAsset: data, assetTypeMap })
+        }
+      }
+    )
+    return assetsApi
+      .updateAsset(data)
+      .then(
+        result => {
+          trackedEdit.keep()
+          return result
+        },
+        err => {
+          // A save Zou refuses puts back the values the changes replaced.
+          const undoEdit = trackedEdit.undo()
+          if (undoEdit) {
+            commit(EDIT_ASSET_END, { newAsset: undoEdit, assetTypeMap })
+          }
+          throw err
+        }
+      )
+      .finally(() => {
+        setTimeout(() => {
+          commit(UNLOCK_ASSET, data)
+        }, 2000)
+      })
   },
 
   deleteAsset({ commit, state }, asset) {
@@ -787,7 +796,8 @@ const actions = {
   computeAssetTypeStats({ commit, rootGetters }) {
     const taskStatusMap = rootGetters.taskStatusMap
     const taskMap = rootGetters.taskMap
-    commit(COMPUTE_ASSET_TYPE_STATS, { taskStatusMap, taskMap })
+    const isInWorkflow = rootGetters.isInAssetTypeWorkflow
+    commit(COMPUTE_ASSET_TYPE_STATS, { taskStatusMap, taskMap, isInWorkflow })
   },
 
   getAssetsCsvLines({ state, rootGetters }) {
@@ -881,7 +891,7 @@ const actions = {
   },
 
   deleteAllAssetTasks({ dispatch }, { projectId, taskTypeId, selectionOnly }) {
-    let taskIds = []
+    let taskIds
     if (selectionOnly) {
       taskIds = cache.result
         .filter(asset => asset.validations.get(taskTypeId))
@@ -1096,7 +1106,6 @@ const mutations = {
 
     state.isAssetsLoading = false
     state.isAssetsLoadingError = false
-    state.nbValidationColumns = state.assetValidationColumns.length
 
     state.displayedAssets = displayedAssets
     helpers.setListStats(state, cache.assets)
@@ -1148,7 +1157,8 @@ const mutations = {
       persons,
       personMap,
       production,
-      asset
+      asset,
+      isInLoadedScope = true
     }
   ) {
     asset.tasks = sortTasks(asset.tasks, taskTypeMap)
@@ -1182,23 +1192,36 @@ const mutations = {
     const keywords = getKeyWords(query) || []
     const filters = getFilters({
       entryIndex: addedAssetIndex,
-      assetTypes: [],
+      assetTypes: state.assetTypes,
       taskTypes,
       taskStatuses,
       descriptors: production?.descriptors || [],
       persons,
       query
     })
-    let result = indexSearch(addedAssetIndex, keywords)
+    // No keyword leaves the asset to the filters, as for a list.
+    let result = indexSearch(addedAssetIndex, keywords) || [asset]
     result = applyFilters(result, filters, taskMap)
 
-    if (result && result.length > 0) {
-      cache.result.push(asset)
-      insertSortedAsset(state.displayedAssets, asset)
-      helpers.setListStats(state, cache.assets)
-      state.assetFilledColumns = getFilledColumns(state.displayedAssets)
+    if (isInLoadedScope && result.length > 0) {
+      if (cache.result !== cache.assets) {
+        insertSortedAsset(cache.result, asset)
+      }
+      helpers.setListStats(state, cache.result)
 
-      state.assetSelectionGrid = buildSelectionGrid()
+      const rowIndex = insertAssetInPage(
+        state.displayedAssets,
+        asset,
+        cache.result.length
+      )
+      if (rowIndex >= 0) {
+        state.assetFilledColumns = getFilledColumns(state.displayedAssets)
+      }
+      // Select column reaches the rows of the next pages too.
+      state.assetSelectionGrid = addRowToSelectionGrid(
+        state.assetSelectionGrid,
+        rowIndex >= 0 ? rowIndex : cache.result.indexOf(asset)
+      )
     }
   },
 
@@ -1249,9 +1272,7 @@ const mutations = {
   // one stats recompute instead of one per deleted asset. Cancel flags are
   // set first so the recomputed stats exclude the canceled assets.
   [REMOVE_ASSETS](state, { removedAssets, canceledAssets }) {
-    canceledAssets.forEach(asset => {
-      asset.canceled = true
-    })
+    setCanceled(state.displayedAssets, canceledAssets, true)
     const removedIds = new Set()
     removedAssets.forEach(asset => {
       if (cache.assetMap.get(asset.id)) {
@@ -1332,13 +1353,13 @@ const mutations = {
   },
 
   [CANCEL_ASSET](state, asset) {
-    asset.canceled = true
+    setCanceled(state.displayedAssets, [asset], true)
     state.displayedAssetsLength = cache.result.filter(a => !a.canceled).length
   },
 
   [RESTORE_ASSET_END](state, assetToRestore) {
     const asset = cache.assetMap.get(assetToRestore.id)
-    asset.canceled = false
+    setCanceled(state.displayedAssets, [asset], false)
     // No index update needed: restoring only flips `canceled`, none of the
     // indexed words change.
     state.displayedAssetsLength = cache.result.filter(a => !a.canceled).length
@@ -1355,12 +1376,10 @@ const mutations = {
 
       const tasks = JSON.parse(JSON.stringify(asset.tasks))
       const taskIndex = tasks.findIndex(assetTaskId => assetTaskId === task.id)
-      tasks.splice(taskIndex, 1)
+      if (taskIndex >= 0) tasks.splice(taskIndex, 1)
       asset.tasks = tasks
     }
   },
-
-  [NEW_TASK_COMMENT_END](state, { comment, taskId }) {},
 
   [LOAD_TASK_END](state, task) {
     const asset = cache.assetMap.get(task.entity_id)
@@ -1497,6 +1516,7 @@ const mutations = {
         state.assetFilledColumns[task.task_type_id] = true
       }
       // Push task and readds the whole map to activate the realtime display.
+      asset.tasks.push(task.id)
       const displayedAsset = state.displayedAssets.find(
         asset => asset.id === task.entity_id
       )
@@ -1519,6 +1539,7 @@ const mutations = {
           if (!asset.validations) asset.validations = new Map()
           helpers.populateTask(task, asset)
           asset.validations.set(task.task_type_id, task.id)
+          asset.tasks.push(task.id)
           if (displayedAsset) {
             displayedAsset.validations = new Map(asset.validations)
           }
@@ -1527,9 +1548,16 @@ const mutations = {
     })
   },
 
-  [COMPUTE_ASSET_TYPE_STATS](state, { taskStatusMap, taskMap }) {
+  [COMPUTE_ASSET_TYPE_STATS](state, { taskStatusMap, taskMap, isInWorkflow }) {
+    const assets = cache.assets.map(asset => ({
+      ...asset,
+      tasks: asset.tasks.filter(taskId => {
+        const task = taskMap.get(taskId)
+        return task && isInWorkflow(asset.asset_type_id, task.task_type_id)
+      })
+    }))
     state.assetTypeStats = computeStats(
-      cache.assets,
+      assets,
       'asset_type_id',
       taskStatusMap,
       taskMap

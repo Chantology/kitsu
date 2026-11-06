@@ -29,6 +29,12 @@ const linksError = {
 const tasksError = {
   body: { message: 'The change conflicts with records referencing this one.' }
 }
+const automationsError = {
+  body: {
+    message:
+      'Task type Compositing is used by 2 status automations (1 archived). Remove it from them first.'
+  }
+}
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -55,7 +61,7 @@ const mountComponent = async (deleteError, deleteImpl) => {
   await router.push('/task-types?tab=archived')
   await router.isReady()
   const wrapper = shallowMount(TaskTypes, {
-    global: { plugins: [store, router], mocks: { $t: key => key } }
+    global: { plugins: [store, router] }
   })
   await flushPromises()
   return { store, wrapper }
@@ -90,8 +96,7 @@ const mountForReorder = async reorder => {
   const wrapper = shallowMount(TaskTypes, {
     global: {
       config: { errorHandler },
-      plugins: [store, router],
-      mocks: { $t: key => key }
+      plugins: [store, router]
     }
   })
   await flushPromises()
@@ -204,6 +209,21 @@ describe('TaskTypes', () => {
       'task_types.delete_blocked_by_tasks'
     )
     expect(modal.props('errorDetails')).toEqual(tasksError.body.message)
+    expect(modal.props('deleteButtonText')).toEqual('')
+  })
+
+  // Zou refuses it, force or not, while a status automation uses it.
+  it('explains when status automations use it, without offering to force', async () => {
+    const { wrapper } = await mountComponent(automationsError)
+    await openDeleteModal(wrapper)
+
+    const modal = await confirmDeletion(wrapper)
+
+    expect(modal.props('isError')).toBe(true)
+    expect(modal.props('errorText')).toEqual(
+      'task_types.delete_blocked_by_automations'
+    )
+    expect(modal.props('errorDetails')).toEqual(automationsError.body.message)
     expect(modal.props('deleteButtonText')).toEqual('')
   })
 

@@ -34,10 +34,6 @@ export default {
     return client.pput(`/api/data/tasks/${taskId}`, data)
   },
 
-  getTaskSubscribed(taskId) {
-    return client.pget(`/api/data/user/tasks/${taskId}/subscribed`)
-  },
-
   subscribeToTask(taskId) {
     return client.ppost(`/api/actions/user/tasks/${taskId}/subscribe`, {})
   },
@@ -60,10 +56,6 @@ export default {
 
   getTaskComments(taskId) {
     return client.pget(`/api/data/tasks/${taskId}/comments`)
-  },
-
-  getTaskPreviews(taskId) {
-    return client.pget(`/api/data/tasks/${taskId}/previews`)
   },
 
   commentTask(data) {
@@ -184,21 +176,19 @@ export default {
     })
   },
 
-  deleteTask(task) {
-    return client.pdel(`/api/data/tasks/${task.id}?force=true`)
-  },
-
   deleteAllTasks(projectId, taskTypeId, taskIds) {
-    if (taskIds && taskIds.length > 0) {
-      return client.ppost(
-        `/api/actions/projects/${projectId}/delete-tasks`,
-        taskIds
-      )
-    } else {
+    // No list deletes every task of the type across the production. An empty
+    // list deletes nothing.
+    if (!taskIds) {
       return client.pdel(
         `/api/actions/projects/${projectId}/task-types/${taskTypeId}/delete-tasks`
       )
     }
+    if (taskIds.length === 0) return Promise.resolve()
+    return client.ppost(
+      `/api/actions/projects/${projectId}/delete-tasks`,
+      taskIds
+    )
   },
 
   addPreview(data) {

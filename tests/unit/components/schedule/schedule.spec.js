@@ -3,9 +3,9 @@ import moment from 'moment'
 import { vi } from 'vitest'
 import { isReactive, nextTick, reactive } from 'vue'
 
-const { milestones, organisation } = vi.hoisted(() => ({
-  // mutated by the milestone tests, by date
-  milestones: {},
+const { milestonesByDate, organisation } = vi.hoisted(() => ({
+  // mutated by the milestone tests: the milestones of each date
+  milestonesByDate: {},
   organisation: { hours_by_day: 8, format_duration_in_hours: false }
 }))
 
@@ -18,9 +18,14 @@ vi.mock('vuex', () => ({
       departmentMap: new Map([
         ['dep-2', { id: 'dep-2', name: 'Lighting', color: '#222222' }]
       ]),
+      // read by the department combobox of the milestone modal
+      departments: [],
+      isCurrentUserManager: true,
       isCurrentUserProductionManager: true,
+      isCurrentUserSupervisor: false,
+      user: { departments: [] },
       isDarkTheme: false,
-      milestones,
+      milestonesByDate,
       openProductions: [{ id: 'production-1', team: ['person-1'] }],
       organisation,
       taskMap: new Map(),
@@ -74,15 +79,21 @@ const mountSchedule = (props = {}, options = {}) =>
 
 describe('Schedule widget - milestones', () => {
   afterEach(() => {
-    Object.keys(milestones).forEach(date => delete milestones[date])
+    Object.keys(milestonesByDate).forEach(
+      date => delete milestonesByDate[date]
+    )
   })
 
   it('shows a milestone set on the first day of the range', () => {
-    milestones['2026-08-01'] = {
-      id: 'milestone-1',
-      date: '2026-08-01',
-      name: 'Kickoff'
-    }
+    milestonesByDate['2026-08-01'] = [
+      {
+        id: 'milestone-1',
+        date: '2026-08-01',
+        name: 'Kickoff',
+        milestone_type: 'kickoff',
+        color: null
+      }
+    ]
     // the header lists the days in UTC: a UTC start keeps that day first
     const wrapper = mountSchedule({
       startDate: moment.utc('2026-08-01'),
@@ -90,9 +101,102 @@ describe('Schedule widget - milestones', () => {
       withMilestones: true
     })
 
-    expect(wrapper.find('.milestone-tooltip').text()).toBe('Kickoff')
+    expect(wrapper.find('.milestone-flag-name').text()).toBe('Kickoff')
     expect(wrapper.find('.milestone-vertical-line').exists()).toBe(true)
     wrapper.unmount()
+  })
+
+  it('merges the milestones of a day into one flag', () => {
+    milestonesByDate['2026-08-10'] = [
+      { id: 'm1', date: '2026-08-10', name: 'Delivery' },
+      { id: 'm2', date: '2026-08-10', name: 'Review' }
+    ].map(milestone => ({ ...milestone, milestone_type: 'other', color: null }))
+    const wrapper = mountSchedule({ withMilestones: true, zoomLevel: 3 })
+
+    const flags = wrapper.findAll('.milestone-flag')
+    expect(flags).toHaveLength(1)
+    expect(flags[0].attributes('aria-label')).toBe('Delivery, Review')
+    expect(flags[0].findAll('.milestone-flag-stripe')).toHaveLength(2)
+    expect(flags[0].find('.milestone-flag-more').text()).toBe('+1')
+    expect(wrapper.findAll('.milestone-vertical-line')).toHaveLength(1)
+    wrapper.unmount()
+  })
+
+  describe('flag popover', () => {
+    const milestone = (id, name) => ({
+      id,
+      name,
+      date: '2026-08-10',
+      milestone_type: 'other',
+      color: null
+    })
+    const popover = () => document.querySelector('.milestone-popover')
+    const mountWithFlag = milestones => {
+      milestonesByDate['2026-08-10'] = milestones
+      return mountSchedule(
+        { withMilestones: true, zoomLevel: 3 },
+        { attachTo: document.body }
+      )
+    }
+
+    it('stays closed when the closing modal gives the focus back', async () => {
+      const wrapper = mountWithFlag([milestone('m1', 'Solo')])
+      const flag = wrapper.find('.milestone-flag')
+
+      flag.element.focus()
+      await flag.trigger('click')
+      await nextTick()
+      expect(document.querySelector('.modal.is-active')).not.toBeNull()
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      await nextTick()
+      await nextTick()
+
+      expect(document.querySelector('.modal.is-active')).toBeNull()
+      expect(document.activeElement).toBe(flag.element)
+      expect(popover()).toBeNull()
+      wrapper.unmount()
+    })
+
+    it('opens when Tab lands on a flag', async () => {
+      const wrapper = mountWithFlag([milestone('m1', 'Solo')])
+
+      await wrapper.find('.milestone-flag').trigger('keyup', { key: 'Tab' })
+
+      expect(popover()).not.toBeNull()
+      wrapper.unmount()
+    })
+
+    it('takes the focus on Enter on a merged flag', async () => {
+      const wrapper = mountWithFlag([
+        milestone('m1', 'Delivery'),
+        milestone('m2', 'Review')
+      ])
+
+      await wrapper.find('.milestone-flag').trigger('keydown', { key: 'Enter' })
+      await nextTick()
+
+      expect(document.activeElement).toBe(
+        popover().querySelector('.milestone-popover-item')
+      )
+      wrapper.unmount()
+    })
+
+    it('leaves the focus on a merged flag clicked with the mouse', async () => {
+      const wrapper = mountWithFlag([
+        milestone('m1', 'Delivery'),
+        milestone('m2', 'Review')
+      ])
+      const flag = wrapper.find('.milestone-flag')
+
+      flag.element.focus()
+      await flag.trigger('click')
+      await nextTick()
+
+      expect(popover()).not.toBeNull()
+      expect(document.activeElement).toBe(flag.element)
+      wrapper.unmount()
+    })
   })
 })
 
@@ -926,7 +1030,7 @@ describe('Schedule widget - dragging an entity bar over its task rows', () => {
   })
 })
 
-describe('Schedule widget - shift drag with tasks', () => {
+describe('Schedule widget - drag with tasks', () => {
   let rafSpy
 
   beforeEach(() => {
@@ -945,8 +1049,8 @@ describe('Schedule widget - shift drag with tasks', () => {
   const fmt = date => date.format('YYYY-MM-DD')
 
   // zoom level 1 is 20px a day: a 200px drag is 10 days
-  const shiftDrag = async (wrapper, bar) => {
-    await bar.trigger('mousedown', { clientX: 300, shiftKey: true })
+  const dragBar = async (bar, options = {}) => {
+    await bar.trigger('mousedown', { clientX: 300, ...options })
     document.dispatchEvent(
       new MouseEvent('mousemove', { bubbles: true, clientX: 500 })
     )
@@ -970,7 +1074,7 @@ describe('Schedule widget - shift drag with tasks', () => {
         ({ element }) =>
           !element.closest('.root-element') && !element.closest('.subchild')
       )
-    await shiftDrag(wrapper, bar)
+    await dragBar(bar)
 
     expect(fmt(row.startDate)).toBe('2026-08-13')
     expect([fmt(task.startDate), fmt(task.endDate)]).toEqual([
@@ -983,7 +1087,29 @@ describe('Schedule widget - shift drag with tasks', () => {
     wrapper.unmount()
   })
 
-  it('moves the tasks of every selected row on a shift drag', async () => {
+  it('leaves the tasks in place on a shift drag', async () => {
+    const hierarchy = buildSubchildrenHierarchy(1)
+    const [root] = hierarchy
+    const [row] = root.children
+    const [task] = row.children.get('person-1')
+    const taskDates = [fmt(task.startDate), fmt(task.endDate)]
+    row.endDate = moment('2026-09-30')
+    const wrapper = mountSubchildren(hierarchy)
+
+    const bar = wrapper
+      .findAll('.timebar-center')
+      .find(
+        ({ element }) =>
+          !element.closest('.root-element') && !element.closest('.subchild')
+      )
+    await dragBar(bar, { shiftKey: true })
+
+    expect(fmt(row.startDate)).toBe('2026-08-13')
+    expect([fmt(task.startDate), fmt(task.endDate)]).toEqual(taskDates)
+    wrapper.unmount()
+  })
+
+  it('moves the tasks of every selected row', async () => {
     const hierarchy = buildSubchildrenHierarchy(2)
     const [root] = hierarchy
     const [first, second] = root.children
@@ -1005,8 +1131,7 @@ describe('Schedule widget - shift drag with tasks', () => {
     await nextTick()
     await secondBar.trigger('mousedown', {
       clientX: 300,
-      ctrlKey: true,
-      shiftKey: true
+      ctrlKey: true
     })
     document.dispatchEvent(
       new MouseEvent('mousemove', { bubbles: true, clientX: 500 })
@@ -1032,7 +1157,7 @@ describe('Schedule widget - shift drag with tasks', () => {
     root.endDate = moment('2026-09-30')
     const wrapper = mountSubchildren(hierarchy)
 
-    await shiftDrag(wrapper, wrapper.find('.root-element .timebar-center'))
+    await dragBar(wrapper.find('.root-element .timebar-center'))
 
     expect(fmt(root.startDate)).toBe('2026-08-13')
     expect(fmt(first.startDate)).toBe('2026-08-13')
@@ -1214,14 +1339,14 @@ describe('Schedule widget - entity rows', () => {
     await nextTick()
   }
 
-  it('clips the rows to the moved root bar', async () => {
+  it('clips the rows to the root bar moved on a shift drag', async () => {
     const hierarchy = buildEntityHierarchy(1)
     const { wrapper } = mountCounted(hierarchy)
     const [root] = hierarchy
     const [row] = root.children
     root.endDate = moment('2026-09-30')
 
-    await dragRootBar(wrapper, 500)
+    await dragRootBar(wrapper, 500, { shiftKey: true })
 
     expect(root.startDate.format('YYYY-MM-DD')).toBe('2026-08-13')
     expect(row.startDate.format('YYYY-MM-DD')).toBe('2026-08-13')
@@ -1229,14 +1354,91 @@ describe('Schedule widget - entity rows', () => {
     wrapper.unmount()
   })
 
-  it('moves the rows along with the root bar on a shift drag', async () => {
+  // The all-episodes rows are laid out by line: rows snapped to the same
+  // edge of the bar must not stay piled up on the line they had before.
+  it('lays the multiline rows out again once the root bar clipped them', async () => {
+    const hierarchy = buildEntityHierarchy(3)
+    const [root] = hierarchy
+    root.endDate = moment('2026-09-30')
+    const wrapper = mountSchedule(
+      { hierarchy, clipChildren: true, multiline: true },
+      { attachTo: document.body }
+    )
+    wrapper.vm.refreshAllItemPositions()
+    expect(root.children.map(row => row.line)).toEqual([0, 0, 0])
+
+    await dragRootBar(wrapper, 800, { shiftKey: true })
+
+    root.children.forEach(row => {
+      expect(row.startDate.format('YYYY-MM-DD')).toBe('2026-08-28')
+    })
+    expect(root.children.map(row => row.line)).toEqual([0, 1, 2])
+    expect(wrapper.find('.children[data-root-element-id]').element.style.height)
+      .toBe('130px')
+    wrapper.unmount()
+  })
+
+  describe('rows loaded after the drop of a collapsed bar', () => {
+    const dropCollapsedBar = async (options = {}) => {
+      const hierarchy = buildEntityHierarchy(0)
+      const [root] = hierarchy
+      root.expanded = false
+      root.endDate = moment('2026-09-30')
+      const wrapper = mountSchedule(
+        { hierarchy, clipChildren: true, multiline: true },
+        { attachTo: document.body }
+      )
+      await dragRootBar(wrapper, 500, options)
+      // loaded from the server: the dates the bar had before its move
+      root.children = [
+        {
+          id: 'row-1',
+          name: 'E01',
+          startDate: moment('2026-08-03'),
+          endDate: moment('2026-08-07'),
+          parentElement: root
+        },
+        {
+          id: 'row-2',
+          name: 'E02',
+          startDate: moment('2026-08-04'),
+          endDate: moment('2026-08-07'),
+          parentElement: root
+        }
+      ]
+      wrapper.vm.applyMoveToLoadedRows(root)
+      return { root, wrapper }
+    }
+
+    it('clips them to the bar on a shift drag, on lines of their own', async () => {
+      const { root, wrapper } = await dropCollapsedBar({ shiftKey: true })
+      const [row] = root.children
+
+      expect(row.startDate.format('YYYY-MM-DD')).toBe('2026-08-13')
+      expect(row.endDate.format('YYYY-MM-DD')).toBe('2026-08-14')
+      expect(row._dragOrigStartDate.format('YYYY-MM-DD')).toBe('2026-08-03')
+      expect(root.children.map(({ line }) => line)).toEqual([0, 1])
+      wrapper.unmount()
+    })
+
+    it('moves them with the bar', async () => {
+      const { root, wrapper } = await dropCollapsedBar()
+      const [row] = root.children
+
+      expect(row.startDate.format('YYYY-MM-DD')).toBe('2026-08-13')
+      expect(row.endDate.format('YYYY-MM-DD')).toBe('2026-08-17')
+      wrapper.unmount()
+    })
+  })
+
+  it('moves the rows along with the root bar', async () => {
     const hierarchy = buildEntityHierarchy(2)
     const { wrapper } = mountCounted(hierarchy)
     const [root] = hierarchy
     const [first, second] = root.children
     root.endDate = moment('2026-09-30')
 
-    await dragRootBar(wrapper, 500, { shiftKey: true })
+    await dragRootBar(wrapper, 500)
 
     expect(root.startDate.format('YYYY-MM-DD')).toBe('2026-08-13')
     expect(first.startDate.format('YYYY-MM-DD')).toBe('2026-08-20')
@@ -1259,7 +1461,7 @@ describe('Schedule widget - entity rows', () => {
     )
 
     // the week zoom is 20px a week
-    await dragRootBar(wrapper, 320, { shiftKey: true })
+    await dragRootBar(wrapper, 320)
 
     expect(root.startDate.format('YYYY-MM-DD')).toBe('2026-08-10')
     expect(row.startDate.format('YYYY-MM-DD')).toBe('2026-08-17')

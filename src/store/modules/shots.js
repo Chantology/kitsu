@@ -5,7 +5,6 @@ import peopleApi from '@/store/api/people'
 import shotsApi from '@/store/api/shots'
 
 import episodeStore from '@/store/modules/episodes'
-import peopleStore from '@/store/modules/people'
 import productionsStore from '@/store/modules/productions'
 import sequenceStore from '@/store/modules/sequences'
 import tasksStore from '@/store/modules/tasks'
@@ -17,19 +16,25 @@ import { isEpisodeInLoadedScope } from '@/lib/episodes'
 import { PAGE_SIZE } from '@/lib/pagination'
 import { getTaskTypePriorityOfProd } from '@/lib/productions'
 import {
+  insertShotInPage,
   insertSortedShot,
   sortByName,
   sortByPersonName,
   sortShotResult,
   sortShots,
-  sortTasks,
   sortValidationColumns
 } from '@/lib/sorting'
-import { buildSelectionGrid, clearSelectionGrid } from '@/lib/selection'
+import {
+  addRowToSelectionGrid,
+  buildSelectionGrid,
+  clearSelectionGrid
+} from '@/lib/selection'
 import {
   getFilledColumns,
   groupEntitiesByParents,
-  removeModelFromList
+  removeModelFromList,
+  setCanceled,
+  trackEdit
 } from '@/lib/models'
 import { minutesToDays } from '@/lib/time'
 import {
@@ -50,10 +55,8 @@ import {
   MARK_SHOTS_PARTIAL,
   SORT_VALIDATION_COLUMNS,
   SET_CURRENT_EPISODE,
-  LOAD_SHOT_END,
   SHOT_CSV_FILE_SELECTED,
   IMPORT_SHOTS_END,
-  LOAD_OPEN_PRODUCTIONS_END,
   NEW_SHOT_END,
   EDIT_SHOT_END,
   ADD_SHOT,
@@ -113,29 +116,39 @@ const mergeShotEdits = (previous, next) => {
   return merged
 }
 
+// Shows the edit at once, and returns it followed until its save settles.
 const applyShotEdit = ({ commit, rootGetters }, data) => {
   commit(LOCK_SHOT, data)
-  commit(EDIT_SHOT_END, {
-    newShot: data,
-    sequences: rootGetters.displayedSequences
-  })
+  return trackEdit(
+    () => cache.shotMap.get(data.id),
+    () =>
+      commit(EDIT_SHOT_END, {
+        newShot: data,
+        sequences: rootGetters.displayedSequences
+      })
+  )
+}
+
+// A save Zou refuses puts back the values the changes replaced.
+const undoShotEdit = ({ commit, rootGetters }, trackedEdit) => {
+  const undoEdit = trackedEdit.undo()
+  if (undoEdit) {
+    commit(EDIT_SHOT_END, {
+      newShot: undoEdit,
+      sequences: rootGetters.displayedSequences
+    })
+  }
 }
 
 const helpers = {
   getCurrentProduction() {
     return productionsStore.getters.currentProduction(productionsStore.state)
   },
-  getTask(taskId) {
-    return tasksStore.cache.taskMap.get(taskId)
-  },
   getTaskStatus(taskStatusId) {
     return taskStatusStore.cache.taskStatusMap.get(taskStatusId)
   },
   getTaskType(taskTypeId) {
     return taskTypesStore.cache.taskTypeMap.get(taskTypeId)
-  },
-  getPerson(personId) {
-    return peopleStore.cache.personMap.get(personId)
   },
 
   getShotName(shot) {
@@ -144,10 +157,6 @@ const helpers = {
       shotName = `${shot.episode_name} / ${shotName}`
     }
     return shotName
-  },
-
-  dateDigit(date) {
-    return date.toString().padStart(2, '0')
   },
 
   populateTask(task, shot) {
@@ -204,43 +213,6 @@ const helpers = {
       taskTypeMap,
       helpers.getCurrentProduction()
     )
-  },
-
-  getPeriod(task, detailLevel) {
-    const endDateString = helpers.getTaskEndDate(task, detailLevel)
-    let period
-    if (detailLevel === 'day') {
-      period = moment(endDateString, 'YYYY-MM').format('YYYY-MM')
-    } else if (detailLevel === 'month') {
-      period = moment(endDateString, 'YYYY').format('YYYY')
-    } else if (detailLevel === 'week') {
-      period = moment(endDateString, 'YYYY-MM-DD').format('GGGG')
-    }
-    return period
-  },
-
-  getDateFromParameters({ detailLevel, year, week, month, day }) {
-    if (detailLevel === 'day') {
-      return `${year}-${helpers.dateDigit(month)}-${helpers.dateDigit(day)}`
-    } else if (detailLevel === 'month') {
-      return `${year}-${helpers.dateDigit(month)}`
-    } else if (detailLevel === 'week') {
-      return `${year}-${week}`
-    } else {
-      return `${year}`
-    }
-  },
-
-  getTaskEndDate(task, detailLevel) {
-    let endDateString
-    if (detailLevel === 'day') {
-      endDateString = moment(task.end_date, 'YYYY-MM-DD').format('YYYY-MM-DD')
-    } else if (detailLevel === 'month') {
-      endDateString = moment(task.end_date, 'YYYY-MM').format('YYYY-MM')
-    } else if (detailLevel === 'week') {
-      endDateString = moment(task.end_date, 'YYYY-MM-DD').format('GGGG-W')
-    }
-    return endDateString
   },
 
   buildResult(
@@ -317,7 +289,6 @@ const initialState = {
   displayedShotsDrawings: 0,
   shotFilledColumns: {},
 
-  shotCreated: '',
   shotSelectionGrid: new Set(),
 
   isShotsLoading: false,
@@ -376,7 +347,6 @@ const getters = {
 
   isShotsLoading: state => state.isShotsLoading,
   isShotsLoadingError: state => state.isShotsLoadingError,
-  shotCreated: state => state.shotCreated,
 
   shotsCsvFormData: state => state.shotsCsvFormData,
   shotListScrollPosition: state => state.shotListScrollPosition,
@@ -566,7 +536,8 @@ const actions = {
             persons,
             personMap,
             production,
-            shot
+            shot,
+            isInLoadedScope
           })
           // A detail page loads its shot whatever the list holds: holding more
           // than its recorded scope, the list must be refetched by its pages.
@@ -589,32 +560,52 @@ const actions = {
   },
 
   editShot(context, data) {
-    applyShotEdit(context, data)
-    return shotsApi.updateShot(data).finally(() => {
-      setTimeout(() => {
-        context.commit(UNLOCK_SHOT, data)
-      }, 2000)
-    })
+    const trackedEdit = applyShotEdit(context, data)
+    return shotsApi
+      .updateShot(data)
+      .then(
+        result => {
+          trackedEdit.keep()
+          return result
+        },
+        err => {
+          undoShotEdit(context, trackedEdit)
+          throw err
+        }
+      )
+      .finally(() => {
+        setTimeout(() => {
+          context.commit(UNLOCK_SHOT, data)
+        }, 2000)
+      })
   },
 
   // editShot for the inline cells: the list is updated at once, the edits of
   // a shot made within EDIT_SHOT_DELAY are merged into one request, each call
   // resolves once that request settles and keeps its own lock 2 s after it.
   editShotDebounced(context, data) {
-    applyShotEdit(context, data)
+    const trackedEdit = applyShotEdit(context, data)
     const pending = pendingEdits.get(data.id) || { data: {}, waiters: [] }
     pending.data = mergeShotEdits(pending.data, data)
     clearTimeout(pending.timer)
     pendingEdits.set(data.id, pending)
     return new Promise((resolve, reject) => {
-      pending.waiters.push({ resolve, reject })
+      pending.waiters.push({ trackedEdit, resolve, reject })
       pending.timer = setTimeout(() => {
         pendingEdits.delete(data.id)
         shotsApi
           .updateShot(pending.data)
           .then(
-            result => pending.waiters.forEach(waiter => waiter.resolve(result)),
-            err => pending.waiters.forEach(waiter => waiter.reject(err))
+            result =>
+              pending.waiters.forEach(waiter => {
+                waiter.trackedEdit.keep()
+                waiter.resolve(result)
+              }),
+            err =>
+              pending.waiters.forEach(waiter => {
+                undoShotEdit(context, waiter.trackedEdit)
+                waiter.reject(err)
+              })
           )
           .finally(() => {
             setTimeout(() => {
@@ -867,7 +858,7 @@ const actions = {
   },
 
   deleteAllShotTasks({ dispatch }, { projectId, taskTypeId, selectionOnly }) {
-    let taskIds = []
+    let taskIds
     if (selectionOnly) {
       taskIds = cache.result
         .filter(shot => shot.validations.get(taskTypeId))
@@ -1071,7 +1062,6 @@ const mutations = {
       taskTypeMap
     )
 
-    state.nbValidationColumns = state.shotValidationColumns.length
     state.isFps = isFps
     state.isFrames = isFrames
     state.isFrameIn = isFrameIn
@@ -1136,23 +1126,11 @@ const mutations = {
     }
   },
 
-  [LOAD_SHOT_END](state, { shot, taskTypeMap }) {
-    shot.tasks.forEach(task => {
-      helpers.populateTask(task, shot)
-    })
-    shot.tasks = sortTasks(shot.tasks, taskTypeMap)
-    cache.shotMap.set(shot.id, shot)
-  },
-
   [SHOT_CSV_FILE_SELECTED](state, formData) {
     state.shotsCsvFormData = formData
   },
   [IMPORT_SHOTS_END](state) {
     state.shotsCsvFormData = null
-  },
-
-  [LOAD_OPEN_PRODUCTIONS_END](state, projects) {
-    state.openProductions = projects
   },
 
   [EDIT_SHOT_END](state, { newShot, sequences }) {
@@ -1175,7 +1153,6 @@ const mutations = {
       return stateShot
     })
     updateEntryInIndex(cache.shotIndex, shot, getShotIndexWords(shot))
-    state.shotCreated = newShot.name
 
     if (state.shotSearchText) {
       helpers.setListStats(state, cache.result)
@@ -1203,7 +1180,7 @@ const mutations = {
 
   [RESTORE_SHOT_END](state, shotToRestore) {
     const shot = cache.shotMap.get(shotToRestore.id)
-    shot.canceled = false
+    setCanceled(state.displayedShots, [shot], false)
     // No index update needed: restoring only flips `canceled`, none of the
     // indexed words change.
     state.displayedShotsLength = cache.result.filter(s => !s.canceled).length
@@ -1228,6 +1205,8 @@ const mutations = {
     shot.tasks = []
     shot.validations = new Map()
     shot.data = {}
+    shot.timeSpent = 0
+    shot.estimation = 0
 
     // zou emits shot:new before this response lands, so the socket handler
     // may already have inserted the shot through ADD_SHOT: merge into that
@@ -1240,8 +1219,14 @@ const mutations = {
       insertSortedShot(cache.shots, shot)
       cache.shotMap.set(shot.id, shot)
     }
-    state.displayedShots = cache.shots.slice(0, PAGE_SIZE)
-    helpers.setListStats(state, cache.shots)
+    // A search stays, and the list shows the new shot whatever it asks for.
+    if (!state.shotSearchText) {
+      cache.result = cache.shots
+    } else if (!cache.result.includes(listedShot)) {
+      insertSortedShot(cache.result, listedShot)
+    }
+    state.displayedShots = cache.result.slice(0, PAGE_SIZE)
+    helpers.setListStats(state, cache.result)
     state.shotFilledColumns = getFilledColumns(state.displayedShots)
     updateEntryInIndex(
       cache.shotIndex,
@@ -1374,7 +1359,7 @@ const mutations = {
       const taskIndex = shot.tasks.findIndex(
         shotTaskId => shotTaskId === task.id
       )
-      shot.tasks.splice(taskIndex, 1)
+      if (taskIndex >= 0) shot.tasks.splice(taskIndex, 1)
     }
   },
 
@@ -1411,7 +1396,8 @@ const mutations = {
       persons,
       personMap,
       production,
-      shot
+      shot,
+      isInLoadedScope = true
     }
   ) {
     const taskIds = []
@@ -1464,17 +1450,31 @@ const mutations = {
       persons,
       query
     })
-    let result = indexSearch(addedShotIndex, keywords)
+    // No keyword leaves the shot to the filters, as for a list.
+    let result = indexSearch(addedShotIndex, keywords) || [shot]
     result = applyFilters(result, filters, taskMap)
 
-    if (result && result.length > 0) {
-      cache.result.push(shot)
-      insertSortedShot(state.displayedShots, shot)
-      state.displayedShotsCount = cache.shots.length
-      state.displayedShotsLength = cache.shots.filter(s => !s.canceled).length
-      state.shotFilledColumns = getFilledColumns(state.displayedShots)
+    if (isInLoadedScope && result.length > 0) {
+      if (!state.shotSearchText) {
+        cache.result = cache.shots
+      } else if (cache.result !== cache.shots) {
+        insertSortedShot(cache.result, shot)
+      }
+      helpers.setListStats(state, cache.result)
 
-      state.shotSelectionGrid = buildSelectionGrid()
+      const rowIndex = insertShotInPage(
+        state.displayedShots,
+        shot,
+        cache.result.length
+      )
+      if (rowIndex >= 0) {
+        state.shotFilledColumns = getFilledColumns(state.displayedShots)
+      }
+      // Select column reaches the rows of the next pages too.
+      state.shotSelectionGrid = addRowToSelectionGrid(
+        state.shotSelectionGrid,
+        rowIndex >= 0 ? rowIndex : cache.result.indexOf(shot)
+      )
     }
   },
 
@@ -1520,6 +1520,8 @@ const mutations = {
       state.displayedShotsFrames -= shotToDelete.nb_frames
     }
     state.displayedShotsDrawings -= shotToDelete.nb_drawings || 0
+    state.displayedShotsCount = cache.result.length
+    state.displayedShotsLength = cache.result.filter(s => !s.canceled).length
   },
 
   // Bulk variant of REMOVE_SHOT/CANCEL_SHOT: one pass over each list
@@ -1545,16 +1547,15 @@ const mutations = {
     state.displayedShots = state.displayedShots.filter(
       shot => !removedIds.has(shot.id)
     )
-    canceledShots.forEach(shot => {
-      shot.canceled = true
-    })
+    setCanceled(state.displayedShots, canceledShots, true)
+    state.displayedShotsCount = cache.result.length
     state.displayedShotsLength = cache.result.filter(
       shot => !shot.canceled
     ).length
   },
 
   [CANCEL_SHOT](state, shot) {
-    shot.canceled = true
+    setCanceled(state.displayedShots, [shot], true)
     state.displayedShotsLength = cache.result.filter(s => !s.canceled).length
   },
 

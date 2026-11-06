@@ -1,12 +1,10 @@
-import { shallowMount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { createStore } from 'vuex'
 
-import i18n from '@/lib/i18n'
 import ComboboxTaskType from '@/components/widgets/ComboboxTaskType.vue'
 
 import { resetFullScreen, setFullScreenElement } from '../fixtures/full-screen'
-import './setup'
+import { shallowMountWithI18n } from '../fixtures/i18n'
 
 describe('ComboboxTaskType', () => {
   let store, wrapper
@@ -26,13 +24,13 @@ describe('ComboboxTaskType', () => {
       }
     })
 
-    wrapper = shallowMount(ComboboxTaskType, {
+    wrapper = shallowMountWithI18n(ComboboxTaskType, {
       props: {
         taskTypeList,
         modelValue: 'tt-2'
       },
       global: {
-        plugins: [i18n, store],
+        plugins: [store],
         // The option list renders through <teleport to="body">; shallowMount
         // stubs it out by default, so opt back into the real teleport.
         stubs: { teleport: false }
@@ -55,6 +53,22 @@ describe('ComboboxTaskType', () => {
     await trigger.trigger('click')
     expect(trigger.attributes('aria-expanded')).toBe('true')
     expect(findTeleportedList().getAttribute('role')).toBe('listbox')
+  })
+
+  it('names the combobox by its label', () => {
+    const labeled = shallowMountWithI18n(ComboboxTaskType, {
+      props: { label: 'Task Type', taskTypeList, modelValue: 'tt-2' },
+      global: { plugins: [store], stubs: { teleport: false } }
+    })
+    const labelId = labeled.find('label').attributes('id')
+    expect(labelId).toBeTruthy()
+    expect(
+      labeled.find('[role="combobox"]').attributes('aria-labelledby')
+    ).toBe(labelId)
+    expect(
+      wrapper.find('[role="combobox"]').attributes('aria-labelledby')
+    ).toBeUndefined()
+    labeled.unmount()
   })
 
   it('opens and selects a task type via keyboard', async () => {
@@ -82,10 +96,10 @@ describe('ComboboxTaskType', () => {
 
     const openIn = async element => {
       wrapper.unmount()
-      wrapper = shallowMount(ComboboxTaskType, {
+      wrapper = shallowMountWithI18n(ComboboxTaskType, {
         props: { taskTypeList, modelValue: 'tt-2' },
         attachTo: element.appendChild(document.createElement('div')),
-        global: { plugins: [i18n, store], stubs: { teleport: false } }
+        global: { plugins: [store], stubs: { teleport: false } }
       })
       await nextTick()
       await wrapper.find('.flexrow.selector').trigger('click')

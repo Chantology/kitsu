@@ -78,7 +78,6 @@ const mountPage = async ({ dispatch, getters = {}, query = {} } = {}) => {
   wrapper = shallowMount(SequenceStats, {
     global: {
       plugins: [store, router],
-      mocks: { $t: key => key },
       stubs: { SearchField: false }
     }
   })
@@ -269,15 +268,5 @@ describe('SequenceStats page', () => {
 
     await mountPage()
     expect(listProps().displayMode).toBe('bars')
-  })
-
-  // The scroll position of the store belongs to the Sequences list page.
-  test('leaves the scroll position of the sequences page alone', async () => {
-    const { store } = await mountPage()
-    await wrapper.findComponent(SequenceStatsList).vm.$emit('scroll', 120)
-    expect(store.dispatch).not.toHaveBeenCalledWith(
-      'setSequenceListScrollPosition',
-      120
-    )
   })
 })

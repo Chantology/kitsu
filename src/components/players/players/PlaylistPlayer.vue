@@ -80,12 +80,15 @@
         @leave-room="leaveRoom"
         v-if="isValidRoomId(playlist) && !isFullMode"
       />
+      <!-- During a load, the playlist is still the one shown before, or an
+           empty one: these buttons would act on it. -->
       <button-simple
         class="playlist-button topbar-button flexrow-item full-button"
         icon="bell"
         :text="$t('playlists.notify_clients')"
         @click="onNotifyClientsClicked"
-        v-if="!isLoading && isCurrentUserManager && playlist.for_client"
+        :disabled="isLoading"
+        v-if="isCurrentUserManager && playlist.for_client"
       />
       <button-simple
         class="playlist-button topbar-button flexrow-item full-button"
@@ -93,7 +96,8 @@
         icon="link"
         :text="$t('playlists.share')"
         @click="modals.share = true"
-        v-if="!isLoading && isCurrentUserManager"
+        :disabled="isLoading"
+        v-if="isCurrentUserManager"
       />
 
       <template v-if="isAllowToEdit">
@@ -102,20 +106,22 @@
           icon="plus"
           :text="addEntitiesText"
           @click="onAddEntitiesClicked"
-          :active="isAddingEntity || isFullMode"
-          v-if="!isLoading"
+          :active="!isLoading && (isAddingEntity || isFullMode)"
+          :disabled="isLoading"
         />
         <button-simple
           @click="$emit('edit-clicked')"
           class="edit-button playlist-button flexrow-item"
           :title="$t('playlists.actions.edit')"
           icon="edit"
+          :disabled="isLoading"
         />
         <button-simple
           @click="showDeleteModal"
           class="delete-button playlist-button flexrow-item"
           :title="$t('playlists.actions.delete')"
           icon="trash"
+          :disabled="isLoading"
         />
       </template>
     </div>
@@ -636,6 +642,7 @@
             :title="$t('playlists.actions.change_task_type')"
             icon="check"
             @click="showTaskTypeModal"
+            :disabled="isLoading"
             v-if="!tempMode && !isFullMode && !isCurrentUserClient"
           />
         </template>
@@ -787,9 +794,7 @@
             :class="{
               'dl-button': true,
               'mp4-button': true,
-              disabled:
-                !(isCurrentUserManager || isCurrentUserSupervisor) ||
-                isJobRunning,
+              disabled: isBuildDisabled,
               hidden: isDlButtonsHidden
             }"
             @click="onBuildClicked"
@@ -800,9 +805,7 @@
             :class="{
               'dl-button': true,
               'mp4-2-button': true,
-              disabled:
-                !(isCurrentUserManager || isCurrentUserSupervisor) ||
-                isJobRunning,
+              disabled: isBuildDisabled,
               hidden: isDlButtonsHidden
             }"
             @click="onBuildFullClicked"
@@ -858,6 +861,7 @@
           class="playlist-button"
           :title="$t('playlists.actions.download')"
           icon="download"
+          :disabled="isLoading"
           @click="toggleDlButtons"
           v-if="!isCurrentUserArtist && !isCurrentUserClient"
         />
@@ -1013,11 +1017,11 @@ import {
   drawSnapshotTitle,
   isMoviePreview,
   isPicturePreview,
-  isSoundPreview
+  isSoundPreview,
+  waitForPicture
 } from '@/lib/preview'
 import { formatDisplayDate, formatTimeOfDay } from '@/lib/time'
 import {
-  ceilToFrame,
   floorToFrame,
   formatFrame,
   formatTime,
@@ -1667,6 +1671,14 @@ const isJobRunning = computed(
       .length !== 0
 )
 
+// During a load, the footer still belongs to the playlist shown before.
+const isBuildDisabled = computed(
+  () =>
+    !(isCurrentUserManager.value || isCurrentUserSupervisor.value) ||
+    isJobRunning.value ||
+    props.isLoading
+)
+
 const csvDlPath = computed(
   () => `/api/export/csv/playlists/${props.playlist?.id}`
 )
@@ -1820,6 +1832,7 @@ const {
   removeObjectFromCanvas,
   updateObjectInCanvas,
   isWriting,
+  isTypingText,
   getNewAnnotations,
   loadSingleAnnotation,
   loadSingleAnnotationComparison,
@@ -2131,6 +2144,12 @@ const hideDeleteModal = () => {
   modals.value.delete = false
 }
 
+const closeModals = () => {
+  Object.keys(modals.value).forEach(modal => {
+    modals.value[modal] = false
+  })
+}
+
 const showTaskTypeModal = () => {
   modals.value.taskType = true
 }
@@ -2402,21 +2421,12 @@ const pause = () => {
     isPlaying.value = false
     _stopPlaylistProgressUpdateLoop()
   } else if (isCurrentPreviewMovie.value) {
-    const comparisonPlayer = rawPlayerComparison.value
-    let currentTimeValue = 0
-    if (rawPlayer.value) {
-      // The next frame boundary, but within the last frame: the very end of
-      // the movie holds no drawing.
-      currentTimeValue = Math.min(
-        ceilToFrame(rawPlayer.value.getCurrentTimeRaw(), fps.value),
-        frameStartTime(nbFrames.value - 1, fps.value)
-      )
-    }
+    // The viewer pauses on the frame on screen. The comparison viewer is
+    // mounted even when not comparing: seeking the movie again for it
+    // moved the picture off that frame.
     rawPlayer.value?.pause()
-    if (comparisonPlayer) {
-      comparisonPlayer.pause()
-      rawPlayer.value.setCurrentTimeRaw(currentTimeValue)
-      comparisonPlayer.setCurrentTimeRaw(currentTimeValue)
+    if (isComparing.value) {
+      rawPlayerComparison.value?.pause(rawPlayer.value?.getCurrentFrame())
     }
   } else if (isCurrentPreviewSound.value) {
     soundPlayer.value?.pause()
@@ -2608,7 +2618,9 @@ const goPreviousFrame = () => {
     if (!rawPlayer.value) return
     rawPlayer.value.goPreviousFrame()
     if (isComparing.value) syncComparisonPlayer()
-    const time = rawPlayer.value.getCurrentTime()
+    // The time of the frame the step sent, as drawings are saved: the
+    // movie time runs ahead of frame * frameDuration along the movie.
+    const time = currentTimeRaw.value
     const ann = getAnnotation(time)
     if (ann) loadSingleAnnotation(ann)
     if (isComparing.value && !isComparisonOverlay.value) {
@@ -2642,7 +2654,9 @@ const goNextFrame = () => {
     clearCanvas()
     rawPlayer.value.goNextFrame()
     if (isComparing.value) syncComparisonPlayer()
-    const time = rawPlayer.value.getCurrentTime()
+    // The time of the frame the step sent, as drawings are saved: the
+    // movie time runs ahead of frame * frameDuration along the movie.
+    const time = currentTimeRaw.value
     const ann = getAnnotation(time)
     if (ann) loadSingleAnnotation(ann)
     if (isComparing.value && !isComparisonOverlay.value) {
@@ -2822,7 +2836,8 @@ const togglePlayPause = () => {
     playClicked()
   } else {
     pauseClicked()
-    const ann = getAnnotation(rawPlayer.value?.getCurrentTime())
+    // The frame the viewer paused on, as drawings are saved.
+    const ann = getAnnotation(currentTimeRaw.value)
     if (ann) loadAnnotation(ann)
     updateRoomStatus()
   }
@@ -3722,11 +3737,15 @@ const extractPicture = canvas => {
   context.drawImage(image, 0, 0, canvas.width, canvas.height)
 }
 
-const extractAnnotationSnapshots = async ({ withLabel = false } = {}) => {
+// signal: aborted once the attachment dialog closes or goes away
+const extractAnnotationSnapshots = async ({
+  withLabel = false,
+  signal
+} = {}) => {
   if (isCurrentPreviewPicture.value) {
-    return extractPicturePreviewSnapshots({ withLabel })
+    return extractPicturePreviewSnapshots({ withLabel, signal })
   }
-  return extractVideoAnnotationSnapshots({ withLabel })
+  return extractVideoAnnotationSnapshots({ withLabel, signal })
 }
 
 const snapshotIdentity = ({ revision, frame, index } = {}) => ({
@@ -3746,7 +3765,10 @@ const snapshotTitle = identity =>
 
 // Video preview: one PNG per annotation, each captured at the
 // annotation's frame with its drawing composited on top.
-const extractVideoAnnotationSnapshots = async ({ withLabel = false } = {}) => {
+const extractVideoAnnotationSnapshots = async ({
+  withLabel = false,
+  signal
+} = {}) => {
   const cur = currentFrame.value
   // The loop below repaints the live canvas annotation by annotation, so
   // grab the one being displayed now: currentTimeRaw has drifted by the
@@ -3755,35 +3777,75 @@ const extractVideoAnnotationSnapshots = async ({ withLabel = false } = {}) => {
   const sorted = annotations.value.sort((a, b) => a.time - b.time)
   const files = []
   const revision = currentPreview.value?.revision
+  // The user can move the player to another file meanwhile: its frames do
+  // not go with these annotations.
+  const previewId = currentPreview.value?.id
+  const isMoved = () => currentPreview.value?.id !== previewId
   for (const ann of sorted) {
-    const canvas = document.getElementById('annotation-snapshot')
-    const frame = Math.round(
-      roundToFrame(ann.time, fps.value) / frameDuration.value
-    )
-    if (!(await extractVideoFrame(canvas, frame))) return []
-    await copyAnnotationCanvas(canvas, ann)
-    if (withLabel) drawSnapshotTitle(canvas, snapshotTitle({ revision, frame }))
-    files.push(
-      await getFileFromCanvas(canvas, snapshotFilename({ revision, frame }))
-    )
+    // Stopped once the user closes the dialog or moves the player
+    if (!signal?.aborted && !isMoved()) {
+      const canvas = document.getElementById('annotation-snapshot')
+      const frame = Math.round(
+        roundToFrame(ann.time, fps.value) / frameDuration.value
+      )
+      if (!(await extractVideoFrame(canvas, frame))) return []
+      await copyAnnotationCanvas(canvas, ann)
+      if (withLabel) {
+        drawSnapshotTitle(canvas, snapshotTitle({ revision, frame }))
+      }
+      files.push(
+        await getFileFromCanvas(canvas, snapshotFilename({ revision, frame }))
+      )
+    }
   }
   if (!rawPlayer.value) return []
+  if (isMoved()) {
+    // The player stays where the user moved it, without the drawing the
+    // loop may have left on the live canvas.
+    nextTick(() => {
+      clearCanvas()
+      reloadCurrentAnnotation()
+    })
+    return []
+  }
   rawPlayer.value.setCurrentFrame(cur - 1)
   nextTick(() => {
     clearCanvas()
     if (displayedAnnotation) loadSingleAnnotation(displayedAnnotation)
   })
-  return files
+  return signal?.aborted ? [] : files
 }
 
 // Picture revisions can hold several preview files (main + extras).
 // Walk them all and emit one PNG per picture preview, with that
-// preview's annotations composited on top. Briefly switches the
-// displayed picture in order to reuse the live extract/composite
-// pipeline.
-const extractPicturePreviewSnapshots = async ({ withLabel = false } = {}) => {
+// preview's annotations composited on top. Switches the displayed
+// picture in turn to reuse the live extract/composite pipeline.
+const extractPicturePreviewSnapshots = async ({
+  withLabel = false,
+  signal
+} = {}) => {
   const entity = currentEntity.value
   if (!entity) return []
+  const savedIndex = currentPreviewIndex.value
+  // The file the snapshots have the player show: the user can move the
+  // player to another one meanwhile.
+  const shown = { id: currentPreview.value?.id }
+  try {
+    return await snapshotPicturePreviews(entity, shown, { withLabel, signal })
+  } finally {
+    // Back to the file of the user, even after a failed snapshot. A closed
+    // player has nothing left to show, and one the user moved stays there.
+    if (picturePlayer.value && currentPreview.value?.id === shown.id) {
+      await showPreviewFile(savedIndex)
+    }
+  }
+}
+
+const snapshotPicturePreviews = async (
+  entity,
+  shown,
+  { withLabel, signal }
+) => {
   const picturePreviews = [
     {
       id: entity.preview_file_id,
@@ -3795,46 +3857,71 @@ const extractPicturePreviewSnapshots = async ({ withLabel = false } = {}) => {
   ]
     .map((preview, index) => ({ preview, index }))
     .filter(({ preview }) => isPicturePreview(preview.extension))
+  // The snapshots stop once the user closes the dialog, or moves the player
+  // to another file.
+  const isLeft = () =>
+    Boolean(signal?.aborted) || currentPreview.value?.id !== shown.id
 
-  const savedIndex = currentPreviewIndex.value
   const files = []
   let fileIndex = 1
   for (const { preview, index } of picturePreviews) {
+    if (isLeft()) return []
     if (currentPreviewIndex.value !== index) {
       currentPreviewIndex.value = index
     }
-    // Always wait for the live canvas to settle before compositing.
-    // Iteration #1 often skips the index switch (the user is already
-    // on the main preview), but the live canvas can still be mid-load
-    // when the snapshot is triggered right after opening the task —
-    // composite would then capture an empty canvas and the resulting
-    // PNG would come out without any annotation.
+    shown.id = preview.id
+    // The viewer takes the new file at the next render: read before it,
+    // the state is still the one of the previous picture.
+    await nextTick()
+    const isInTime = await waitForPicture(
+      () =>
+        isLeft() ||
+        !picturePlayer.value ||
+        picturePlayer.value.isPictureReady() ||
+        picturePlayer.value.isPictureUnavailable()
+    )
+    // Then let the live canvas settle before compositing. Iteration #1
+    // often skips the index switch (the user is already on the main
+    // preview), but the live canvas can still be mid-load when the
+    // snapshot is triggered right after opening the task: composite would
+    // then capture an empty canvas and the resulting PNG would come out
+    // without any annotation.
     await new Promise(resolve => setTimeout(resolve, 500))
-    // Closed meanwhile, like in extractVideoFrame
-    if (!picturePlayer.value) return []
-    const canvas = document.getElementById('annotation-snapshot')
-    extractPicture(canvas)
-    await compositeLiveAnnotationsOntoCanvas(canvas)
-    if (withLabel) {
-      drawSnapshotTitle(
-        canvas,
-        snapshotTitle({ revision: preview.revision, index: fileIndex })
+    // Closed meanwhile, like in extractVideoFrame, or left
+    if (!picturePlayer.value || isLeft()) return []
+    // Leave out a picture that cannot load or is still loading: its snapshot
+    // would be 0x0, which drawImage refuses, or without the picture. Leave out
+    // one that came in after its 10 s too: it did not get the time above to
+    // settle.
+    if (isInTime && picturePlayer.value.isPictureReady()) {
+      const canvas = document.getElementById('annotation-snapshot')
+      extractPicture(canvas)
+      await compositeLiveAnnotationsOntoCanvas(canvas)
+      if (withLabel) {
+        drawSnapshotTitle(
+          canvas,
+          snapshotTitle({ revision: preview.revision, index: fileIndex })
+        )
+      }
+      files.push(
+        await getFileFromCanvas(
+          canvas,
+          snapshotFilename({ revision: preview.revision, index: fileIndex })
+        )
       )
     }
-    files.push(
-      await getFileFromCanvas(
-        canvas,
-        snapshotFilename({ revision: preview.revision, index: fileIndex })
-      )
-    )
     fileIndex++
   }
-  if (currentPreviewIndex.value !== savedIndex) {
-    currentPreviewIndex.value = savedIndex
+  // Left during the encoding of the last picture
+  return isLeft() ? [] : files
+}
+
+const showPreviewFile = async index => {
+  if (currentPreviewIndex.value !== index) {
+    currentPreviewIndex.value = index
     await new Promise(resolve => setTimeout(resolve, 500))
   }
   nextTick(() => reloadCurrentAnnotation())
-  return files
 }
 
 const getFileFromCanvas = (canvas, filename) => {
@@ -4077,44 +4164,34 @@ const onEntityDropped = info => {
   }
 }
 
-// Read the reorder payload BEFORE moving: moveSelectedEntity empties
-// entityList synchronously (restored on nextTick), so any index read
-// after the call lands on an empty array.
+const toOrderEntry = entity => ({
+  entity_id: entity.id,
+  preview_file_id: entity.preview_file_id
+})
+
+// The page saves a move by putting the `after` entry right after the
+// `before` one, which cannot take the last entry to the start. The shortcut
+// stops at both ends instead of wrapping around, the first entry too, so
+// that both directions behave alike. During a load, the entries are still
+// those of the playlist shown before.
 const moveSelectedEntityToLeft = () => {
-  if (entityList.value.length < 2) return
-  const toMoveIndex = playingEntityIndex.value
-  const targetIndex = previousEntityIndex.value
-  const entityToMove = currentEntity.value
-  const info = {
-    before: {
-      entity_id: entityList.value[targetIndex].id,
-      preview_file_id: entityList.value[targetIndex].preview_file_id
-    },
-    after: {
-      entity_id: entityList.value[toMoveIndex].id,
-      preview_file_id: entityList.value[toMoveIndex].preview_file_id
-    }
-  }
-  moveSelectedEntity(entityToMove, toMoveIndex, targetIndex)
+  const index = playingEntityIndex.value
+  const previous = entityList.value[index - 1]
+  const played = entityList.value[index]
+  if (props.isLoading || !previous || !played) return
+  // The previous entry goes right after the one played.
+  const info = { before: toOrderEntry(played), after: toOrderEntry(previous) }
+  moveSelectedEntity(played, index, index - 1)
   emit('order-change', info)
 }
 
 const moveSelectedEntityToRight = () => {
-  if (entityList.value.length < 2) return
-  const toMoveIndex = playingEntityIndex.value
-  const targetIndex = nextEntityIndex.value
-  const entityToMove = currentEntity.value
-  const info = {
-    before: {
-      entity_id: entityList.value[toMoveIndex].id,
-      preview_file_id: entityList.value[toMoveIndex].preview_file_id
-    },
-    after: {
-      entity_id: entityList.value[targetIndex].id,
-      preview_file_id: entityList.value[targetIndex].preview_file_id
-    }
-  }
-  moveSelectedEntity(entityToMove, toMoveIndex, targetIndex)
+  const index = playingEntityIndex.value
+  const played = entityList.value[index]
+  const next = entityList.value[index + 1]
+  if (props.isLoading || !played || !next) return
+  const info = { before: toOrderEntry(next), after: toOrderEntry(played) }
+  moveSelectedEntity(played, index, index + 1)
   emit('order-change', info)
 }
 
@@ -4280,11 +4357,7 @@ const onBuildClicked = () => runBuild(false)
 const onBuildFullClicked = () => runBuild(true)
 
 const runBuild = (full = false) => {
-  if (
-    (isCurrentUserManager.value || isCurrentUserSupervisor.value) &&
-    !isJobRunning.value &&
-    !isBuildLaunched.value
-  ) {
+  if (!isBuildDisabled.value && !isBuildLaunched.value) {
     isBuildLaunched.value = true
     store
       .dispatch('runPlaylistBuild', { playlist: props.playlist, full })
@@ -4873,8 +4946,10 @@ const onPreviewFileAnnotationUpdate = eventData => {
       taskId: currentPreview.value.task_id
     })
     .then(preview => {
+      // A reload under a text being typed ends the typing.
       if (
         !notSaved.value &&
+        !isTypingText() &&
         currentPreview.value?.id === eventData.preview_file_id &&
         !isWriting(eventData.updated_at)
       ) {
@@ -4954,7 +5029,14 @@ watch(framesSeenOfPicture, () => {
 watch(
   () => props.isLoading,
   () => {
-    if (!props.isLoading) resetHeight()
+    // The download menu and the modals belong to the playlist shown before
+    // the load.
+    if (props.isLoading) {
+      isDlButtonsHidden.value = true
+      closeModals()
+    } else {
+      resetHeight()
+    }
   }
 )
 

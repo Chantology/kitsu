@@ -63,7 +63,10 @@ export default {
     include_all: 'Includes all asset task types',
     new_asset_type: 'Add an asset type',
     number: 'asset type | asset types',
+    restore_studio_workflow: 'Use the studio workflow',
     title: 'Asset Types',
+    workflow_production: 'Production workflow',
+    workflow_studio: 'Studio workflow',
     production_title: 'Asset Type Stats',
     fields: {
       name: 'Name',
@@ -395,31 +398,51 @@ export default {
   },
 
   status_automations: {
+    add_condition: '+ Add condition',
     add_status_automation_placeholder: '+ Add Status Automation',
     change_ready_for: 'changes "ready for" to',
-    change_status: 'changes task status to',
-    create_error: 'An error occurred while saving this status automation. Are you sure that there is no other automation with the same name?',
-    delete_text: 'Are you sure you want to remove status automation {name} from your database?',
-    delete_error: 'An error occurred while deleting this status automation. It may be linked to a production. If so, you must remove it from every production first.',
+    change_status: 'changes the status of',
+    create_error: 'Could not save. Please try again.',
+    delete_text: 'Are you sure you want to remove this status automation from your database?',
+    delete_error: 'An error occurred while deleting this status automation. It may be linked to a production or a production template. If so, you must remove it from every production and template first.',
     edit_title: 'Edit a status automation',
-    entity_title: 'Entity type affected by the trigger',
+    guard_only_condition_and: 'In this production, {taskType} comes after the applied task type: its status changes do not run this automation, but the condition must still be met.',
+    guard_only_condition_or: 'In this production, {taskType} comes after the applied task type: this condition is ignored.',
     number: 'status automation | status automations',
-    in_title: 'Status triggering a change',
+    only_from: 'only from',
+    in_title: 'Trigger conditions',
     out_title: 'The change that will be applied on trigger firing',
     new_status_automation: 'Add status automation',
+    remove_condition: 'Remove condition',
+    remove_condition_on: 'Remove the condition on {taskType}',
     production_description: 'An automation changes a task status, or the next task, when a status is set.',
     run_for_selection: 'Run status automation for selected tasks:',
+    save_refused: 'This automation cannot be saved as it is.',
     title: 'Automations',
-    wrong_automation: 'This automation applies to an upstream task type. It is not permitted by Kitsu (to avoid infinite cycles). It will have no effect.',
+    to_status: 'to',
+    trigger_when: 'Trigger when',
+    wrong_automation: 'In this production, every condition uses a task type that comes after the applied task type. Their status changes do not run this automation, to avoid infinite cycles: it has no effect.',
+    connectors: {
+      and: 'and',
+      or: 'or'
+    },
+    errors: {
+      max_conditions: 'An automation accepts at most 10 conditions.',
+      missing_value: 'Choose a task type and at least one status.',
+      output_in_conditions: 'The applied task type cannot be used in the conditions.',
+      same_task_type: 'This task type is already used by another condition: add the statuses there.'
+    },
     fields: {
+      conditions: 'Conditions',
       entity_type: 'Entity Type',
-      in_field_type: 'Input Field Type',
       in_task_type: 'Task Type',
       in_task_status: 'Task Status',
-      out_field_type: 'Trigger',
+      out_field_type: 'Applied Change',
       out_task_type: 'Applied Task Type',
       out_task_status: 'Applied Task Status',
-      import_last_revision: 'Import Last Revision'
+      import_last_revision: 'Import Last Revision',
+      operator: 'Operator',
+      out_only_if_task_status_ids: 'Only when the applied task is in'
     },
     entity_types: {
       asset: 'Asset',
@@ -431,6 +454,18 @@ export default {
     field_types: {
       status: 'Status',
       ready_for: 'Ready For'
+    },
+    help: {
+      and: 'Runs when a status change makes all the conditions true. A task type the entity does not have is ignored.',
+      import_and: 'The revision comes from the task of the first condition the entity has.',
+      import_or: 'The revision comes from the task whose status change met the conditions.',
+      new_comments_only: 'Automations run when a new comment changes a status, never when a comment is edited or deleted.',
+      or: 'Runs when a status change makes one of the conditions true and none was true before.',
+      out_only_if: 'Leave empty to apply the change whatever the status of the applied task.'
+    },
+    operators: {
+      and: 'all of the following conditions are met',
+      or: 'any of the following conditions is met'
     }
   },
 
@@ -839,6 +874,10 @@ export default {
     back: 'Back',
     before: 'Before',
     cancel: 'Cancel',
+    cell_save_error:
+      '"{name}" could not be saved: the previous value is back. Please reload the page and try again.',
+    cells_save_error:
+      'Some changes could not be saved: the previous values are back. Please reload the page and try again.',
     clear_selection: 'Clear current selection',
     clear_sorting: 'Clear current sorting',
     close: 'Close',
@@ -869,6 +908,7 @@ export default {
     documentation: 'Documentation',
     drop_files_here: 'Drop files here',
     edit: 'Edit',
+    edit_deleted_error: '"{name}" could not be saved: it was deleted in the meantime.',
     edit_mode_on: 'Toggle edit mode',
     empty_comment: 'Empty comment',
     empty_schedule: 'There are no tasks or they don\'t have start dates.',
@@ -963,7 +1003,9 @@ export default {
     },
     remove: 'Remove',
     remove_search_query: 'Are you sure you want to remove the search query "{name}"?',
+    remove_search_query_error: 'An error occurred while removing this search query.',
     remove_search_filter_group: 'Are you sure you want to remove the search filter group "{name}"?',
+    remove_search_filter_group_error: 'An error occurred while removing this search filter group.',
     reload: 'Reload',
     remaining: 'Remaining',
     reply: 'Reply',
@@ -1331,6 +1373,7 @@ export default {
       create_new: 'Create a new link',
       expiration: 'Expiration date (optional)',
       can_comment: 'Allow comments',
+      can_download: 'Allow .zip download',
       generate: 'Generate a new link',
       copy: 'Copy link',
       open: 'Open link in a new tab',
@@ -1351,6 +1394,7 @@ export default {
       expires: 'Expires',
       no_expiration: 'No expiration',
       comments_enabled: 'Comments enabled',
+      download_enabled: '.zip download enabled',
       comments_disabled: 'Comments disabled',
       error: 'An error occurred while creating the share link.'
     },
@@ -1865,10 +1909,12 @@ export default {
     create_error: 'An error occurred while saving this task status. Are you sure there is no task status with a similar name?',
     delete_text: 'Are you sure you want to remove {name} from your database?',
     delete_error: 'An error occurred while deleting this task status. There may be existing data currently linked to it. Are you sure this task status has no task linked to it?',
+    delete_blocked_by_automations: 'Status automations still use this task status, archived ones included. Edit or delete them first.',
     edit_title: 'Edit task status',
     name: 'task status',
     number: 'task status | task statuses',
     new_task_status: 'Add a task status',
+    remove_status: 'Remove status {name}',
     production_description: "Only these statuses can be set on this production's tasks.",
     title: 'Task Status',
     help: {
@@ -1895,6 +1941,7 @@ export default {
     add_task_type_to_library: 'Add a task type to the library',
     delete_text: 'Are you sure you want to remove {name} from your database?',
     delete_error: 'An error occurred while deleting this task type. There may be existing data currently linked to it. Are you sure this task type has no task linked to it?',
+    delete_blocked_by_automations: 'Status automations still use this task type, archived ones included. Edit or delete them first.',
     delete_blocked_by_links: 'This task type is still used in the schedule or in the workflow of some productions. Detaching it will drop its schedule dates in every production.',
     delete_blocked_by_tasks: 'Tasks still use this task type. Delete or reassign them before removing it.',
     delete_force: 'Detach and delete',
@@ -1910,6 +1957,7 @@ export default {
     remaining_tasks_delete:
       'Also delete this task, with its comments and previews | Also delete these {count} tasks, with their comments and previews',
     remaining_tasks_lock: 'Type {name} to confirm the deletion',
+    remaining_tasks_lock_error: 'The name does not match.',
     remove_error: 'Could not remove the task type. Please try again.',
     remove_title: 'Remove the task type',
     select_task_type: 'Select a task type...',
@@ -2041,7 +2089,16 @@ export default {
       delete_milestone: 'Delete milestone',
       edit_milestone: 'Edit milestone for',
       name: 'Name',
-      error: 'An error occurred while adding or editing the milestone. Please try again.'
+      error: 'An error occurred while adding or editing the milestone. Please try again.',
+      type: 'Type',
+      color: 'Color',
+      types: {
+        kickoff: 'Kickoff',
+        review: 'Review',
+        approval: 'Approval',
+        delivery: 'Delivery',
+        other: 'Other'
+      }
     },
     mode: 'View Mode',
     mode_prev: 'Forecast',

@@ -24,6 +24,14 @@ describe('render', () => {
       expect(safeUrl('')).toBe(null)
       expect(safeUrl(undefined)).toBe(null)
     })
+
+    test('reads the scheme the way the browser does', () => {
+      expect(safeUrl('java\tscript:alert(1)')).toBe(null)
+      expect(safeUrl('java\nscript:alert(1)')).toBe(null)
+      expect(safeUrl('java\rscript:alert(1)')).toBe(null)
+      expect(safeUrl('\u0001javascript:alert(1)')).toBe(null)
+      expect(safeUrl('ht\ttps://cg-wire.com')).toBe('ht\ttps://cg-wire.com')
+    })
   })
 
   test('renderComment', () => {
@@ -51,6 +59,69 @@ describe('render', () => {
     const result = renderComment(input, [], mentions, {}, departmentMap)
     expect(result.trim()).toEqual(
       '<p>Text <span style="color: red">@Modeling</span></p>'
+    )
+  })
+
+  test('renderComment links the task types with a safe URL, and #All', () => {
+    const taskTypes = [
+      { name: 'Light & Render', url: '/productions/p1/tasks/tt1?a=1&b=2' },
+      { name: 'Anim', url: 'javascript:alert(1)' }
+    ]
+    const result = renderComment(
+      '#Light & Render #Anim #All',
+      [],
+      [],
+      new Map(),
+      new Map(),
+      taskTypes
+    )
+    expect(result.trim()).toEqual(
+      '<p><a class="mention mention-task" ' +
+        'href="/productions/p1/tasks/tt1?a=1&amp;b=2">#Light &amp; Render</a> ' +
+        '#Anim <a class="mention mention-task" href="#">#All</a></p>'
+    )
+  })
+
+  // Sanitized text keeps quotes and apostrophes raw: names holding them,
+  // like O'Brien, must still be found.
+  test('renderComment finds the mentions of a name holding quotes', () => {
+    const personMap = new Map([
+      ['person-1', { id: 'person-1', full_name: 'Sean "Tom & Jerry" O\'Brien' }]
+    ])
+    const departmentMap = new Map([
+      ['department-1', { id: 'department-1', name: "Director's", color: 'red' }]
+    ])
+    const taskTypes = [{ name: "Artist's cut", url: '/tasks/tt1' }]
+    const result = renderComment(
+      'Hi @Sean "Tom & Jerry" O\'Brien, @Director\'s, #Artist\'s cut',
+      ['person-1'],
+      ['department-1'],
+      personMap,
+      departmentMap,
+      taskTypes
+    )
+    expect(result.trim()).toEqual(
+      '<p>Hi <a class="mention" href="/people/person-1">' +
+        '@Sean "Tom &amp; Jerry" O\'Brien</a>, ' +
+        '<span style="color: red">@Director\'s</span>, ' +
+        '<a class="mention mention-task" href="/tasks/tt1">#Artist\'s cut</a></p>'
+    )
+  })
+
+  test('renderComment marks the timecodes of a revision', () => {
+    const result = renderComment(
+      'Fix v3 00:01:02.04 (28) please',
+      [],
+      [],
+      new Map(),
+      new Map(),
+      [],
+      'clickable'
+    )
+    const timecode = result.match(/<span([^>]*)>([^<]*)<\/span>/)
+    expect(timecode[2]).toBe('v3 00:01:02.04 (28)')
+    expect(timecode[1].replace(/\s+/g, ' ').trim()).toBe(
+      'class="timecode clickable" data-version-revision="3" data-frame="28"'
     )
   })
 

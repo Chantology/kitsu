@@ -1,12 +1,10 @@
 import { nextTick, reactive } from 'vue'
-import { shallowMount } from '@vue/test-utils'
 import { createStore } from 'vuex'
 import { createRouter, createWebHistory } from 'vue-router'
 
-import i18n from '@/lib/i18n'
 import AddComment from '@/components/widgets/AddComment.vue'
 
-import './setup'
+import { shallowMountWithI18n } from '../fixtures/i18n'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -64,7 +62,7 @@ describe('AddComment', () => {
     project_id: 'production-1'
   }
 
-  const mountComment = async (getterOverrides = {}) => {
+  const mountComment = async (getterOverrides = {}, stubs = {}) => {
     draftComment = makeDraftComment()
     clearedProgress = []
 
@@ -108,7 +106,7 @@ describe('AddComment', () => {
     await router.push('/tasks/task-1')
     await router.isReady()
 
-    wrapper = shallowMount(AddComment, {
+    wrapper = shallowMountWithI18n(AddComment, {
       props: {
         task,
         taskStatus: taskStatusList,
@@ -116,7 +114,7 @@ describe('AddComment', () => {
         taskTypes: []
       },
       global: {
-        plugins: [i18n, store, router],
+        plugins: [store, router],
         provide: {
           draftComment
         },
@@ -128,7 +126,8 @@ describe('AddComment', () => {
           'at-ta': false,
           EmojiButton: true,
           AddAttachmentModal: true,
-          ConfirmModal: true
+          ConfirmModal: true,
+          ...stubs
         }
       }
     })
@@ -176,6 +175,47 @@ describe('AddComment', () => {
     await wrapper.find('.post-button').trigger('click')
 
     expect(clearedProgress).toEqual([['sh010.mp4']])
+  })
+
+  // Snapshots taken once the attachment dialog is closed would land in it,
+  // and the dialog empties itself when it opens again.
+  describe('snapshots', () => {
+    const attachmentModal = {
+      name: 'AddAttachmentModal',
+      template: '<div />',
+      emits: ['cancel', 'confirm'],
+      methods: {
+        addFiles: () => {},
+        hideAnnotationLoading: () => {},
+        showAnnotationLoading: () => {}
+      }
+    }
+
+    beforeEach(async () => {
+      wrapper.unmount()
+      await mountComment({}, { AddAttachmentModal: attachmentModal })
+    })
+
+    // Confirming the files already in it closes it too.
+    it.each(['cancel', 'confirm'])(
+      'stops them when the attachment dialog closes on %s',
+      event => {
+        const signal = wrapper.vm.showAnnotationLoading('standard')
+        expect(signal.aborted).toBe(false)
+
+        wrapper.findComponent({ name: 'AddAttachmentModal' }).vm.$emit(event, [])
+
+        expect(signal.aborted).toBe(true)
+      }
+    )
+
+    it('stops them when it goes away', () => {
+      const signal = wrapper.vm.showAnnotationLoading('standard')
+
+      wrapper.unmount()
+
+      expect(signal.aborted).toBe(true)
+    })
   })
 
   describe('exposed methods', () => {

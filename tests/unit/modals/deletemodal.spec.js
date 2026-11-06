@@ -5,8 +5,7 @@ import DeleteModal from '@/components/modals/DeleteModal.vue'
 
 const mountModal = (props = {}) =>
   mount(DeleteModal, {
-    props: { active: true, text: 'Are you sure?', ...props },
-    global: { mocks: { $t: key => key } }
+    props: { active: true, text: 'Are you sure?', ...props }
   })
 
 describe('DeleteModal', () => {
@@ -40,12 +39,24 @@ describe('DeleteModal', () => {
     expect(wrapper.find('.error-details').exists()).toBe(false)
   })
 
+  it('announces an error with its details', async () => {
+    const wrapper = mountModal({
+      errorText: 'Still linked',
+      errorDetails: 'Used by 2 status automations.'
+    })
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+
+    await wrapper.setProps({ isError: true })
+    expect(wrapper.find('[role="alert"]').text().replace(/\s+/g, ' ')).toBe(
+      'Still linked (main.technical_details Used by 2 status automations.)'
+    )
+  })
+
   // A row button hides itself once the modal covers the row, which used to
   // drop the focus on <body>: Shift+Tab then reached the page behind.
   it('keeps Shift+Tab inside the modal it opened', async () => {
     const wrapper = mount(DeleteModal, {
       props: { active: false, text: 'Are you sure?' },
-      global: { mocks: { $t: key => key } },
       attachTo: document.body
     })
 

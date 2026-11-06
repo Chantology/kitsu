@@ -1,10 +1,8 @@
-import { shallowMount } from '@vue/test-utils'
 import { createStore } from 'vuex'
 
-import i18n from '@/lib/i18n'
 import ComboboxStatus from '@/components/widgets/ComboboxStatus.vue'
 
-import './setup'
+import { shallowMountWithI18n } from '../fixtures/i18n'
 
 describe('ComboboxStatus', () => {
   let store, wrapper
@@ -41,19 +39,41 @@ describe('ComboboxStatus', () => {
       }
     })
 
-    wrapper = shallowMount(ComboboxStatus, {
+    wrapper = shallowMountWithI18n(ComboboxStatus, {
       props: {
         taskStatusList,
         modelValue: 'status-2'
       },
       global: {
-        plugins: [i18n, store]
+        plugins: [store]
       }
     })
   })
 
   it('displays current status short name', () => {
     expect(wrapper.find('.tag').text()).toBe('WIP')
+  })
+
+  it('names the combobox by its label, else by the given element', () => {
+    const mountNamed = props =>
+      shallowMountWithI18n(ComboboxStatus, {
+        props: { taskStatusList, modelValue: 'status-2', ...props },
+        global: { plugins: [store] }
+      })
+    const labeled = mountNamed({ label: 'Status' })
+    const labelId = labeled.find('label').attributes('id')
+    expect(labelId).toBeTruthy()
+    expect(
+      labeled.find('[role="combobox"]').attributes('aria-labelledby')
+    ).toBe(labelId)
+    expect(
+      mountNamed({ ariaLabelledby: 'field-label' })
+        .find('[role="combobox"]')
+        .attributes('aria-labelledby')
+    ).toBe('field-label')
+    expect(
+      wrapper.find('[role="combobox"]').attributes('aria-labelledby')
+    ).toBeUndefined()
   })
 
   it('does not show the dropdown list initially', () => {
@@ -82,24 +102,24 @@ describe('ComboboxStatus', () => {
   })
 
   it('shows placeholder when no modelValue and addPlaceholder is true', () => {
-    const w = shallowMount(ComboboxStatus, {
+    const w = shallowMountWithI18n(ComboboxStatus, {
       props: {
         taskStatusList,
         modelValue: '',
         addPlaceholder: true
       },
-      global: { plugins: [i18n, store] }
+      global: { plugins: [store] }
     })
     expect(w.find('.tag').exists()).toBe(true)
   })
 
   it('falls back to first status when modelValue is empty and no placeholder', () => {
-    const w = shallowMount(ComboboxStatus, {
+    const w = shallowMountWithI18n(ComboboxStatus, {
       props: {
         taskStatusList,
         modelValue: ''
       },
-      global: { plugins: [i18n, store] }
+      global: { plugins: [store] }
     })
     expect(w.find('.tag').text()).toBe('TODO')
   })

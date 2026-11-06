@@ -40,6 +40,12 @@ import {
 // concurrent fetches triggered by the player's sliding-window prefetch.
 const annotationRequests = new Map()
 
+// The last order save of each playlist, keyed by playlist id. Each save sends
+// the whole order, and Zou keeps the one it stores last: a save waits for the
+// previous one, then sends the order of that moment, unless a later move
+// queued a save of its own meanwhile.
+const orderSaves = new Map()
+
 const helpers = {
   getEntityPreviewFile(entity, previewFileList, taskTypeId) {
     const previewFiles = taskTypeId
@@ -261,7 +267,17 @@ const actions = {
   changePlaylistOrder({ commit, dispatch }, { playlist, info }) {
     if (!playlist) return null
     commit(CHANGE_PLAYLIST_ORDER, { playlist, info })
-    return dispatch('editPlaylist', { data: playlist })
+    const send = () =>
+      orderSaves.get(playlist.id) === save
+        ? dispatch('editPlaylist', { data: playlist })
+        : null
+    const save = (orderSaves.get(playlist.id) ?? Promise.resolve())
+      .then(send, send)
+      .finally(() => {
+        if (orderSaves.get(playlist.id) === save) orderSaves.delete(playlist.id)
+      })
+    orderSaves.set(playlist.id, save)
+    return save
   },
 
   changePlaylistPreview(
@@ -386,6 +402,46 @@ const actions = {
 
   saveSharedPlaylistAnnotations(_, { shareToken, data }) {
     return playlistsApi.saveSharedPlaylistAnnotations(shareToken, data)
+  },
+
+  loadSharedPlaylistComments(_, shareToken) {
+    return playlistsApi.loadSharedPlaylistComments(shareToken)
+  },
+
+  postSharedPlaylistComment(_, { shareToken, data }) {
+    return playlistsApi.postSharedPlaylistComment(shareToken, data)
+  },
+
+  editSharedPlaylistComment(_, { shareToken, commentId, data }) {
+    return playlistsApi.editSharedPlaylistComment(shareToken, commentId, data)
+  },
+
+  deleteSharedPlaylistComment(_, { shareToken, commentId, guestId }) {
+    return playlistsApi.deleteSharedPlaylistComment(
+      shareToken,
+      commentId,
+      guestId
+    )
+  },
+
+  postSharedPlaylistCommentAttachments(_, { shareToken, commentId, formData }) {
+    return playlistsApi.postSharedPlaylistCommentAttachments(
+      shareToken,
+      commentId,
+      formData
+    )
+  },
+
+  deleteSharedPlaylistCommentAttachment(
+    _,
+    { shareToken, commentId, attachmentId, guestId }
+  ) {
+    return playlistsApi.deleteSharedPlaylistCommentAttachment(
+      shareToken,
+      commentId,
+      attachmentId,
+      guestId
+    )
   },
 
   loadPlaylistShareLinks(_, playlistId) {

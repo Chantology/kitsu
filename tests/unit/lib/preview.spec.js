@@ -1,10 +1,13 @@
 // @vitest-environment node
 
 import {
+  buildAnnotationSnapshotTitle,
+  drawSnapshotTitle,
   formatRevision,
   hasPreviewFilePicture,
   isPreviewFileStatus,
-  latestPreviewFileStatus
+  latestPreviewFileStatus,
+  waitForPicture
 } from '@/lib/preview'
 
 describe('lib/preview', () => {
@@ -63,6 +66,138 @@ describe('lib/preview', () => {
         'processing'
       )
       expect(latestPreviewFileStatus('ready', undefined)).toBe('ready')
+    })
+  })
+
+  // A picture shown for a snapshot loads asynchronously.
+  describe('waitForPicture', () => {
+    // isDone tells whether the wait is over, without awaiting it, and
+    // isInTime what it resolved to.
+    const startWait = isReady => {
+      const wait = { isDone: false, isInTime: null }
+      wait.promise = (async () => {
+        wait.isInTime = await waitForPicture(isReady)
+        wait.isDone = true
+      })()
+      return wait
+    }
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('resolves once the picture is ready', async () => {
+      let isReady = false
+      const wait = startWait(() => isReady)
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(wait.isDone).toBe(false)
+
+      isReady = true
+      await vi.advanceTimersByTimeAsync(100)
+
+      expect(wait.isDone).toBe(true)
+      expect(wait.isInTime).toBe(true)
+      expect(vi.getTimerCount()).toBe(0)
+    })
+
+    it('gives up after 10 s', async () => {
+      const wait = startWait(() => false)
+      await vi.advanceTimersByTimeAsync(9900)
+      expect(wait.isDone).toBe(false)
+
+      await vi.advanceTimersByTimeAsync(200)
+
+      expect(wait.isDone).toBe(true)
+      expect(wait.isInTime).toBe(false)
+      expect(vi.getTimerCount()).toBe(0)
+    })
+
+    it('counts a picture ready right before the 10 s', async () => {
+      let isReady = false
+      const wait = startWait(() => isReady)
+      // Between two checks
+      await vi.advanceTimersByTimeAsync(9990)
+      isReady = true
+      await vi.advanceTimersByTimeAsync(10)
+
+      expect(wait.isDone).toBe(true)
+      expect(wait.isInTime).toBe(true)
+      expect(vi.getTimerCount()).toBe(0)
+    })
+
+    it('resolves at once for a picture already ready', async () => {
+      const wait = startWait(() => true)
+      await vi.advanceTimersByTimeAsync(0)
+
+      expect(wait.isDone).toBe(true)
+      expect(wait.isInTime).toBe(true)
+      expect(vi.getTimerCount()).toBe(0)
+    })
+  })
+
+  describe('annotation snapshot title', () => {
+    const context = { production: 'Agent 327', entity: 'SQ01 / SH010' }
+
+    it('joins the parts of the source, with the frame or the index', () => {
+      expect(
+        buildAnnotationSnapshotTitle({
+          ...context,
+          taskType: 'Animation',
+          revision: 3,
+          frame: 12.4
+        })
+      ).toEqual('Agent 327 / SQ01 / SH010 / Animation / v3 / #12')
+      expect(buildAnnotationSnapshotTitle({ ...context, index: 2 })).toEqual(
+        'Agent 327 / SQ01 / SH010 / #2'
+      )
+      expect(
+        buildAnnotationSnapshotTitle({ ...context, taskType: '', revision: '' })
+      ).toEqual('Agent 327 / SQ01 / SH010')
+    })
+
+    const buildCanvas = (width, height) => {
+      const calls = []
+      const context = {
+        save: () => calls.push(['save']),
+        restore: () => calls.push(['restore']),
+        fillRect: (...args) => calls.push(['fillRect', ...args]),
+        fillText: (...args) => calls.push(['fillText', ...args])
+      }
+      return { width, height, calls, context, getContext: () => context }
+    }
+
+    it('burns the title into a band at the bottom of the canvas', () => {
+      const canvas = buildCanvas(1000, 800)
+
+      drawSnapshotTitle(canvas, 'Agent 327 / SH010')
+
+      expect(canvas.calls).toEqual([
+        ['save'],
+        ['fillRect', 0, 756, 1000, 44],
+        ['fillText', 'Agent 327 / SH010', 12, 778],
+        ['restore']
+      ])
+      expect(canvas.context.font).toEqual('20px sans-serif')
+      expect(canvas.context.fillStyle).toEqual('#ffffff')
+    })
+
+    it('keeps the text readable on a small canvas', () => {
+      const canvas = buildCanvas(320, 200)
+
+      drawSnapshotTitle(canvas, 'SH010')
+
+      expect(canvas.calls[1]).toEqual(['fillRect', 0, 170, 320, 30])
+      expect(canvas.context.font).toEqual('14px sans-serif')
+    })
+
+    it('draws nothing without a title', () => {
+      const canvas = buildCanvas(1000, 800)
+      drawSnapshotTitle(canvas, '')
+      expect(canvas.calls).toEqual([])
     })
   })
 })

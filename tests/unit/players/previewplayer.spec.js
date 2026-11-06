@@ -1725,6 +1725,313 @@ describe('PreviewPlayer.vue', () => {
       await expect(snapshots).resolves.toEqual([])
     }
     )
+
+    // Its snapshots would land in the closed dialog.
+    it('stops the video snapshots once the attachment dialog closes', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      // jsdom draws and encodes nothing
+      const snapshotCanvas = document.createElement('canvas')
+      snapshotCanvas.toBlob = callback => callback(new Blob())
+      vi.spyOn(document, 'getElementById').mockReturnValue(snapshotCanvas)
+      vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+        drawImage: () => {}
+      })
+      const canvas = {
+        ...createFakeCanvas(),
+        getWidth: () => 800,
+        toCanvasElement: () => document.createElement('canvas')
+      }
+      const annotations = [1, 2].map(time => ({
+        time,
+        drawing: { objects: [] }
+      }))
+      wrapper = mountPlayer({
+        props: { previews: [{ ...moviePreview, annotations }] },
+        stubs: { AnnotationCanvas: annotationCanvasStub(canvas) }
+      })
+      await nextTick()
+      const controller = new AbortController()
+
+      const snapshots = wrapper.vm.extractAnnotationSnapshots({
+        signal: controller.signal
+      })
+      await vi.advanceTimersByTimeAsync(550)
+      expect(viewer.extractFrame).toHaveBeenCalledTimes(1)
+      controller.abort()
+      await vi.advanceTimersByTimeAsync(1200)
+
+      await expect(snapshots).resolves.toEqual([])
+      expect(viewer.extractFrame).toHaveBeenCalledTimes(1)
+      // Back on the frame of the user
+      expect(viewer.setCurrentFrame).toHaveBeenLastCalledWith(0)
+    })
+
+    // The user can move the player to another task or revision meanwhile.
+    it('stops the video snapshots once the player shows another file', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      // jsdom draws and encodes nothing
+      const snapshotCanvas = document.createElement('canvas')
+      snapshotCanvas.toBlob = callback => callback(new Blob())
+      vi.spyOn(document, 'getElementById').mockReturnValue(snapshotCanvas)
+      vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+        drawImage: () => {}
+      })
+      const canvas = {
+        ...createFakeCanvas(),
+        getWidth: () => 800,
+        toCanvasElement: () => document.createElement('canvas')
+      }
+      const annotations = [1, 2].map(time => ({
+        time,
+        drawing: { objects: [] }
+      }))
+      wrapper = mountPlayer({
+        props: { previews: [{ ...moviePreview, annotations }] },
+        stubs: {
+          AnnotationCanvas: annotationCanvasStub(canvas),
+          // Read once another movie is in
+          PreviewViewer: {
+            name: 'PreviewViewer',
+            template: '<div />',
+            methods: {
+              ...viewer,
+              getNaturalDimensions: () => ({ width: 1920, height: 1080 })
+            }
+          }
+        }
+      })
+      await nextTick()
+
+      const snapshots = wrapper.vm.extractAnnotationSnapshots()
+      await vi.advanceTimersByTimeAsync(550)
+      expect(viewer.extractFrame).toHaveBeenCalledTimes(1)
+      await wrapper.setProps({
+        previews: [{ ...moviePreview, id: 'preview-3', revision: 2, annotations }]
+      })
+      await vi.advanceTimersByTimeAsync(1200)
+
+      await expect(snapshots).resolves.toEqual([])
+      expect(viewer.extractFrame).toHaveBeenCalledTimes(1)
+    })
+
+    // A picture loads once shown, and the next one of a revision can take
+    // longer than the snapshot of the previous one: a picture still loading
+    // makes a 0x0 snapshot that drawImage refuses, even once its size is
+    // known.
+    describe('of a revision with several pictures', () => {
+      const nextPicture = { ...preview, id: 'preview-1b' }
+      let extracted = []
+      let loaded = null
+      let snapshotCanvas = null
+      let unavailable = null
+
+      beforeEach(async () => {
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+        // jsdom draws and encodes nothing
+        snapshotCanvas = document.createElement('canvas')
+        snapshotCanvas.toBlob = callback => callback(new Blob())
+        vi.spyOn(document, 'getElementById').mockReturnValue(snapshotCanvas)
+        vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+          drawImage: () => {}
+        })
+        extracted = []
+        loaded = new Set([preview.id])
+        unavailable = new Set()
+        wrapper = mountPlayer({
+          props: { previews: [preview, nextPicture] },
+          stubs: {
+            AnnotationCanvas: annotationCanvasStub({
+              ...createFakeCanvas(),
+              getWidth: () => 800,
+              toCanvasElement: () => document.createElement('canvas')
+            }),
+            // Its picture has a size before the whole file is in.
+            PreviewViewer: {
+              name: 'PreviewViewer',
+              template: '<div />',
+              props: { preview: { type: Object, default: null } },
+              methods: viewer,
+              setup: props => ({
+                extractPicture: () => extracted.push(props.preview.id),
+                getNaturalDimensions: () => ({ width: 800, height: 600 }),
+                isPictureReady: () => loaded.has(props.preview?.id),
+                isPictureUnavailable: () => unavailable.has(props.preview?.id)
+              })
+            }
+          }
+        })
+        await nextTick()
+      })
+
+      it('waits for the next picture to load', async () => {
+        const snapshots = wrapper.vm.extractAnnotationSnapshots()
+        await vi.advanceTimersByTimeAsync(2000)
+        expect(extracted).toEqual([preview.id])
+
+        loaded.add(nextPicture.id)
+        await vi.advanceTimersByTimeAsync(1500)
+
+        expect(extracted).toEqual([preview.id, nextPicture.id])
+        await expect(snapshots).resolves.toHaveLength(2)
+      })
+
+      it('leaves out a picture that does not load', async () => {
+        const snapshots = wrapper.vm.extractAnnotationSnapshots()
+        // A picture gets 10 s to load.
+        await vi.advanceTimersByTimeAsync(12000)
+
+        await expect(snapshots).resolves.toHaveLength(1)
+        expect(extracted).toEqual([preview.id])
+      })
+
+      // The live canvas gets 500 ms to settle once the picture is in: a picture
+      // that comes in after its 10 s would get less.
+      it('leaves out a picture that comes in after its 10 s', async () => {
+        const snapshots = wrapper.vm.extractAnnotationSnapshots()
+        await vi.advanceTimersByTimeAsync(10700)
+        loaded.add(nextPicture.id)
+        await vi.advanceTimersByTimeAsync(2000)
+
+        await expect(snapshots).resolves.toHaveLength(1)
+        expect(extracted).toEqual([preview.id])
+      })
+
+      it('does not wait for a picture that cannot load', async () => {
+        unavailable.add(nextPicture.id)
+        let isDone = false
+
+        const snapshots = wrapper.vm.extractAnnotationSnapshots()
+        const done = (async () => {
+          await snapshots
+          isDone = true
+        })()
+        await vi.advanceTimersByTimeAsync(2000)
+
+        expect(isDone).toBe(true)
+        await done
+        await expect(snapshots).resolves.toHaveLength(1)
+        expect(extracted).toEqual([preview.id])
+      })
+
+      it('goes back to the file of the user when a snapshot fails', async () => {
+        loaded.add(nextPicture.id)
+        const error = new Error('encoding failed')
+        let encoded = 0
+        snapshotCanvas.toBlob = callback => {
+          encoded += 1
+          if (encoded > 1) throw error
+          callback(new Blob())
+        }
+
+        const failure = wrapper.vm.extractAnnotationSnapshots().catch(e => e)
+        await vi.advanceTimersByTimeAsync(3000)
+
+        expect(await failure).toBe(error)
+        expect(
+          wrapper.findComponent({ ref: 'preview-viewer' }).props('preview').id
+        ).toBe(preview.id)
+      })
+
+      // Its snapshots would land in the closed dialog.
+      it('stops once the attachment dialog closes, back on the first file', async () => {
+        const controller = new AbortController()
+        let isDone = false
+
+        const snapshots = wrapper.vm.extractAnnotationSnapshots({
+          signal: controller.signal
+        })
+        const done = (async () => {
+          await snapshots
+          isDone = true
+        })()
+        await vi.advanceTimersByTimeAsync(2000)
+        controller.abort()
+        await vi.advanceTimersByTimeAsync(1500)
+
+        expect(isDone).toBe(true)
+        await done
+        await expect(snapshots).resolves.toEqual([])
+        expect(
+          wrapper.findComponent({ ref: 'preview-viewer' }).props('preview').id
+        ).toBe(preview.id)
+      })
+
+      // The user can move the player to another task or revision meanwhile.
+      it('stops once the player shows other files, and leaves it there', async () => {
+        let isDone = false
+
+        const snapshots = wrapper.vm.extractAnnotationSnapshots()
+        const done = (async () => {
+          await snapshots
+          isDone = true
+        })()
+        await vi.advanceTimersByTimeAsync(2000)
+        await wrapper.setProps({
+          previews: [
+            { ...preview, id: 'preview-3', revision: 2 },
+            { ...preview, id: 'preview-3b', revision: 2 }
+          ]
+        })
+        await vi.advanceTimersByTimeAsync(1500)
+
+        expect(isDone).toBe(true)
+        await done
+        await expect(snapshots).resolves.toEqual([])
+        expect(extracted).toEqual([preview.id])
+        // The player kept the file index, not sent back to the first file
+        expect(
+          wrapper.findComponent({ ref: 'preview-viewer' }).props('preview').id
+        ).toBe('preview-3b')
+      })
+
+      // Encoding a big picture takes a while.
+      it('drops the snapshots when the dialog closes during the last encoding', async () => {
+        loaded.add(nextPicture.id)
+        const controller = new AbortController()
+        let encodeLast = null
+        snapshotCanvas.toBlob = callback => {
+          if (extracted.length === 2) {
+            encodeLast = () => callback(new Blob())
+          } else {
+            callback(new Blob())
+          }
+        }
+
+        const snapshots = wrapper.vm.extractAnnotationSnapshots({
+          signal: controller.signal
+        })
+        await vi.advanceTimersByTimeAsync(1500)
+        expect(encodeLast).not.toBeNull()
+        controller.abort()
+        encodeLast()
+        await vi.advanceTimersByTimeAsync(1000)
+
+        await expect(snapshots).resolves.toEqual([])
+      })
+
+      it('drops the snapshots when the player moves during the last encoding', async () => {
+        loaded.add(nextPicture.id)
+        let encodeLast = null
+        snapshotCanvas.toBlob = callback => {
+          if (extracted.length === 2) {
+            encodeLast = () => callback(new Blob())
+          } else {
+            callback(new Blob())
+          }
+        }
+
+        const snapshots = wrapper.vm.extractAnnotationSnapshots()
+        await vi.advanceTimersByTimeAsync(1500)
+        expect(encodeLast).not.toBeNull()
+        await wrapper.setProps({
+          previews: [{ ...preview, id: 'preview-3', revision: 2 }]
+        })
+        encodeLast()
+        await vi.advanceTimersByTimeAsync(1000)
+
+        await expect(snapshots).resolves.toEqual([])
+      })
+    })
   })
 
   // fabric disposes a text still in editing without the object:modified of
@@ -1766,7 +2073,16 @@ describe('PreviewPlayer.vue', () => {
         text.text = value
         canvas.fire('text:changed', { target: text })
       }
-      return { player, type }
+      return { canvas, player, text, type }
+    }
+
+    // fabric types into a hidden textarea, focused while the text is typed.
+    const textareas = []
+    const giveTextarea = (text, { isFocused }) => {
+      text.hiddenTextarea = document.createElement('textarea')
+      textareas.push(text.hiddenTextarea)
+      document.body.appendChild(text.hiddenTextarea)
+      if (isFocused) text.hiddenTextarea.focus()
     }
 
     const savedTexts = player =>
@@ -1780,6 +2096,7 @@ describe('PreviewPlayer.vue', () => {
 
     afterEach(() => {
       vi.useRealTimers()
+      textareas.splice(0).forEach(textarea => textarea.remove())
     })
 
     it('saves the text typed right before the player closes', async () => {
@@ -1800,6 +2117,45 @@ describe('PreviewPlayer.vue', () => {
       player.unmount()
 
       expect(savedTexts(player)).toEqual(['Fix hand'])
+    })
+
+    // A reload ended the typing.
+    it('refuses the annotation updates while the text is typed', async () => {
+      const { canvas, player, text } = await mountWithText('Type...')
+      giveTextarea(text, { isFocused: true })
+      const isValid = () =>
+        player.vm.isValidPreviewModification('preview-1', '2026-11-03T10:00:00')
+
+      expect(isValid()).toBe(false)
+
+      canvas.getActiveObject.mockReturnValue(null)
+      expect(isValid()).toBe(true)
+    })
+
+    // A text left for the comment box no longer keeps the reloads away: its
+    // last keystrokes, still waiting for the debounce, must start a save.
+    it('saves the last keystrokes once the text loses the focus', async () => {
+      const { canvas, player, text, type } = await mountWithText('Fix hand')
+      giveTextarea(text, { isFocused: true })
+      canvas.fire('text:editing:entered', { target: text })
+      type('Fix the hand')
+
+      text.hiddenTextarea.blur()
+
+      expect(
+        player.vm.isValidPreviewModification('preview-1', '2026-11-03T10:00:00')
+      ).toBe(false)
+    })
+
+    // fabric keeps a text in editing when the user clicks outside the
+    // canvas, into the comment box for instance.
+    it('takes the annotation updates once the text loses the focus', async () => {
+      const { player, text } = await mountWithText('Fix hand')
+      giveTextarea(text, { isFocused: false })
+
+      expect(
+        player.vm.isValidPreviewModification('preview-1', '2026-11-03T10:00:00')
+      ).toBe(true)
     })
   })
 

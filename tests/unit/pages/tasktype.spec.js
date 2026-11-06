@@ -1,14 +1,17 @@
 import { useHead } from '@unhead/vue'
 import { flushPromises, shallowMount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ref } from 'vue'
+import { nextTick, ref } from 'vue'
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { createStore } from 'vuex'
 
 vi.mock('@unhead/vue', () => ({ useHead: vi.fn() }))
 vi.mock('vue-i18n', async importOriginal => ({
   ...(await importOriginal()),
-  useI18n: () => ({ t: key => key })
+  // The parameters of a message show in its text.
+  useI18n: () => ({
+    t: (key, params) => (params ? `${key} ${JSON.stringify(params)}` : key)
+  })
 }))
 
 // Pre-load the real store to avoid circular-import race from child components.
@@ -28,8 +31,10 @@ import EstimationHelper from '@/components/pages/tasktype/EstimationHelper.vue'
 import ButtonSimple from '@/components/widgets/ButtonSimple.vue'
 import ComboboxMultiple from '@/components/widgets/ComboboxMultiple.vue'
 import ComboboxStatusMultiple from '@/components/widgets/ComboboxStatusMultiple.vue'
+import ErrorText from '@/components/widgets/ErrorText.vue'
 
 import { BrokenFileReader, GoneFileReader } from '../fixtures/file-reader'
+import { buildRefusal } from '../fixtures/refusal'
 
 const SearchFieldStub = {
   template: '<div />',
@@ -81,6 +86,7 @@ const mountPage = async ({
   }
   const store = createStore({
     getters: {
+      isInAssetTypeWorkflow: () => () => true,
       currentEpisode: () => null,
       currentProduction: () => ({ id: 'production-1', name: 'Production' }),
       currentTaskType: () => ({
@@ -126,7 +132,6 @@ const mountPage = async ({
         {
           install: app => {
             app.config.globalProperties.$socket = socket
-            app.config.globalProperties.$t = key => key
           }
         }
       ],
@@ -316,7 +321,7 @@ describe('TaskType page', () => {
 
     // The URL filters are read on the first load only, once the tasks
     // arrive: 100 ms after mounting, then 200 ms more.
-    const mountTasks = async query => {
+    const mountTasks = async (query, getters = {}) => {
       const page = await mountPage({
         section: 'tasks',
         query,
@@ -343,7 +348,8 @@ describe('TaskType page', () => {
             { id: 'props', name: 'Props' }
           ],
           taskMap: () => new Map(statusTasks.map(t => [t.id, t])),
-          user: () => ({ id: 'manager-1', departments: [], full_name: 'M' })
+          user: () => ({ id: 'manager-1', departments: [], full_name: 'M' }),
+          ...getters
         }
       })
       wrapper = page.wrapper
@@ -357,6 +363,13 @@ describe('TaskType page', () => {
         .props('tasks')
         .map(t => t.id)
         .sort()
+
+    it('hides the tasks of the asset types outside the workflow', async () => {
+      await mountTasks('', {
+        isInAssetTypeWorkflow: () => assetTypeId => assetTypeId === 'chars'
+      })
+      expect(listedTaskIds()).toEqual(['task-10'])
+    })
 
     it('keeps the tasks of every status the URL selects', async () => {
       await mountTasks('?task_status_id=status-1,status-3')
@@ -1303,5 +1316,129 @@ describe('TaskType page', () => {
         expect(paths).toEqual([base, `${base}/schedule`, `${base}/estimation`])
       })
     })
+  })
+
+  describe('back link of the schedule tab', () => {
+    const routes = [
+      ...taskTypeRoutes,
+      {
+        name: 'schedule',
+        path: '/productions/:production_id/schedule',
+        component: Page
+      },
+      {
+        name: 'episode-schedule',
+        path: '/productions/:production_id/episodes/:episode_id/schedule',
+        component: Page
+      }
+    ]
+    let wrapper
+
+    afterEach(() => {
+      wrapper.unmount()
+      vi.useRealTimers()
+    })
+
+    const backPathOf = async (getters, path) => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      const mounted = await mountPage({ getters, path, routes })
+      wrapper = mounted.wrapper
+      const link = wrapper
+        .findAllComponents({ name: 'RouterLink' })
+        .find(routerLink => routerLink.classes('back-link'))
+      return mounted.router.resolve(link.props('to')).path
+    }
+
+    it('goes back to the schedule of the current episode', async () => {
+      const path = await backPathOf(
+        {
+          currentEpisode: () => ({ id: 'episode-1' }),
+          isTVShow: () => true
+        },
+        '/productions/production-1/episodes/episode-1/assets/task-types/task-type-1/schedule'
+      )
+      expect(path).toBe('/productions/production-1/episodes/episode-1/schedule')
+    })
+
+    it('goes back to all the episodes when none is set', async () => {
+      const path = await backPathOf(
+        { isTVShow: () => true },
+        '/productions/production-1/assets/task-types/task-type-1/schedule'
+      )
+      expect(path).toBe('/productions/production-1/episodes/all/schedule')
+    })
+
+    it('stays out of the episodes on a production without them', async () => {
+      const path = await backPathOf(
+        {},
+        '/productions/production-1/assets/task-types/task-type-1/schedule'
+      )
+      expect(path).toBe('/productions/production-1/schedule')
+    })
+  })
+})
+
+// The cells save at once, with no modal to tell a refusal.
+describe('TaskType page, cell saves', () => {
+  beforeEach(() => {
+    // the data load the page starts 100 ms after mounting is not under test
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  it.each([
+    ['refused', 400],
+    // Its row names the entity of the task, which may still stand.
+    ['on a task deleted meanwhile', 404]
+  ])('tells an estimation %s in the estimation tab', async (_, status) => {
+    const error = buildRefusal(status)
+    const { wrapper } = await mountPage({
+      actions: { updateTask: vi.fn(() => Promise.reject(error)) },
+      // The entity stores give each task the name of its entity.
+      getters: {
+        taskMap: () =>
+          new Map([[task.id, { ...task, entity_name: 'Props / Tree' }]])
+      }
+    })
+
+    wrapper
+      .findComponent(EstimationHelper)
+      .vm.$emit('estimation-changed', { taskId: 'task-1', estimation: 16 * 60 })
+    await flushPromises()
+
+    expect(wrapper.findComponent(ErrorText).props('text')).toBe(
+      'main.cell_save_error {"name":"Props / Tree"}'
+    )
+    expect(console.error).toHaveBeenCalledWith(error)
+    wrapper.unmount()
+  })
+
+  // The row of the task list holds the schedule beside the rows.
+  it('shows above the task list the refused cell save it tells', async () => {
+    const TaskListStub = {
+      name: 'TaskList',
+      template: '<div />',
+      data: () => ({ cellSaveErrorText: 'main.cells_save_error' }),
+      methods: { resetSelection: () => {} }
+    }
+    const { wrapper } = await mountPage({
+      section: 'tasks',
+      stubs: { TaskList: TaskListStub }
+    })
+
+    expect(wrapper.findComponent(ErrorText).props('text')).toBe(
+      'main.cells_save_error'
+    )
+
+    wrapper.findComponent(TaskListStub).vm.cellSaveErrorText = ''
+    await nextTick()
+
+    expect(wrapper.findComponent(ErrorText).exists()).toBe(false)
+    wrapper.unmount()
   })
 })

@@ -1710,6 +1710,73 @@ describe('TaskInfo.vue', () => {
     })
   })
 
+  // The panel asks the player again once the refresh is back: a text may be
+  // typed by then, and reloading the canvas under it ended the typing.
+  describe('preview-file:annotation-update', () => {
+    const previews = [
+      { id: 'preview-1', revision: 1, extension: 'mp4', previews: ['p-1'] }
+    ]
+
+    const emitAnnotationUpdate = async isValidPreviewModification => {
+      const player = {
+        isValidPreviewModification,
+        loadAnnotation: vi.fn(),
+        reloadAnnotations: vi.fn()
+      }
+      const { socket, store } = await mountPanel({
+        previews,
+        stubs: {
+          PreviewPlayer: {
+            props: ['canComment', 'fps', 'previews', 'readOnly'],
+            template: '<div />',
+            data: () => ({
+              currentPreview: { id: 'preview-1', task_id: TASK_ID },
+              notSaved: false
+            }),
+            methods: { focus: () => {}, setCurrentFrame: () => {}, ...player }
+          }
+        }
+      })
+      const [, onRemoteAnnotationUpdate] = socket.on.mock.calls.find(
+        ([event]) => event === 'preview-file:annotation-update'
+      )
+      onRemoteAnnotationUpdate({
+        preview_file_id: 'preview-1',
+        updated_at: '2026-11-03T10:00:00'
+      })
+      await flushPromises()
+      return { player, store }
+    }
+
+    it('reloads the annotations another user saved', async () => {
+      const { player, store } = await emitAnnotationUpdate(() => true)
+
+      expect(store.dispatch).toHaveBeenCalledWith('refreshPreview', {
+        previewId: 'preview-1',
+        taskId: TASK_ID
+      })
+      expect(player.reloadAnnotations).toHaveBeenCalled()
+      expect(player.loadAnnotation).toHaveBeenCalled()
+    })
+
+    it('keeps the canvas when the player refuses the refreshed update', async () => {
+      const isValid = vi.fn().mockReturnValueOnce(true).mockReturnValue(false)
+      const { player, store } = await emitAnnotationUpdate(isValid)
+
+      expect(store.dispatch).toHaveBeenCalledWith(
+        'refreshPreview',
+        expect.anything()
+      )
+      expect(isValid).toHaveBeenCalledTimes(2)
+      expect(isValid).toHaveBeenLastCalledWith(
+        'preview-1',
+        '2026-11-03T10:00:00'
+      )
+      expect(player.reloadAnnotations).not.toHaveBeenCalled()
+      expect(player.loadAnnotation).not.toHaveBeenCalled()
+    })
+  })
+
   describe('full screen', () => {
     const previews = [
       { id: 'preview-1', revision: 1, extension: 'png', previews: ['p-1'] }
@@ -1846,6 +1913,84 @@ describe('TaskInfo.vue', () => {
       await flushPromises()
 
       expect(errorHandler).not.toHaveBeenCalled()
+    })
+
+    // Closing the attachment dialog aborts its signal: the player stops.
+    it('lets the attachment dialog stop the snapshots', async () => {
+      const { signal } = new AbortController()
+      const extractAnnotationSnapshots = vi.fn(() => Promise.resolve([]))
+      const { wrapper } = await mountPanel({
+        previews,
+        getterOverrides: {
+          currentUserRoleForProduction: () => () => 'manager'
+        },
+        stubs: {
+          AddComment: {
+            template: '<div />',
+            methods: {
+              hideAnnotationLoading: () => {},
+              setAnnotationSnapshots: () => {},
+              showAnnotationLoading: () => signal
+            }
+          },
+          PreviewPlayer: {
+            ...PlayerStub,
+            methods: { ...PlayerStub.methods, extractAnnotationSnapshots }
+          }
+        }
+      })
+
+      wrapper
+        .findComponent(AddComment)
+        .vm.$emit('annotation-snapshots-with-label-requested')
+      await flushPromises()
+
+      expect(extractAnnotationSnapshots).toHaveBeenCalledWith({
+        withLabel: true,
+        signal
+      })
+    })
+
+    // The snapshot buttons spin while the player takes the snapshots.
+    it('stops the snapshot loading when the snapshots fail', async () => {
+      const failure = new Error('drawImage failed')
+      const hideAnnotationLoading = vi.fn()
+      const setAnnotationSnapshots = vi.fn()
+      const { wrapper } = await mountPanel({
+        previews,
+        getterOverrides: {
+          currentUserRoleForProduction: () => () => 'manager'
+        },
+        stubs: {
+          AddComment: {
+            template: '<div />',
+            methods: {
+              hideAnnotationLoading,
+              setAnnotationSnapshots,
+              showAnnotationLoading: () => {}
+            }
+          },
+          PreviewPlayer: {
+            ...PlayerStub,
+            methods: {
+              ...PlayerStub.methods,
+              extractAnnotationSnapshots: () => Promise.reject(failure)
+            }
+          }
+        }
+      })
+      const errorHandler = vi.fn()
+      wrapper.vm.$.appContext.config.errorHandler = errorHandler
+
+      wrapper
+        .findComponent(AddComment)
+        .vm.$emit('annotation-snapshots-requested')
+      await flushPromises()
+
+      expect(hideAnnotationLoading).toHaveBeenCalledTimes(1)
+      expect(setAnnotationSnapshots).not.toHaveBeenCalled()
+      // Still reported, as a Vue error
+      expect(errorHandler.mock.calls[0][0]).toBe(failure)
     })
 
     it('logs an annotation refresh that fails', async () => {

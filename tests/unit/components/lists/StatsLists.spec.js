@@ -35,6 +35,7 @@ const mountList = (component, props = {}, getters = {}) => {
       displayedSequencesLength: () => 1,
       episodeSearchText: () => '',
       isCurrentUserClient: () => false,
+      isInAssetTypeWorkflow: () => () => true,
       isTVShow: () => false,
       sequenceSearchText: () => '',
       taskTypeMap: () => new Map(),
@@ -45,7 +46,6 @@ const mountList = (component, props = {}, getters = {}) => {
     props: { entries: [{ id: 'episode-1', name: 'E01' }], ...props },
     global: {
       plugins: [store],
-      mocks: { $t: key => key },
       stubs: { RouterLink: RouterLinkStub }
     }
   })
@@ -60,6 +60,23 @@ describe.each([
   test('puts no scope on data cells', () => {
     const wrapper = mountList(component, { ...props, showAll: true })
     expect(wrapper.findAll('td[scope]')).toHaveLength(0)
+  })
+})
+
+describe('lists/ProductionAssetTypeList, workflow', () => {
+  test('grays the cells of the task types outside the workflow', () => {
+    const wrapper = mountList(
+      ProductionAssetTypeList,
+      {
+        assetTypeStats: {},
+        entries: [{ id: 'chars', name: 'Characters' }],
+        validationColumns: ['modeling', 'rigging']
+      },
+      {
+        isInAssetTypeWorkflow: () => (_, columnId) => columnId === 'modeling'
+      }
+    )
+    expect(wrapper.findAll('td.disabled')).toHaveLength(1)
   })
 })
 

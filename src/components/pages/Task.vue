@@ -269,13 +269,12 @@
                       }"
                     >
                       <a
-                        :href="task.data[descriptor.field_name]"
+                        :href="linkForDescriptor(descriptor)"
                         target="_blank"
                         rel="noopener noreferrer"
                         v-if="
                           descriptor.data_type === 'url' &&
-                          task.data &&
-                          task.data[descriptor.field_name]
+                          linkForDescriptor(descriptor)
                         "
                       >
                         {{ task.data[descriptor.field_name] }}
@@ -513,6 +512,7 @@ import {
   getTaskTypePriorityOfProd,
   getTaskTypeWithUrl
 } from '@/lib/productions'
+import { safeUrl } from '@/lib/render'
 import { sortPeople } from '@/lib/sorting'
 import {
   formatDisplayDate as formatDisplayDateLib,
@@ -1077,6 +1077,10 @@ const getTaskMetadataValue = descriptor => {
 const personForDescriptor = descriptor =>
   personMap.value.get(task.value?.data?.[descriptor.field_name]) || null
 
+// The url field accepts any absolute URL, javascript: included.
+const linkForDescriptor = descriptor =>
+  safeUrl(task.value?.data?.[descriptor.field_name])
+
 // Functions (routing)
 // --------------------------------------------------------------------------
 function taskPath(targetTask, section = 'task') {
@@ -1621,14 +1625,21 @@ const onAnnotationChanged = async ({
 }
 
 const extractAnnotationSnapshots = async (withLabel = false) => {
-  addCommentRef.value.showAnnotationLoading(withLabel ? 'label' : 'standard')
-  const files = await previewPlayerRef.value.extractAnnotationSnapshots({
-    withLabel
-  })
-  // The page may have been left during the extraction.
-  addCommentRef.value?.setAnnotationSnapshots(files)
-  addCommentRef.value?.hideAnnotationLoading()
-  return files
+  // The attachment dialog stops the snapshots when it closes.
+  const signal = addCommentRef.value.showAnnotationLoading(
+    withLabel ? 'label' : 'standard'
+  )
+  try {
+    const files = await previewPlayerRef.value.extractAnnotationSnapshots({
+      withLabel,
+      signal
+    })
+    // The page may have been left during the extraction.
+    addCommentRef.value?.setAnnotationSnapshots(files)
+    return files
+  } finally {
+    addCommentRef.value?.hideAnnotationLoading()
+  }
 }
 
 const timeCodeClicked = ({ versionRevision, frame }) => {
@@ -1818,7 +1829,12 @@ const onAnnotationUpdate = eventData => {
         taskId: previewPlayerRef.value.currentPreview.task_id
       })
       .then(() => {
-        if (!previewPlayerRef.value.notSaved) {
+        // Asked again: a text may be typed, or a batch sent, by now.
+        const isStillValid = previewPlayerRef.value?.isValidPreviewModification(
+          eventData.preview_file_id,
+          eventData.updated_at
+        )
+        if (isStillValid) {
           taskPreviews.value = getCurrentTaskPreviews()
           nextTick(() => {
             previewPlayerRef.value.reloadAnnotations()

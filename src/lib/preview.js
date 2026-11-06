@@ -43,15 +43,6 @@ export const latestPreviewFileStatus = (olderStatus, newerStatus) =>
     ? olderStatus
     : newerStatus || olderStatus
 
-export const isFilePreview = extension =>
-  !isMoviePreview(extension) &&
-  !isPicturePreview(extension) &&
-  !isModelPreview(extension) &&
-  !isSoundPreview(extension) &&
-  !isPdfPreview(extension) &&
-  !isMarkdownPreview(extension) &&
-  !isDiffPreview(extension)
-
 // Format a preview revision for display, applying the project's
 // revision padding (a display-only setting; Zou stores the bare
 // integer). `revision_padding` is the minimum number of digits:
@@ -137,3 +128,23 @@ export const drawSnapshotTitle = (canvas, text) => {
   context.fillText(text, padding, canvas.height - stripHeight / 2)
   context.restore()
 }
+
+// A picture shown for a snapshot loads asynchronously. Resolves to true once
+// isSettled() is true, or to false after 10 s.
+export const waitForPicture = isSettled =>
+  new Promise(resolve => {
+    let poll = null
+    const deadline = setTimeout(() => {
+      clearTimeout(poll)
+      resolve(isSettled())
+    }, 10000)
+    const check = () => {
+      if (isSettled()) {
+        clearTimeout(deadline)
+        resolve(true)
+      } else {
+        poll = setTimeout(check, 50)
+      }
+    }
+    check()
+  })

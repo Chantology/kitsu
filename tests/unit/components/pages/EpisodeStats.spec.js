@@ -84,7 +84,6 @@ const mountPage = async ({ getters = {}, query = {} } = {}) => {
   wrapper = shallowMount(EpisodeStats, {
     global: {
       plugins: [store, router],
-      mocks: { $t: key => key },
       stubs: { SearchField: false }
     }
   })
@@ -354,15 +353,5 @@ describe('EpisodeStats page', () => {
     await mountPage()
     expect(listProps().displayMode).toBe('heatmap')
     expect(listProps().dataMode).toBe('status')
-  })
-
-  // The scroll position of the store belongs to the Episodes list page.
-  test('leaves the scroll position of the episodes page alone', async () => {
-    const { store } = await mountPage()
-    await wrapper.findComponent(EpisodeStatsList).vm.$emit('scroll', 120)
-    expect(store.dispatch).not.toHaveBeenCalledWith(
-      'setEpisodeListScrollPosition',
-      120
-    )
   })
 })

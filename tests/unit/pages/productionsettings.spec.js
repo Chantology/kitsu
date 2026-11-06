@@ -47,6 +47,7 @@ const mountWithAssetTypes = async (assetTypeIds, path = '/settings') => {
         task_statuses: []
       }),
       isCurrentUserProductionManager: () => true,
+      productionAssetTaskTypes: () => [],
       productionTaskStatuses: () => [],
       taskStatus: () => [],
       // Mirrors the real getter: an empty asset_types means "all".
@@ -62,7 +63,6 @@ const mountWithAssetTypes = async (assetTypeIds, path = '/settings') => {
   return shallowMount(ProductionSettings, {
     global: {
       plugins: [store, router],
-      mocks: { $t: key => key },
       // The menu and the tabs render through the layout
       stubs: { SettingsLayout: false }
     }
@@ -85,6 +85,16 @@ describe('ProductionSettings — asset types tab', () => {
     expect(
       wrapper.findComponent(AssetTypeSettings).props('assetTypes')
     ).toEqual([{ id: 'at-2', name: 'Prop' }])
+  })
+})
+
+describe('ProductionSettings — tab widths', () => {
+  it('lets the board and automation tabs fill the page', async () => {
+    const wrapper = await mountWithAssetTypes([])
+
+    expect(
+      wrapper.findAll('.tab.is-full h2.subtitle').map(title => title.text())
+    ).toEqual(['board.settings.title', 'status_automations.title'])
   })
 })
 
@@ -113,6 +123,7 @@ const mountWithTaskStatuses = async (taskStatusIds, { errorHandler } = {}) => {
   const store = createStore({
     state: { taskStatusIds },
     getters: {
+      productionAssetTaskTypes: () => [],
       assetTypes: () => [],
       currentProduction: state => ({
         id: 'prod-1',
@@ -139,7 +150,6 @@ const mountWithTaskStatuses = async (taskStatusIds, { errorHandler } = {}) => {
     global: {
       config: { errorHandler },
       plugins: [store, router],
-      mocks: { $t: key => key },
       stubs: { draggable: false, SettingsLayout: false }
     }
   })
